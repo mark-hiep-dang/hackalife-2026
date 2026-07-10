@@ -3,7 +3,7 @@ import { translations } from '../translations';
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, language }) {
   const t = translations[language];
 
-  if (!profile) return <div style={{ padding: '24px', textAlign: 'center' }}>Loading dossier...</div>;
+  if (!profile) return <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading dossier...</div>;
 
   // Level progress calculations
   const xp = profile.xp || 0;
@@ -25,13 +25,13 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
   );
 
   const CheckIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12"></polyline>
     </svg>
   );
 
   const FireIcon = () => (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#ef4444' }}>
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#ffffff' }}>
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
     </svg>
   );
@@ -46,12 +46,12 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
     </svg>
   );
 
-  // Badge list data mapping
+  // Badge definitions
   const badgeDefinitions = [
-    { id: 'first_lesson', label: t.badge_first_lesson, desc: t.desc_badge_first_lesson, color: '#f97316', icon: '🔫' },
-    { id: 'streak_3', label: t.badge_streak_3, desc: t.desc_badge_streak_3, color: '#fbbf24', icon: '🎯' },
+    { id: 'first_lesson', label: t.badge_first_lesson, desc: t.desc_badge_first_lesson, color: 'var(--primary)', icon: '🔫' },
+    { id: 'streak_3', label: t.badge_streak_3, desc: t.desc_badge_streak_3, color: 'var(--warning)', icon: '🎯' },
     { id: 'streak_7', label: t.badge_streak_7, desc: t.desc_badge_streak_7, color: '#ef4444', icon: '🔥' },
-    { id: 'pang_sniper', label: t.badge_pang_sniper, desc: t.desc_badge_pang_sniper, color: '#10b981', icon: '💥' },
+    { id: 'pang_sniper', label: t.badge_pang_sniper, desc: t.desc_badge_pang_sniper, color: 'var(--success)', icon: '💥' },
     { id: 'topic_master', label: t.badge_topic_master, desc: t.desc_badge_topic_master, color: '#8b5cf6', icon: '🎖' },
     { id: 'xp_1000', label: t.badge_xp_1000, desc: t.desc_badge_xp_1000, color: '#ec4899', icon: '👑' }
   ];
@@ -66,35 +66,33 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
         <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
             <div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: 800 }}>{t.statsTitle}</h2>
+              <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-dark)' }}>{t.statsTitle}</h2>
               <p style={{ color: 'var(--text-muted)' }}>{t.welcomeUser}, <strong style={{ color: 'var(--text-main)' }}>{profile.username}</strong></p>
             </div>
             
-            {/* Streak Indicator */}
+            {/* Streak Indicator (Duolingo style yellow tactile badge) */}
             <div className="streak-badge" style={{
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
-              padding: '10px 18px',
-              borderRadius: '12px',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              background: 'rgba(239, 68, 68, 0.08)'
+              padding: '10px 20px',
+              borderRadius: '14px'
             }}>
               <FireIcon />
               <div>
-                <span style={{ fontSize: '0.8rem', color: '#fca5a5', display: 'block', fontWeight: 500 }}>{t.streakLabel}</span>
-                <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>{profile.streak || 0} {language === 'vn' ? 'ngày' : 'days'}</span>
+                <span style={{ fontSize: '0.75rem', color: '#fffdf0', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>{t.streakLabel}</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff' }}>{profile.streak || 0} {language === 'vn' ? 'ngày' : 'days'}</span>
               </div>
             </div>
           </div>
 
           {/* XP & Level progress bar */}
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+          <div style={{ borderTop: '2px solid var(--border-color)', paddingTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.95rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>
-                {t.levelLabel}: <strong style={{ color: 'var(--primary)' }}>Lvl {level}</strong>
+              <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>
+                {t.levelLabel}: <strong style={{ color: 'var(--info)' }}>Lvl {level}</strong>
               </span>
-              <span style={{ color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>
                 {xp} / {nextLevelThreshold} XP
               </span>
             </div>
@@ -102,35 +100,32 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
             {/* Custom progress bar */}
             <div style={{
               height: '16px',
-              background: 'rgba(15, 23, 42, 0.8)',
-              border: '1px solid var(--border-color)',
+              background: '#e5e5e5',
               borderRadius: '99px',
-              overflow: 'hidden',
-              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)'
+              overflow: 'hidden'
             }}>
               <div style={{
                 width: `${progressPercent}%`,
                 height: '100%',
-                background: 'linear-gradient(to right, var(--primary) 0%, #facc15 100%)',
-                boxShadow: '0 0 10px var(--primary-glow)',
+                background: 'var(--success)',
                 borderRadius: '99px',
                 transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
               }} />
             </div>
             
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px', fontWeight: 500 }}>
               {profile.streak > 0 ? t.streakActive : t.streakBroken}
             </p>
           </div>
         </div>
       </div>
 
-      {/* SECTION 2: Split Roadmaps & Badges Panel */}
+      {/* SECTION 2: Roadmaps & Badges */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
         
         {/* Topic Roadmap */}
         <div>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '18px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: '18px', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>📖</span> {t.lessonsProgress}
           </h3>
           
@@ -146,32 +141,33 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   opacity: isLocked ? 0.6 : 1,
-                  borderLeft: isCompleted 
-                    ? '4px solid var(--success)' 
+                  borderLeftWidth: '8px',
+                  borderLeftColor: isCompleted 
+                    ? 'var(--success)' 
                     : isLocked 
-                      ? '4px solid #64748b' 
-                      : '4px solid var(--primary)',
-                  background: isLocked ? 'rgba(15, 23, 42, 0.4)' : 'var(--bg-card)'
+                      ? '#ccd0d4' 
+                      : 'var(--primary)',
+                  background: isLocked ? '#f1f3f5' : '#ffffff'
                 }}>
                   <div style={{ flex: 1, paddingRight: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                       <span style={{
                         fontSize: '0.75rem',
                         textTransform: 'uppercase',
-                        fontWeight: 700,
+                        fontWeight: 800,
                         letterSpacing: '0.5px',
-                        color: isCompleted ? 'var(--success)' : isLocked ? '#94a3b8' : 'var(--primary)'
+                        color: isCompleted ? 'var(--success)' : isLocked ? '#777' : 'var(--primary)'
                       }}>
                         {lesson.topic} • {lesson.difficulty}
                       </span>
                       {isCompleted && (
                         <span style={{
-                          background: 'rgba(16, 185, 129, 0.15)',
+                          background: 'rgba(88, 204, 2, 0.1)',
                           color: 'var(--success)',
                           fontSize: '0.75rem',
                           padding: '2px 8px',
                           borderRadius: '99px',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px'
@@ -181,12 +177,12 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
                       )}
                     </div>
                     
-                    <h4 style={{ fontSize: '1.2rem', fontWeight: 700, color: isLocked ? 'var(--text-muted)' : 'var(--text-main)' }}>
+                    <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: isLocked ? 'var(--text-muted)' : 'var(--text-dark)' }}>
                       {language === 'vn' ? lesson.title_vn : lesson.title_en}
                     </h4>
                     
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {isLocked ? t.lockedLesson : `${JSON.parse(JSON.stringify(lesson.cards)).length} ${language === 'vn' ? 'thẻ ôn tập' : 'flashcards'}`}
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 500 }}>
+                      {isLocked ? t.lockedLesson : `${JSON.parse(JSON.stringify(lesson.cards)).length} ${language === 'vn' ? 'thẻ học' : 'flashcards'}`}
                     </p>
                   </div>
 
@@ -195,13 +191,13 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
                       <div style={{
                         width: '42px',
                         height: '42px',
-                        borderRadius: '50%',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid var(--border-color)',
+                        borderRadius: '12px',
+                        background: '#e5e5e5',
+                        border: '2px solid #d0d0d0',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--text-muted)'
+                        color: '#888'
                       }}>
                         <PadlockIcon />
                       </div>
@@ -209,7 +205,7 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
                       <button
                         onClick={() => onSelectLesson(lesson)}
                         className="btn-primary"
-                        style={{ padding: '10px 18px', fontSize: '0.9rem' }}
+                        style={{ padding: '10px 20px', fontSize: '0.85rem' }}
                       >
                         {t.startLessonBtn}
                       </button>
@@ -223,7 +219,7 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
 
         {/* Badges Cabinet */}
         <div>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '18px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: '18px', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <TrophyIcon /> {t.badgesTitle}
           </h3>
 
@@ -237,32 +233,31 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
 
               return (
                 <div key={badge.id} className="glass-panel" style={{
-                  padding: '16px 12px',
+                  padding: '20px 12px',
                   textAlign: 'center',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '8px',
-                  background: isUnlocked ? 'rgba(22, 30, 49, 0.85)' : 'rgba(15, 23, 42, 0.4)',
-                  borderColor: isUnlocked ? badge.color : 'rgba(255,255,255,0.04)',
+                  background: isUnlocked ? '#ffffff' : '#f1f3f5',
+                  borderColor: isUnlocked ? badge.color : 'var(--border-color)',
+                  borderBottomWidth: isUnlocked ? '6px' : '2px',
                   filter: isUnlocked ? 'none' : 'grayscale(100%)',
-                  boxShadow: isUnlocked ? `0 4px 18px -4px ${badge.color}60` : 'none'
+                  opacity: isUnlocked ? 1 : 0.6
                 }}>
                   <span style={{
-                    fontSize: '2.2rem',
+                    fontSize: '2.4rem',
                     marginBottom: '4px',
-                    display: 'block',
-                    animation: isUnlocked ? 'pulseGlow 2s infinite alternate' : 'none',
-                    borderRadius: '50%'
+                    display: 'block'
                   }}>
                     {badge.icon}
                   </span>
                   
-                  <h5 style={{ fontSize: '0.9rem', fontWeight: 700, color: isUnlocked ? '#fff' : 'var(--text-muted)' }}>
+                  <h5 style={{ fontSize: '0.9rem', fontWeight: 800, color: isUnlocked ? 'var(--text-dark)' : 'var(--text-muted)' }}>
                     {badge.label}
                   </h5>
                   
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: '1.2' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.3', fontWeight: 500 }}>
                     {badge.desc}
                   </p>
                 </div>

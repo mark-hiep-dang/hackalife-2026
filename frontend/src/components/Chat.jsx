@@ -23,12 +23,11 @@ export default function Chat({ language }) {
 
   const messagesEndRef = useRef(null);
 
-  // Auto scroll to bottom of chat
+  // Auto scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  // Test Llama connection on load
   useEffect(() => {
     checkLlamaConnection();
   }, [ollamaUrl]);
@@ -58,13 +57,9 @@ export default function Chat({ language }) {
     setLoading(true);
 
     try {
-      // Map message history to send to backend API
-      const history = messages.slice(-6); // last 6 messages
+      const history = messages.slice(-6);
       const reply = await sendChatMessage(text, history);
-      
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-      
-      // Play a quick synth sound on response
       playPang();
     } catch (err) {
       setMessages(prev => [...prev, {
@@ -77,7 +72,6 @@ export default function Chat({ language }) {
     }
   }
 
-  // Pre-configured quick suggestions
   const suggestions = [
     { label_en: "⏱️ Grace Period", label_vn: "⏱️ Gia hạn đóng phí", prompt: "Explain the 60-day grace period in Vietnam insurance contract law." },
     { label_en: "👁️ Free Look", label_vn: "👁️ 21 ngày cân nhắc", prompt: "Explain the 21-day free look period for life insurance." },
@@ -85,12 +79,11 @@ export default function Chat({ language }) {
     { label_en: "⚖️ Insurable Interest", label_vn: "⚖️ Quyền lợi bảo hiểm", prompt: "What is the Principle of Insurable Interest in simple terms?" }
   ];
 
-  // Helper to parse markdown-like bold (**text**) in chatbot answers
   function parseMessageContent(content) {
     const parts = content.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} style={{ color: '#fff', fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+        return <strong key={i} style={{ color: 'var(--text-dark)', fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
       }
       return part;
     });
@@ -105,7 +98,7 @@ export default function Chat({ language }) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        background: 'rgba(15, 23, 42, 0.4)'
+        background: '#ffffff'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{
@@ -113,10 +106,9 @@ export default function Chat({ language }) {
             height: '10px',
             borderRadius: '50%',
             background: isLlamaOnline ? 'var(--success)' : '#ef4444',
-            boxShadow: isLlamaOnline ? '0 0 10px var(--success-glow)' : '0 0 10px rgba(239, 68, 68, 0.6)',
             display: 'inline-block'
           }} />
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
             {isLlamaOnline ? t.statusConnected : t.statusFallback}
           </span>
         </div>
@@ -126,10 +118,10 @@ export default function Chat({ language }) {
           style={{
             background: 'none',
             border: 'none',
-            color: 'var(--primary)',
+            color: 'var(--info)',
             fontSize: '0.85rem',
             cursor: 'pointer',
-            fontWeight: 600,
+            fontWeight: 700,
             textDecoration: 'underline'
           }}
         >
@@ -137,10 +129,10 @@ export default function Chat({ language }) {
         </button>
       </div>
 
-      {/* Config Panel Drawer */}
+      {/* Config Drawer */}
       {showConfig && (
         <form onSubmit={handleSaveConfig} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
             {t.connectionConfig}
           </label>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -159,16 +151,15 @@ export default function Chat({ language }) {
         </form>
       )}
 
-      {/* Chat Display Container */}
+      {/* Chat Frame */}
       <div className="glass-panel" style={{
         height: '420px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
         overflow: 'hidden'
       }}>
-        {/* Messages History List */}
+        {/* Messages */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
@@ -190,9 +181,9 @@ export default function Chat({ language }) {
                   <span style={{
                     width: '32px',
                     height: '32px',
-                    borderRadius: '50%',
-                    background: 'rgba(249, 115, 22, 0.1)',
-                    border: '1px solid var(--primary)',
+                    borderRadius: '10px',
+                    background: 'rgba(28, 176, 246, 0.1)',
+                    border: '2px solid var(--info-dark)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -205,16 +196,17 @@ export default function Chat({ language }) {
                 
                 <div style={{
                   maxWidth: '75%',
-                  background: isUser ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-                  border: isUser ? 'none' : '1px solid var(--border-color)',
-                  color: '#fff',
+                  background: isUser ? 'var(--primary)' : '#f1f3f5',
+                  border: isUser ? '2px solid var(--primary-dark)' : '2px solid #e5e5e5',
+                  color: isUser ? '#ffffff' : 'var(--text-main)',
                   borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   padding: '12px 16px',
                   fontSize: '0.95rem',
                   lineHeight: '1.45',
+                  fontWeight: 500,
                   whiteSpace: 'pre-wrap'
                 }}>
-                  {parseMessageContent(msg.content)}
+                  {isUser ? msg.content : parseMessageContent(msg.content)}
                 </div>
               </div>
             );
@@ -225,9 +217,9 @@ export default function Chat({ language }) {
               <span style={{
                 width: '32px',
                 height: '32px',
-                borderRadius: '50%',
-                background: 'rgba(249, 115, 22, 0.1)',
-                border: '1px solid var(--primary)',
+                borderRadius: '10px',
+                background: 'rgba(28, 176, 246, 0.1)',
+                border: '2px solid var(--info-dark)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -236,12 +228,13 @@ export default function Chat({ language }) {
                 🦙
               </span>
               <div style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid var(--border-color)',
+                background: '#f1f3f5',
+                border: '2px solid #e5e5e5',
                 borderRadius: '12px',
                 padding: '10px 16px',
                 fontSize: '0.9rem',
-                color: 'var(--text-muted)'
+                color: 'var(--text-muted)',
+                fontWeight: 500
               }}>
                 {t.aiThinking}
               </div>
@@ -252,12 +245,12 @@ export default function Chat({ language }) {
 
         {/* Suggestion Chips */}
         <div style={{
-          padding: '8px 12px',
-          borderTop: '1px solid var(--border-color)',
+          padding: '10px 12px',
+          borderTop: '2px solid var(--border-color)',
           display: 'flex',
           gap: '8px',
           overflowX: 'auto',
-          background: 'rgba(0,0,0,0.1)'
+          background: '#f7f9fa'
         }}>
           {suggestions.map((s, idx) => (
             <button
@@ -265,11 +258,12 @@ export default function Chat({ language }) {
               onClick={() => handleSendMessage(s.prompt)}
               className="btn-secondary"
               style={{
-                padding: '6px 12px',
+                padding: '8px 14px',
                 borderRadius: '20px',
                 fontSize: '0.75rem',
                 whiteSpace: 'nowrap',
-                fontWeight: 500
+                fontWeight: 700,
+                borderBottomWidth: '4px'
               }}
             >
               {language === 'vn' ? s.label_vn : s.label_en}
@@ -278,15 +272,16 @@ export default function Chat({ language }) {
         </div>
       </div>
 
-      {/* Input Panel Bar */}
+      {/* Input controls */}
       <div style={{ display: 'flex', gap: '12px' }}>
         <button
           onClick={() => handleSendMessage(language === 'vn' ? 'Đố tôi một câu hỏi ôn thi chứng chỉ bảo hiểm' : 'Quiz me with an insurance certificate question')}
           className="btn-primary"
           style={{
             whiteSpace: 'nowrap',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+            background: 'var(--success)',
+            border: '2px solid var(--success-dark)',
+            borderBottom: '6px solid var(--success-dark)'
           }}
           disabled={loading}
         >

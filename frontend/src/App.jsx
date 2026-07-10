@@ -188,15 +188,15 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {profile && (
               <div style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--border-color)',
-                padding: '6px 12px',
-                borderRadius: '8px',
+                background: '#ffffff',
+                border: '2px solid var(--border-color)',
+                padding: '6px 14px',
+                borderRadius: '12px',
                 fontSize: '0.85rem',
-                fontWeight: 600,
-                color: 'var(--text-muted)'
+                fontWeight: 700,
+                color: 'var(--text-main)'
               }}>
-                ⭐ <strong style={{ color: 'var(--success)' }}>{profile.xp} XP</strong> | Lvl <strong style={{ color: 'var(--primary)' }}>{profile.level}</strong>
+                ⭐ <strong style={{ color: 'var(--success-dark)' }}>{profile.xp} XP</strong> | Lvl <strong style={{ color: 'var(--info-dark)' }}>{profile.level}</strong>
               </div>
             )}
 
@@ -208,16 +208,19 @@ export default function App() {
                 setMuteState(nextMuted);
               }}
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--border-color)',
-                width: '34px',
-                height: '34px',
-                borderRadius: '8px',
+                background: '#ffffff',
+                border: '2px solid var(--border-color)',
+                borderBottom: '4px solid var(--border-color)',
+                width: '38px',
+                height: '38px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                color: 'var(--text-main)',
+                transition: 'all 0.05s ease'
               }}
               title={muted ? "Unmute" : "Mute"}
             >
@@ -228,14 +231,17 @@ export default function App() {
             <button
               onClick={() => setLanguage(language === 'vn' ? 'en' : 'vn')}
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--border-color)',
-                padding: '6px 10px',
-                borderRadius: '8px',
+                background: '#ffffff',
+                border: '2px solid var(--border-color)',
+                borderBottom: '4px solid var(--border-color)',
+                padding: '6px 12px',
+                height: '38px',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 fontSize: '0.85rem',
-                fontWeight: 700,
-                color: '#fff'
+                fontWeight: 800,
+                color: 'var(--text-main)',
+                transition: 'all 0.05s ease'
               }}
             >
               {language === 'vn' ? 'EN' : 'VN'}
