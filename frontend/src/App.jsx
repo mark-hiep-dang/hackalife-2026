@@ -130,7 +130,7 @@ export default function App() {
             <button
               onClick={() => setLanguage(language === 'vn' ? 'en' : 'vn')}
               className="btn-secondary"
-              style={{ padding: '8px 14px', fontSize: '0.85rem' }}
+              style={{ padding: '8px 16px', fontSize: '0.825rem' }}
             >
               🌐 {language === 'vn' ? 'English' : 'Tiếng Việt'}
             </button>
@@ -145,7 +145,7 @@ export default function App() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       {/* 1. APP NAVIGATION HEADER */}
-      <header className="app-header glass-panel" style={{ borderRadius: '0', borderLeft: 'none', borderRight: 'none', borderTop: 'none' }}>
+      <header className="app-header">
         <div className="header-container">
           <div className="brand" onClick={() => { setActiveLesson(null); setActiveTab('home'); }}>
             Pằng Chíu Á! 🎯
@@ -185,22 +185,25 @@ export default function App() {
           </nav>
 
           {/* Quick Stats & Toggles */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {profile && (
               <div style={{
-                background: '#ffffff',
-                border: '2px solid var(--border-color)',
+                background: 'var(--bg-subtle)',
                 padding: '6px 14px',
-                borderRadius: '12px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                color: 'var(--text-main)'
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}>
-                ⭐ <strong style={{ color: 'var(--success-dark)' }}>{profile.xp} XP</strong> | Lvl <strong style={{ color: 'var(--info-dark)' }}>{profile.level}</strong>
+                <span style={{ color: 'var(--success-dark)', fontWeight: 700 }}>{profile.xp} XP</span>
+                <span style={{ color: 'var(--text-muted)' }}>·</span>
+                <span style={{ color: 'var(--info-dark)', fontWeight: 700 }}>Lvl {profile.level}</span>
               </div>
             )}
 
-            {/* Quick Mute Toggle */}
             <button
               onClick={() => {
                 const nextMuted = !muted;
@@ -208,40 +211,37 @@ export default function App() {
                 setMuteState(nextMuted);
               }}
               style={{
-                background: '#ffffff',
-                border: '2px solid var(--border-color)',
-                borderBottom: '4px solid var(--border-color)',
-                width: '38px',
-                height: '38px',
-                borderRadius: '12px',
+                background: 'var(--bg-subtle)',
+                border: '1px solid var(--border-color)',
+                width: '34px',
+                height: '34px',
+                borderRadius: 'var(--radius-sm)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1rem',
-                color: 'var(--text-main)',
-                transition: 'all 0.05s ease'
+                fontSize: '0.875rem',
+                color: 'var(--text-secondary)',
+                transition: 'all var(--transition)'
               }}
               title={muted ? "Unmute" : "Mute"}
             >
               {muted ? '🔇' : '🔊'}
             </button>
 
-            {/* Quick Language Toggle */}
             <button
               onClick={() => setLanguage(language === 'vn' ? 'en' : 'vn')}
               style={{
-                background: '#ffffff',
-                border: '2px solid var(--border-color)',
-                borderBottom: '4px solid var(--border-color)',
+                background: 'var(--bg-subtle)',
+                border: '1px solid var(--border-color)',
                 padding: '6px 12px',
-                height: '38px',
-                borderRadius: '12px',
+                height: '34px',
+                borderRadius: 'var(--radius-sm)',
                 cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: 800,
-                color: 'var(--text-main)',
-                transition: 'all 0.05s ease'
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: 'var(--text-secondary)',
+                transition: 'all var(--transition)'
               }}
             >
               {language === 'vn' ? 'EN' : 'VN'}
@@ -305,17 +305,8 @@ export default function App() {
           if (eff.type === 'pang') {
             return (
               <div key={eff.id}>
-                {/* Ripple Circle */}
-                <div
-                  className="pang-ripple"
-                  style={{ left: `${eff.x}px`, top: `${eff.y}px` }}
-                />
-                {/* Target Flash */}
-                <div
-                  className="pang-target"
-                  style={{ left: `${eff.x}px`, top: `${eff.y}px` }}
-                />
-                {/* Spark Particles */}
+                <div className="pang-ripple" style={{ left: `${eff.x}px`, top: `${eff.y}px` }} />
+                <div className="pang-target" style={{ left: `${eff.x}px`, top: `${eff.y}px` }} />
                 {eff.sparks.map((spark, sIdx) => (
                   <div
                     key={sIdx}
@@ -333,24 +324,8 @@ export default function App() {
           } else if (eff.type === 'chiu') {
             return (
               <div key={eff.id}>
-                {/* Bullet Whizzing */}
-                <div
-                  className="chiu-line"
-                  style={{
-                    top: `${eff.y}px`,
-                    '--angle': eff.angle
-                  }}
-                />
-                {/* Smoke Puff */}
-                <div
-                  className="chiu-dust"
-                  style={{
-                    left: `${eff.x}px`,
-                    top: `${eff.y}px`,
-                    '--dx': eff.dx,
-                    '--dy': eff.dy
-                  }}
-                />
+                <div className="chiu-line" style={{ top: `${eff.y}px`, '--angle': eff.angle }} />
+                <div className="chiu-dust" style={{ left: `${eff.x}px`, top: `${eff.y}px`, '--dx': eff.dx, '--dy': eff.dy }} />
               </div>
             );
           }

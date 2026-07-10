@@ -43,42 +43,43 @@ export default function Auth({ setSession, language }) {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      minHeight: '80vh',
+      minHeight: '70vh',
       padding: '16px'
     }}>
-      <div className="glass-panel" style={{
+      <div className="glass-panel fade-in" style={{
         width: '100%',
-        maxWidth: '420px',
-        padding: '32px',
-        borderTop: '3px solid var(--primary)'
+        maxWidth: '400px',
+        padding: '36px 32px'
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '8px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🎯</div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '6px', color: 'var(--text-dark)', letterSpacing: '-0.03em' }}>
             {isRegister ? t.registerTitle : t.loginTitle}
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
             {t.tagline}
           </p>
         </div>
 
         {error && (
-          <div className="glass-panel-glow-red" style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            padding: '12px',
-            borderRadius: '10px',
-            color: '#f87171',
-            fontSize: '0.9rem',
+          <div style={{
+            background: 'var(--primary-subtle)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--danger)',
+            fontSize: '0.85rem',
             marginBottom: '20px',
             textAlign: 'center',
-            border: '1px solid rgba(239, 68, 68, 0.2)'
+            fontWeight: 500
           }}>
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               {t.usernameLabel}
             </label>
             <input
@@ -93,7 +94,7 @@ export default function Auth({ setSession, language }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               {t.passwordLabel}
             </label>
             <input
@@ -107,12 +108,12 @@ export default function Auth({ setSession, language }) {
             />
           </div>
 
-          <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%', marginTop: '10px', padding: '16px' }}>
+          <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%', marginTop: '8px', padding: '14px' }}>
             {loading ? 'Processing...' : (isRegister ? t.registerBtn : t.loginBtn)}
           </button>
         </form>
 
-        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.9rem' }}>
+        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.85rem' }}>
           <span style={{ color: 'var(--text-muted)' }}>
             {isRegister ? t.hasAccount : t.noAccount}{' '}
           </span>
@@ -127,7 +128,7 @@ export default function Auth({ setSession, language }) {
               color: 'var(--primary)',
               fontWeight: 600,
               cursor: 'pointer',
-              textDecoration: 'underline'
+              textDecoration: 'none'
             }}
           >
             {isRegister ? t.switchLogin : t.switchRegister}

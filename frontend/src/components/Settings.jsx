@@ -30,22 +30,24 @@ export default function Settings({ profile, setSession, language, setLanguage, o
   }
 
   return (
-    <div style={{ maxWidth: '540px', margin: '0 auto' }}>
+    <div className="fade-in" style={{ maxWidth: '520px', margin: '0 auto' }}>
       
-      <div className="glass-panel" style={{ padding: '32px', borderTop: '3px solid var(--primary)' }}>
-        <h2 style={{ fontSize: '1.7rem', fontWeight: 800, textAlign: 'center', marginBottom: '24px' }}>
+      <div className="glass-panel" style={{ padding: '32px 28px' }}>
+        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, textAlign: 'center', marginBottom: '24px', letterSpacing: '-0.03em', color: 'var(--text-dark)' }}>
           ⚙️ {t.navSettings}
         </h2>
 
         {message && (
-          <div className="glass-panel-glow-green" style={{
-            background: 'rgba(16, 185, 129, 0.05)',
-            padding: '12px',
-            color: 'var(--success)',
-            borderRadius: '10px',
+          <div style={{
+            background: 'var(--success-subtle)',
+            border: '1px solid rgba(34,197,94,0.2)',
+            padding: '10px 14px',
+            color: 'var(--success-dark)',
+            borderRadius: 'var(--radius-sm)',
             marginBottom: '20px',
             fontSize: '0.85rem',
-            textAlign: 'center'
+            textAlign: 'center',
+            fontWeight: 500
           }}>
             {message}
           </div>
@@ -53,12 +55,12 @@ export default function Settings({ profile, setSession, language, setLanguage, o
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Language selection */}
+          {/* Language */}
           <div>
-            <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-              🌐 {language === 'vn' ? 'Ngôn Ngữ Học Tập:' : 'Bilingual Study Language:'}
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              🌐 {language === 'vn' ? 'Ngôn Ngữ Học Tập:' : 'Study Language:'}
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <button
                 onClick={() => setLanguage('en')}
                 className={language === 'en' ? 'btn-primary' : 'btn-secondary'}
@@ -78,37 +80,32 @@ export default function Settings({ profile, setSession, language, setLanguage, o
 
           <div style={{ borderTop: '1px solid var(--border-color)' }} />
 
-          {/* Sound Toggle */}
+          {/* Sound */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <strong style={{ fontSize: '1rem', color: '#fff', display: 'block' }}>
-                🔊 {language === 'vn' ? 'Hiệu Ứng Âm Thanh Pằng/Chíu:' : 'Gunshot Sound Effects:'}
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text-dark)', display: 'block' }}>
+                🔊 {language === 'vn' ? 'Hiệu Ứng Âm Thanh' : 'Sound Effects'}
               </strong>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {language === 'vn' ? 'Tắt âm để tự học trong yên tĩnh' : 'Mute to study silently in public'}
+              <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
+                {language === 'vn' ? 'Tắt âm để tự học yên tĩnh' : 'Mute for silent study'}
               </span>
             </div>
 
             <button
               onClick={handleToggleMute}
               className={muted ? 'btn-secondary' : 'btn-success'}
-              style={{
-                padding: '10px 20px',
-                background: muted ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: '#fff',
-                fontWeight: 700
-              }}
+              style={{ padding: '8px 16px', fontSize: '0.85rem' }}
             >
-              {muted ? (language === 'vn' ? 'Đã Tắt 🔇' : 'Muted 🔇') : (language === 'vn' ? 'Bật 🔊' : 'Active 🔊')}
+              {muted ? (language === 'vn' ? 'Tắt 🔇' : 'Muted 🔇') : (language === 'vn' ? 'Bật 🔊' : 'Active 🔊')}
             </button>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border-color)' }} />
 
-          {/* Llama configuration settings */}
-          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Llama Config */}
+          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 🦙 {t.connectionConfig}
               </label>
               <input
@@ -125,18 +122,22 @@ export default function Settings({ profile, setSession, language, setLanguage, o
             </button>
           </form>
 
-          <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '8px' }} />
+          <div style={{ borderTop: '1px solid var(--border-color)' }} />
 
-          {/* Exit account buttons */}
+          {/* Logout */}
           <button
             onClick={handleLogout}
-            className="btn-secondary"
             style={{
               width: '100%',
-              padding: '14px',
-              color: '#f87171',
-              borderColor: 'rgba(239, 68, 68, 0.2)',
-              background: 'rgba(239, 68, 68, 0.03)'
+              padding: '12px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: 'var(--primary-subtle)',
+              color: 'var(--danger)',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              transition: 'all var(--transition)'
             }}
           >
             🚪 {t.logout}
