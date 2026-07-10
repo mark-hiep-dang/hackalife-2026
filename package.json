@@ -1,0 +1,16 @@
+{
+  "name": "hackalife-2026-root",
+  "version": "1.0.0",
+  "description": "Pằng Chíu Á: Gamified MOF Insurance Exam Preparation App",
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install-all": "npm install && npm run install:backend && npm run install:frontend",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
