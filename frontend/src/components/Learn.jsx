@@ -18,13 +18,8 @@ export default function Learn({ lesson, onLessonFinished, language }) {
     setSubmitting(true);
     setError('');
     try {
-      // Complete lesson API
       const result = await completeLesson(lesson.id);
-      
-      // Play celebratory gunshot!
       playPang();
-      
-      // Notify parent to update stats and return to base
       onLessonFinished(result.xp, result.level, result.newBadges);
     } catch (err) {
       setError(err.message || 'Failed to record completion');
@@ -32,171 +27,157 @@ export default function Learn({ lesson, onLessonFinished, language }) {
     }
   }
 
-  // Left & Right arrow icons for navigation
-  const LeftArrow = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  const ArrowLeft = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="19" y1="12" x2="5" y2="12"></line>
       <polyline points="12 19 5 12 12 5"></polyline>
     </svg>
   );
 
-  const RightArrow = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  const ArrowRight = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="5" y1="12" x2="19" y2="12"></line>
       <polyline points="12 5 19 12 12 19"></polyline>
     </svg>
   );
 
   return (
-    <div style={{ maxWidth: '640px', margin: '0 auto', padding: '16px 0' }}>
+    <div className="fade-in" style={{ maxWidth: '600px', margin: '0 auto', padding: '8px 0' }}>
       
-      {/* Top Header Card Info */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      {/* Top bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <button
-          onClick={() => onLessonFinished(null, null, [])} // exit without completing
+          onClick={() => onLessonFinished(null, null, [])}
           style={{
             background: 'none',
             border: 'none',
             color: 'var(--text-muted)',
             cursor: 'pointer',
-            fontSize: '0.95rem',
+            fontSize: '0.85rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '4px',
+            fontWeight: 500
           }}
         >
-          <LeftArrow /> {language === 'vn' ? 'Thoát học' : 'Exit Lesson'}
+          <ArrowLeft /> {language === 'vn' ? 'Thoát' : 'Exit'}
         </button>
 
-        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary)' }}>
+        <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
           {t.cardIndex.replace('{current}', currentIndex + 1).replace('{total}', cards.length)}
         </span>
       </div>
 
-      {/* Progressive study indicator */}
+      {/* Progress bar */}
       <div style={{
-        height: '6px',
-        background: 'rgba(255,255,255,0.03)',
+        height: '4px',
+        background: 'var(--bg-subtle)',
         borderRadius: '99px',
         overflow: 'hidden',
-        marginBottom: '28px'
+        marginBottom: '24px'
       }}>
         <div style={{
           width: `${progressPercent}%`,
           height: '100%',
-          background: 'linear-gradient(to right, var(--primary) 0%, var(--success) 100%)',
+          background: 'linear-gradient(90deg, var(--primary) 0%, #f97316 100%)',
           borderRadius: '99px',
           transition: 'width 0.3s ease'
         }} />
       </div>
 
       {error && (
-        <div className="glass-panel-glow-red" style={{ padding: '12px', color: '#f87171', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem', textAlign: 'center' }}>
-          ⚠️ {error}
+        <div style={{ background: 'var(--primary-subtle)', border: '1px solid rgba(239,68,68,0.15)', padding: '10px', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '16px', textAlign: 'center' }}>
+          {error}
         </div>
       )}
 
-      {/* Main Flashcard Container */}
+      {/* Flashcard */}
       <div className="glass-panel" style={{
-        padding: '36px 24px',
-        marginBottom: '32px',
-        minHeight: '340px',
+        padding: '32px 28px',
+        marginBottom: '24px',
+        minHeight: '320px',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        borderTop: '3px solid var(--primary)',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.5)'
+        justifyContent: 'space-between'
       }}>
         
-        {/* Flashcard Content */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          {/* Card Headers */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Header */}
           <div>
             <span style={{
-              fontSize: '0.75rem',
+              fontSize: '0.7rem',
               color: 'var(--primary)',
               textTransform: 'uppercase',
               fontWeight: 700,
-              letterSpacing: '1px',
+              letterSpacing: '0.05em',
               display: 'block',
-              marginBottom: '6px'
+              marginBottom: '8px'
             }}>
-              {lesson.topic} • {lesson.difficulty}
+              {lesson.topic} · {lesson.difficulty}
             </span>
-            <h2 style={{ fontSize: '1.7rem', fontWeight: 800, color: '#fff', lineHeight: '1.2' }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-dark)', lineHeight: '1.3', letterSpacing: '-0.02em' }}>
               {language === 'vn' ? currentCard.title_vn : currentCard.title_en}
             </h2>
-            {/* Show alternative language title smaller */}
-            <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '4px' }}>
+            <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', marginTop: '4px' }}>
               {language === 'vn' ? currentCard.title_en : currentCard.title_vn}
             </p>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }} />
+          <div style={{ borderTop: '1px solid var(--border-color)' }} />
 
-          {/* Bilingual Descriptions Stacked */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ fontSize: '1.15rem', color: 'var(--text-main)', lineHeight: '1.5', fontWeight: 400 }}>
+          {/* Content */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p style={{ fontSize: '1rem', color: 'var(--text-main)', lineHeight: '1.6' }}>
               {language === 'vn' ? currentCard.content_vn : currentCard.content_en}
             </p>
-            <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: '1.5', fontStyle: 'italic', borderLeft: '2px solid rgba(255,255,255,0.08)', paddingLeft: '12px' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: '1.5', fontStyle: 'italic', borderLeft: '2px solid var(--border-color)', paddingLeft: '12px' }}>
               {language === 'vn' ? currentCard.content_en : currentCard.content_vn}
             </p>
           </div>
         </div>
 
-        {/* Tip / Key takeaway Box */}
+        {/* Tip Box */}
         <div style={{
-          marginTop: '32px',
-          background: 'rgba(249, 115, 22, 0.04)',
-          border: '1px dashed rgba(249, 115, 22, 0.2)',
-          borderRadius: '12px',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px'
+          marginTop: '24px',
+          background: 'var(--warning-subtle)',
+          border: '1px solid rgba(245,158,11,0.15)',
+          borderRadius: 'var(--radius-md)',
+          padding: '14px 16px'
         }}>
-          <strong style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 700 }}>
+          <strong style={{ fontSize: '0.8rem', color: 'var(--warning-dark)', fontWeight: 700 }}>
             {t.keyTakeaway}
           </strong>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+          <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: '1.4', marginTop: '4px' }}>
             {language === 'vn' ? currentCard.tip_vn : currentCard.tip_en}
           </p>
         </div>
-
       </div>
 
-      {/* Navigation Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+      {/* Navigation */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
         <button
           onClick={() => setCurrentIndex(prev => Math.max(prev - 1, 0))}
           className="btn-secondary"
           disabled={currentIndex === 0}
-          style={{ flex: 1, padding: '16px' }}
+          style={{ flex: 1, padding: '14px' }}
         >
-          <LeftArrow /> {t.btnBack}
+          <ArrowLeft /> {t.btnBack}
         </button>
 
         {currentIndex < cards.length - 1 ? (
           <button
             onClick={() => setCurrentIndex(prev => Math.min(prev + 1, cards.length - 1))}
             className="btn-primary"
-            style={{ flex: 1, padding: '16px' }}
+            style={{ flex: 1, padding: '14px' }}
           >
-            {t.btnNext} <RightArrow />
+            {t.btnNext} <ArrowRight />
           </button>
         ) : (
           <button
             onClick={handleFinish}
             className="btn-success"
             disabled={submitting}
-            style={{
-              flex: 1,
-              padding: '16px',
-              boxShadow: '0 4px 20px rgba(16, 185, 129, 0.45)',
-              animation: 'pulseGlow 2.5s infinite alternate'
-            }}
+            style={{ flex: 1, padding: '14px' }}
           >
             {submitting ? 'Recording...' : t.btnFinish}
           </button>
