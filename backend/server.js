@@ -309,13 +309,13 @@ app.get('/api/quiz/generate', authenticateToken, async (req, res) => {
   
   try {
     if (type === 'exam') {
-      // Simulated Exam: 30 static/dynamic mixed questions (10 fundamentals, 8 products, 6 contracts, 6 regulations)
+      // Real MOF exam format per Thông tư 69/2022/TT-BTC: 40 questions, 60 minutes, 70% to pass
       const examQuestions = [];
       const topics = [
-        { name: 'fundamentals', count: 10 },
+        { name: 'fundamentals', count: 12 },
         { name: 'products', count: 8 },
-        { name: 'contracts', count: 6 },
-        { name: 'regulations', count: 6 }
+        { name: 'contracts', count: 10 },
+        { name: 'regulations', count: 10 }
       ];
 
       for (const t of topics) {
@@ -501,11 +501,10 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
     
     // Add mock competitive users to simulate a lively community
     const mockCompetitors = [
-      { id: 991, username: '🎯 Pằng_Chíu_Sniper', xp: 850, level: 3, streak: 9 },
-      { id: 992, username: '🥇 MOF_Master_99', xp: 720, level: 2, streak: 12 },
-      { id: 993, username: '💡 Llama_Fan_Boy', xp: 580, level: 2, streak: 5 },
-      { id: 994, username: '🛡️ Bảo_Việt_Pro', xp: 450, level: 2, streak: 4 },
-      { id: 995, username: '🔥 Học_Bất_Chấp', xp: 320, level: 1, streak: 8 }
+      { id: 991, username: '🎯 Britto Laban', xp: 850, level: 3, streak: 9 },
+      { id: 992, username: '🥇 Khắc Báu', xp: 720, level: 2, streak: 12 },
+      { id: 993, username: '💡 Khánh Linh', xp: 580, level: 2, streak: 5 },
+      { id: 994, username: '🛡️ Mai Anh', xp: 450, level: 2, streak: 4 }
     ];
 
     // Combine and sort

@@ -12,8 +12,8 @@ export const translations = {
     navSettings: "Settings",
     
     // Auth
-    loginTitle: "Agent Login",
-    registerTitle: "Create Agent Account",
+    loginTitle: "Sniper Login",
+    registerTitle: "Create Sniper Account",
     usernameLabel: "Username / Target Name",
     passwordLabel: "Password / Code",
     loginBtn: "Pằng (Login) 🔫",
@@ -23,17 +23,17 @@ export const translations = {
     switchRegister: "Sign up now",
     switchLogin: "Log in here",
     logout: "Exit / Unload",
-    welcomeUser: "Welcome, Agent",
+    welcomeUser: "Welcome, Sniper",
 
     // Dashboard / Stats
-    statsTitle: "Your Agent Dossier",
+    statsTitle: "Your Sniper Dossier",
     xpLabel: "XP (Experience Points)",
-    levelLabel: "Agent Rank / Level",
+    levelLabel: "Sniper Rank / Level",
     streakLabel: "Consecutive Days Streak",
     streakActive: "Active Streak! Keep it firing!",
     streakBroken: "Streak broken! Shoot again today!",
     badgesTitle: "Achievements & Ribbons",
-    lessonsProgress: "MOF Topic Progress",
+    lessonsProgress: "Llama Walks With You to the MOF Summit",
     lockedLesson: "Complete preceding lessons to unlock",
     startLessonBtn: "Initiate Lesson",
     completedStatus: "Completed",
@@ -53,7 +53,7 @@ export const translations = {
     difficultyLabel: "AI Calibrated Difficulty:",
     practiceMode: "Topic Target Practice (Adaptive)",
     examMode: "Timed Mock Exam Simulation",
-    examDuration: "30 Questions • 40 Minutes",
+    examDuration: "40 Questions • 60 Minutes • 70% to pass (real MOF format)",
     startQuizBtn: "Lock & Load (Start) 🔫",
     questionIndicator: "Target {current} / {total}",
     submitAnswerBtn: "Fire Shot (Submit) 💥",
@@ -69,6 +69,8 @@ export const translations = {
     timerLabel: "Time Remaining:",
     examRules: "Note: In Mock Exam mode, explanations are hidden until final evaluation.",
     backToDashboard: "Return to Base",
+    examPassed: "PASSED! 🎉 You've got real agent energy!",
+    examFailed: "Not quite 70% yet — no worries, every sniper misses before they master it! 💪",
 
     // Chat
     chatTitle: "Ask Llama AI Assistant",
@@ -97,9 +99,9 @@ export const translations = {
     desc_badge_xp_1000: "Acquired a total of 1000+ experience points.",
 
     // Leaderboard
-    leaderboardTitle: "Global Sniper Leaderboard",
+    leaderboardTitle: "Techcom Life Sniper Leaderboard",
     rankCol: "Rank",
-    agentCol: "Agent Name",
+    agentCol: "Sniper Name",
     xpCol: "XP",
     streakCol: "Streak",
     levelCol: "Level",
@@ -116,9 +118,9 @@ export const translations = {
     navSettings: "Cài Đặt",
     
     // Auth
-    loginTitle: "Đại Lý Đăng Nhập",
-    registerTitle: "Tạo Tài Khoản Đại Lý",
-    usernameLabel: "Tên Đại Lý / Tên xạ thủ",
+    loginTitle: "Xạ Thủ Đăng Nhập",
+    registerTitle: "Tạo Tài Khoản Xạ Thủ",
+    usernameLabel: "Tên Xạ Thủ / Biệt Danh",
     passwordLabel: "Mật khẩu / Mật mã",
     loginBtn: "Pằng (Đăng Nhập) 🔫",
     registerBtn: "Đăng Ký & Bắt Đầu 🚀",
@@ -127,17 +129,17 @@ export const translations = {
     switchRegister: "Đăng ký ngay",
     switchLogin: "Đăng nhập tại đây",
     logout: "Thoát / Hủy Nạp Đạn",
-    welcomeUser: "Chào mừng, Đại Lý",
+    welcomeUser: "Chào mừng, Xạ Thủ",
 
     // Dashboard / Stats
-    statsTitle: "Hồ Sơ Năng Lực Đại Lý",
+    statsTitle: "Hồ Sơ Năng Lực Xạ Thủ",
     xpLabel: "Điểm Kinh Nghiệm (XP)",
-    levelLabel: "Cấp Bậc Đại Lý",
+    levelLabel: "Cấp Bậc Xạ Thủ",
     streakLabel: "Chuỗi Ngày Học Liên Tục",
     streakActive: "Chuỗi hoạt động! Tiếp tục nổ súng!",
     streakBroken: "Chuỗi đã đứt! Hãy khai hỏa hôm nay!",
     badgesTitle: "Huy Chương & Danh Hiệu",
-    lessonsProgress: "Tiến Trình Bài Học Bộ Tài Chính",
+    lessonsProgress: "Llama Cùng Bạn Tiến Đến Đỉnh MOF",
     lockedLesson: "Hoàn thành bài học trước để mở khóa",
     startLessonBtn: "Bắt Đầu Học",
     completedStatus: "Đã hoàn thành",
@@ -157,7 +159,7 @@ export const translations = {
     difficultyLabel: "Độ Khó AI Điều Chỉnh:",
     practiceMode: "Luyện Tập Chủ Đề (Linh hoạt)",
     examMode: "Thi Thử Giả Lập (Đúng giờ)",
-    examDuration: "30 Câu hỏi • 40 Phút",
+    examDuration: "40 Câu hỏi • 60 Phút • Cần đạt 70% mới đỗ (đúng chuẩn thi thật)",
     startQuizBtn: "Lên Đạn & Bắt Đầu 🔫",
     questionIndicator: "Mục Tiêu {current} / {total}",
     submitAnswerBtn: "Bắn (Nộp Bài) 💥",
@@ -173,6 +175,8 @@ export const translations = {
     timerLabel: "Thời Gian Còn Lại:",
     examRules: "Lưu ý: Ở chế độ Thi Thử, phần giải thích chi tiết chỉ hiển thị sau khi hoàn thành toàn bộ bài thi.",
     backToDashboard: "Quay Về Căn Cứ",
+    examPassed: "ĐẠT RỒI! 🎉 Xạ thủ đúng chuẩn đại lý tương lai đây!",
+    examFailed: "Chưa đủ 70% đâu nha, đừng buồn! Xạ thủ giỏi cỡ nào cũng từng bắn trượt trước khi trăm phát trăm trúng 💪",
 
     // Chat
     chatTitle: "Trò Chuyện Với Llama AI",
@@ -201,9 +205,9 @@ export const translations = {
     desc_badge_xp_1000: "Đạt tổng cộng hơn 1000 điểm kinh nghiệm (XP).",
 
     // Leaderboard
-    leaderboardTitle: "Bảng Xếp Hạng Xạ Thủ Toàn Cầu",
+    leaderboardTitle: "Bảng Xếp Hạng Xạ Thủ Techcom Life",
     rankCol: "Hạng",
-    agentCol: "Tên Đại Lý",
+    agentCol: "Tên Xạ Thủ",
     xpCol: "Điểm XP",
     streakCol: "Chuỗi Ngày",
     levelCol: "Cấp Độ",

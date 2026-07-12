@@ -1,9 +1,21 @@
 import { translations } from '../translations';
+import { getDaysSinceLastStudy } from '../utils/streak';
+import LlamaNag from './LlamaNag';
+import LessonPath from './LessonPath';
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, language }) {
   const t = translations[language];
 
   if (!profile) return <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading dossier...</div>;
+
+  function handleStudyNow() {
+    const nextLesson = lessons.find((l) => l.isUnlocked && !l.isCompleted);
+    if (nextLesson) {
+      onSelectLesson(nextLesson);
+    } else {
+      onNavigate('quiz');
+    }
+  }
 
   // Level progress calculations
   const xp = profile.xp || 0;
@@ -16,20 +28,7 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
   const currentProgress = xp - prevLevelThreshold;
   const progressPercent = Math.min(Math.max((currentProgress / levelRange) * 100, 0), 100);
 
-  // SVG padlocks and checkmarks
-  const PadlockIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-    </svg>
-  );
-
-  const CheckIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12"></polyline>
-    </svg>
-  );
-
+  // SVG icons
   const FireIcon = () => (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#ffffff' }}>
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
@@ -60,7 +59,13 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
-      
+
+      <LlamaNag
+        daysSince={getDaysSinceLastStudy()}
+        language={language}
+        onStudyNow={handleStudyNow}
+      />
+
       {/* SECTION 1: Stats Header & Level Progress */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
         <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -123,98 +128,13 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
       {/* SECTION 2: Roadmaps & Badges */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
         
-        {/* Topic Roadmap */}
+        {/* Topic Roadmap — Everest climb path */}
         <div>
           <h3 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: '18px', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>📖</span> {t.lessonsProgress}
+            <span>🏔️</span> {t.lessonsProgress}
           </h3>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-            {lessons.map((lesson) => {
-              const isLocked = !lesson.isUnlocked;
-              const isCompleted = lesson.isCompleted;
 
-              return (
-                <div key={lesson.id} className="glass-panel" style={{
-                  padding: '20px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  opacity: isLocked ? 0.6 : 1,
-                  borderLeftWidth: '8px',
-                  borderLeftColor: isCompleted 
-                    ? 'var(--success)' 
-                    : isLocked 
-                      ? '#ccd0d4' 
-                      : 'var(--primary)',
-                  background: isLocked ? '#f1f3f5' : '#ffffff'
-                }}>
-                  <div style={{ flex: 1, paddingRight: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        textTransform: 'uppercase',
-                        fontWeight: 800,
-                        letterSpacing: '0.5px',
-                        color: isCompleted ? 'var(--success)' : isLocked ? '#777' : 'var(--primary)'
-                      }}>
-                        {lesson.topic} • {lesson.difficulty}
-                      </span>
-                      {isCompleted && (
-                        <span style={{
-                          background: 'rgba(88, 204, 2, 0.1)',
-                          color: 'var(--success)',
-                          fontSize: '0.75rem',
-                          padding: '2px 8px',
-                          borderRadius: '99px',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          <CheckIcon /> {t.completedStatus}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: isLocked ? 'var(--text-muted)' : 'var(--text-dark)' }}>
-                      {language === 'vn' ? lesson.title_vn : lesson.title_en}
-                    </h4>
-                    
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 500 }}>
-                      {isLocked ? t.lockedLesson : `${JSON.parse(JSON.stringify(lesson.cards)).length} ${language === 'vn' ? 'thẻ học' : 'flashcards'}`}
-                    </p>
-                  </div>
-
-                  <div>
-                    {isLocked ? (
-                      <div style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '12px',
-                        background: '#e5e5e5',
-                        border: '2px solid #d0d0d0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#888'
-                      }}>
-                        <PadlockIcon />
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => onSelectLesson(lesson)}
-                        className="btn-primary"
-                        style={{ padding: '10px 20px', fontSize: '0.85rem' }}
-                      >
-                        {t.startLessonBtn}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <LessonPath lessons={lessons} onSelectLesson={onSelectLesson} language={language} />
         </div>
 
         {/* Badges Cabinet */}

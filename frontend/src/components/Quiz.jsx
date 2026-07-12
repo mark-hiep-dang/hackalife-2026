@@ -26,7 +26,7 @@ export default function Quiz({ onQuizFinished, language }) {
   const [maxCombo, setMaxCombo] = useState(0);
   
   // Timer for Mock Exam
-  const [timeLeft, setTimeLeft] = useState(2400); // 40 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes in seconds (real MOF exam length)
   const timerRef = useRef(null);
 
   // Result States
@@ -67,7 +67,7 @@ export default function Quiz({ onQuizFinished, language }) {
       setMaxCombo(0);
       setSelectedOption(null);
       setIsAnswered(false);
-      setTimeLeft(2400);
+      setTimeLeft(3600);
       setExamAnswers([]);
       setQuizStarted(true);
       setQuizFinished(false);
@@ -292,6 +292,7 @@ export default function Quiz({ onQuizFinished, language }) {
   if (quizFinished) {
     const finalScore = mode === 'exam' ? examAnswers.filter(a => a.isCorrect).length : score;
     const finalTotal = questions.length;
+    const examPassed = finalTotal > 0 && (finalScore / finalTotal) >= 0.7;
 
     return (
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
@@ -318,6 +319,21 @@ export default function Quiz({ onQuizFinished, language }) {
             <span style={{ fontSize: '2.4rem', fontWeight: 900, color: 'var(--success)' }}>{finalScore}/{finalTotal}</span>
             <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>{t.quizScore}</span>
           </div>
+
+          {mode === 'exam' && (
+            <div className="glass-panel" style={{
+              padding: '16px',
+              marginBottom: '24px',
+              background: examPassed ? 'rgba(88, 204, 2, 0.08)' : 'rgba(255, 75, 75, 0.08)',
+              borderColor: examPassed ? 'var(--success)' : 'var(--danger)',
+              borderWidth: '2px',
+              fontWeight: 800,
+              fontSize: '1rem',
+              color: examPassed ? 'var(--success-dark)' : 'var(--danger)'
+            }}>
+              {examPassed ? t.examPassed : t.examFailed}
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
             <div className="glass-panel" style={{ padding: '16px', background: '#f7f9fa' }}>

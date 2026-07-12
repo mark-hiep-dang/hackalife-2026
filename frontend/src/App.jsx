@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getProfile, getLessons } from './utils/api';
 import { translations } from './translations';
 import { getMuteState, setMuteState } from './utils/sound';
+import { markStudiedToday, ensureStudyTrackingInitialized } from './utils/streak';
 
 // Components
 import Auth from './components/Auth';
@@ -40,6 +41,7 @@ export default function App() {
   // Fetch data whenever user session changes
   useEffect(() => {
     if (session) {
+      ensureStudyTrackingInitialized();
       fetchUserDossier();
     } else {
       setProfile(null);
@@ -108,12 +110,14 @@ export default function App() {
   function handleLessonFinished(xp, level, newBadges) {
     setActiveLesson(null);
     if (xp !== null) {
+      markStudiedToday();
       fetchUserDossier();
     }
   }
 
   // Completing a quiz triggers review
   function handleQuizFinished(xpEarned, finalLevel, newBadges) {
+    markStudiedToday();
     fetchUserDossier();
     setActiveTab('home');
   }
