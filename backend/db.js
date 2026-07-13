@@ -91,6 +91,41 @@ export async function initDb() {
     )
   `);
 
+  // Create Flashcards table (imported from Excel)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS flashcards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      stt INTEGER,
+      topic TEXT,
+      card_type TEXT,
+      difficulty TEXT,
+      front TEXT,
+      back TEXT,
+      keyword TEXT,
+      state TEXT,
+      wrong_count INTEGER,
+      notes TEXT
+    )
+  `);
+
+  // Create Test Questions table (imported from Excel)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS test_questions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      stt INTEGER,
+      topic TEXT,
+      difficulty TEXT,
+      question TEXT,
+      optA TEXT,
+      optB TEXT,
+      optC TEXT,
+      optD TEXT,
+      answer TEXT,
+      explanation TEXT,
+      source TEXT
+    )
+  `);
+
   // Seed Lessons if empty
   const lessonsCount = await db.get('SELECT COUNT(*) as count FROM lessons');
   if (lessonsCount.count === 0) {

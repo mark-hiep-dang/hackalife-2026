@@ -75,6 +75,15 @@ export async function completeLesson(lessonId) {
   return data;
 }
 
+export async function getFlashcards() {
+  const res = await fetch(`${API_BASE}/flashcards`, {
+    headers: getHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch flashcards');
+  return data;
+}
+
 export async function generateQuiz(topic, difficulty, type) {
   const ollamaUrl = localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434';
   const query = new URLSearchParams({ topic, difficulty, type, ollamaUrl }).toString();
