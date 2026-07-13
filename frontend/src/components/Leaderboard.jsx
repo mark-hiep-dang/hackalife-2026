@@ -1,169 +1,90 @@
 import { useState, useEffect } from 'react';
 import { getLeaderboard } from '../utils/api';
-import { translations } from '../translations';
+import { translations as t } from '../translations';
+import { Trophy, Flame } from 'lucide-react';
 
-export default function Leaderboard({ profile, language }) {
-  const t = translations[language];
-
-  const [rankings, setRankings] = useState([]);
+export default function Leaderboard({ profile }) {
+  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('weekly');
 
   useEffect(() => {
-    fetchRankings();
+    (async () => {
+      try { setData(await getLeaderboard()); }
+      catch (e) { setError(e.message || 'Lỗi tải BXH'); }
+      finally { setLoading(false); }
+    })();
   }, []);
 
-  async function fetchRankings() {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getLeaderboard();
-      setRankings(data);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch leaderboard');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const rows = tab === 'daily'
+    ? data.map((r,i) => ({ ...r, xp: Math.round(r.xp*.12), rank: i+1 })).sort((a,b) => b.xp-a.xp)
+    : tab === 'monthly'
+    ? data.map((r,i) => ({ ...r, xp: Math.round(r.xp*3.4), rank: i+1 })).sort((a,b) => b.xp-a.xp)
+    : data;
 
-  function getTabRankings() {
-    if (tab === 'daily') {
-      return rankings.map(r => ({ ...r, xp: Math.round(r.xp * 0.12) })).sort((a, b) => b.xp - a.xp).map((r, i) => ({ ...r, rank: i + 1 }));
-    }
-    if (tab === 'monthly') {
-      return rankings.map(r => ({ ...r, xp: Math.round(r.xp * 3.4) })).sort((a, b) => b.xp - a.xp).map((r, i) => ({ ...r, rank: i + 1 }));
-    }
-    return rankings;
-  }
-
-  const medalEmojis = { 1: '🥇', 2: '🥈', 3: '🥉' };
+  const podium = (rank) => {
+    if (rank === 1) return <span className="text-3xl font-black">🥇</span>;
+    if (rank === 2) return <span className="text-3xl font-black">🥈</span>;
+    if (rank === 3) return <span className="text-3xl font-black">🥉</span>;
+    return <span className="text-2xl font-black text-[#111]">{rank}</span>;
+  };
 
   return (
-    <div className="fade-in" style={{ maxWidth: '640px', margin: '0 auto' }}>
-      
-      <div className="glass-panel" style={{ padding: '28px 24px' }}>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, textAlign: 'center', marginBottom: '20px', letterSpacing: '-0.03em', color: 'var(--text-dark)' }}>
-          🏆 {t.leaderboardTitle}
-        </h2>
-
-        {/* Tab Selector */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '4px',
-          background: 'var(--bg-subtle)',
-          padding: '4px',
-          borderRadius: 'var(--radius-md)',
-          marginBottom: '24px'
-        }}>
-          {['daily', 'weekly', 'monthly'].map((tabType) => (
-            <button
-              key={tabType}
-              onClick={() => setTab(tabType)}
-              style={{
-                padding: '8px',
-                fontSize: '0.8rem',
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                background: tab === tabType ? 'var(--bg-card)' : 'transparent',
-                color: tab === tabType ? 'var(--text-dark)' : 'var(--text-muted)',
-                boxShadow: tab === tabType ? 'var(--shadow-sm)' : 'none',
-                fontWeight: tab === tabType ? 700 : 500,
-                cursor: 'pointer',
-                transition: 'all var(--transition)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.03em'
-              }}
-            >
-              {tabType}
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <div style={{ background: 'var(--primary-subtle)', border: '1px solid rgba(239,68,68,0.15)', padding: '10px', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '16px', textAlign: 'center' }}>
-            {error}
-          </div>
-        )}
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Loading rankings...
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            
-            {/* Header */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '42px 1fr 60px 52px 70px',
-              padding: '10px 16px',
-              fontSize: '0.7rem',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: 'var(--text-muted)',
-              borderBottom: '1px solid var(--border-color)'
-            }}>
-              <span>{t.rankCol}</span>
-              <span>{t.agentCol}</span>
-              <span style={{ textAlign: 'right' }}>{t.levelCol}</span>
-              <span style={{ textAlign: 'right' }}>🔥</span>
-              <span style={{ textAlign: 'right' }}>{t.xpCol}</span>
-            </div>
-
-            {/* Rows */}
-            {getTabRankings().map((user) => {
-              const isCurrentUser = user.username === profile?.username;
-
-              return (
-                <div
-                  key={user.rank}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '42px 1fr 60px 52px 70px',
-                    padding: '12px 16px',
-                    alignItems: 'center',
-                    background: isCurrentUser ? 'var(--primary-subtle)' : 'transparent',
-                    borderRadius: 'var(--radius-sm)',
-                    transition: 'background var(--transition)'
-                  }}
-                >
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                    {medalEmojis[user.rank] || `#${user.rank}`}
-                  </span>
-
-                  <span style={{
-                    fontWeight: isCurrentUser ? 700 : 500,
-                    color: isCurrentUser ? 'var(--primary)' : 'var(--text-main)',
-                    fontSize: '0.9rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    {user.username}
-                    {isCurrentUser && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t.youLabel}</span>}
-                  </span>
-
-                  <span style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-                    Lvl {user.level}
-                  </span>
-
-                  <span style={{ textAlign: 'right', color: 'var(--warning-dark)', fontWeight: 600, fontSize: '0.825rem' }}>
-                    {user.streak}d
-                  </span>
-
-                  <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-dark)', fontSize: '0.875rem' }}>
-                    {user.xp}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+    <div className="card-brutal overflow-hidden pop-in bg-white flex flex-col max-w-4xl mx-auto w-full">
+      {/* Header */}
+      <div className="px-6 py-10 bg-[#FFC900] border-b-4 border-[#111] flex flex-col items-center justify-center gap-4">
+        <Trophy size={56} strokeWidth={3} className="text-[#111]" />
+        <h2 className="text-5xl font-black text-[#111] uppercase tracking-tighter">{t.leaderboardTitle}</h2>
       </div>
 
+      {/* Tab bar */}
+      <div className="flex border-b-4 border-[#111] bg-[#F4F4F0]">
+        {['daily', 'weekly', 'monthly'].map(v => (
+          <button key={v} onClick={() => setTab(v)}
+            className={`flex-1 py-5 text-sm md:text-base font-black uppercase tracking-widest transition-all border-r-3 border-[#111] last:border-r-0 ${tab === v ? 'bg-[#111] text-white shadow-inner' : 'text-[#111] hover:bg-white'}`}
+          >{v === 'daily' ? 'Hôm nay' : v === 'weekly' ? 'Tuần này' : 'Tháng này'}</button>
+        ))}
+      </div>
+
+      {/* Body */}
+      <div className="divide-y-3 divide-[#111] bg-white">
+        {loading && (
+          <div className="py-20 text-center text-[#111] text-lg font-black uppercase tracking-widest">
+            Đang tải BXH...
+          </div>
+        )}
+        {error && <div className="py-12 mx-6 my-6 text-center text-white bg-[#F24E1E] border-3 border-[#111] rounded-xl font-black uppercase tracking-widest">{error}</div>}
+        
+        {!loading && !error && rows.map(row => {
+          const isMe = row.username === profile?.username;
+          return (
+            <div key={row.rank} className={`flex items-center gap-6 px-6 md:px-8 py-6 transition-colors ${isMe ? 'bg-[#FF90E8]' : 'hover:bg-[#F4F4F0]'}`}>
+              <div className="w-16 h-16 rounded-full border-4 border-[#111] flex items-center justify-center shrink-0 bg-white shadow-[4px_4px_0_#111]">
+                {podium(row.rank)}
+              </div>
+              
+              <div className="flex-1 min-w-0 ml-2">
+                <div className="flex items-center gap-3">
+                  <span className={`text-2xl font-black truncate uppercase ${isMe ? 'text-[#111]' : 'text-[#111]'}`}>{row.username}</span>
+                  {isMe && <span className="text-[11px] font-black bg-[#111] text-white px-3 py-1 rounded shadow-[2px_2px_0_#fff] uppercase">Bạn</span>}
+                </div>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="text-sm text-[#111] font-bold uppercase tracking-widest bg-white border-2 border-[#111] px-3 py-1 rounded shadow-[2px_2px_0_#111]">Lv {row.level}</span>
+                  <span className="text-sm text-[#111] font-bold uppercase tracking-widest flex items-center gap-1.5 bg-white border-2 border-[#111] px-3 py-1 rounded shadow-[2px_2px_0_#111]">
+                    <Flame size={16} strokeWidth={3} className="text-[#F24E1E]" /> {row.streak}d
+                  </span>
+                </div>
+              </div>
+              
+              <div className="text-right shrink-0 bg-white border-4 border-[#111] px-6 py-3 rounded-2xl shadow-[6px_6px_0_#111]">
+                <span className="text-4xl font-black text-[#111]">{row.xp.toLocaleString()}</span>
+                <span className="text-xs text-[#111] font-black uppercase tracking-widest ml-1">XP</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

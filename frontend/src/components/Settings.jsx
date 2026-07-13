@@ -1,151 +1,83 @@
 import { useState } from 'react';
-import { translations } from '../translations';
+import { translations as t } from '../translations';
 import { logout } from '../utils/api';
 import { getMuteState, setMuteState } from '../utils/sound';
+import { Settings as SettingsIcon, Volume2, VolumeX, LogOut, Database } from 'lucide-react';
 
-export default function Settings({ profile, setSession, language, setLanguage, onMuteToggled }) {
-  const t = translations[language];
-
+export default function Settings({ profile, setSession, onMuteToggled }) {
   const [ollamaUrl, setOllamaUrl] = useState(localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434');
   const [muted, setMuted] = useState(getMuteState());
-  const [message, setMessage] = useState('');
+  const [saved, setSaved] = useState(false);
 
-  function handleSaveSettings(e) {
+  function handleSave(e) {
     e.preventDefault();
     localStorage.setItem('pang_chiu_ollama_url', ollamaUrl);
-    setMessage('Settings applied successfully! / Cấu hình đã được lưu!');
-    setTimeout(() => setMessage(''), 3000);
+    setSaved(true); setTimeout(() => setSaved(false), 3000);
   }
+  function toggleMute() {
+    const n = !muted; setMuted(n); setMuteState(n); onMuteToggled(n);
+  }
+  function handleLogout() { logout(); setSession(null); }
 
-  function handleToggleMute() {
-    const nextMute = !muted;
-    setMuted(nextMute);
-    setMuteState(nextMute);
-    onMuteToggled(nextMute);
-  }
-
-  function handleLogout() {
-    logout();
-    setSession(null);
-  }
+  const Section = ({ title, children }) => (
+    <div className="mb-10">
+      <p className="text-xs font-black text-[#111] bg-[#FFC900] border-2 border-[#111] inline-block px-4 py-1.5 rounded-lg shadow-[3px_3px_0_#111] uppercase tracking-widest mb-6 rotate-1">{title}</p>
+      <div className="card-brutal p-8 md:p-10 bg-white">{children}</div>
+    </div>
+  );
 
   return (
-    <div className="fade-in" style={{ maxWidth: '520px', margin: '0 auto' }}>
-      
-      <div className="glass-panel" style={{ padding: '32px 28px' }}>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, textAlign: 'center', marginBottom: '24px', letterSpacing: '-0.03em', color: 'var(--text-dark)' }}>
-          ⚙️ {t.navSettings}
-        </h2>
-
-        {message && (
-          <div style={{
-            background: 'var(--success-subtle)',
-            border: '1px solid rgba(34,197,94,0.2)',
-            padding: '10px 14px',
-            color: 'var(--success-dark)',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: '20px',
-            fontSize: '0.85rem',
-            textAlign: 'center',
-            fontWeight: 500
-          }}>
-            {message}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Language */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              🌐 {language === 'vn' ? 'Ngôn Ngữ Học Tập:' : 'Study Language:'}
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button
-                onClick={() => setLanguage('en')}
-                className={language === 'en' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '12px' }}
-              >
-                English (EN)
-              </button>
-              <button
-                onClick={() => setLanguage('vn')}
-                className={language === 'vn' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '12px' }}
-              >
-                Tiếng Việt (VN)
-              </button>
-            </div>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--border-color)' }} />
-
-          {/* Sound */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <strong style={{ fontSize: '0.9rem', color: 'var(--text-dark)', display: 'block' }}>
-                🔊 {language === 'vn' ? 'Hiệu Ứng Âm Thanh' : 'Sound Effects'}
-              </strong>
-              <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
-                {language === 'vn' ? 'Tắt âm để tự học yên tĩnh' : 'Mute for silent study'}
-              </span>
-            </div>
-
-            <button
-              onClick={handleToggleMute}
-              className={muted ? 'btn-secondary' : 'btn-success'}
-              style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-            >
-              {muted ? (language === 'vn' ? 'Tắt 🔇' : 'Muted 🔇') : (language === 'vn' ? 'Bật 🔊' : 'Active 🔊')}
-            </button>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--border-color)' }} />
-
-          {/* Llama Config */}
-          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                🦙 {t.connectionConfig}
-              </label>
-              <input
-                type="text"
-                className="glass-input"
-                value={ollamaUrl}
-                onChange={(e) => setOllamaUrl(e.target.value)}
-                placeholder="http://localhost:11434"
-              />
-            </div>
-            
-            <button type="submit" className="btn-primary" style={{ padding: '12px' }}>
-              {t.saveConfig}
-            </button>
-          </form>
-
-          <div style={{ borderTop: '1px solid var(--border-color)' }} />
-
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              background: 'var(--primary-subtle)',
-              color: 'var(--danger)',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              transition: 'all var(--transition)'
-            }}
-          >
-            🚪 {t.logout}
-          </button>
-
+    <div className="flex flex-col pop-in max-w-2xl mx-auto w-full">
+      <div className="flex items-center gap-6 mb-12">
+        <div className="w-16 h-16 bg-[#23A094] border-4 border-[#111] rounded-2xl flex items-center justify-center shadow-[6px_6px_0_#111] -rotate-3">
+          <SettingsIcon size={36} strokeWidth={3} className="text-[#111]" />
         </div>
+        <h2 className="text-5xl font-black text-[#111] uppercase tracking-tighter">{t.settingsTitle}</h2>
       </div>
 
+      {saved && (
+        <div className="bg-[#23A094] border-3 border-[#111] text-white text-base font-black uppercase tracking-widest px-5 py-4 rounded-xl mb-8 shadow-[6px_6px_0_#111]">
+          ✓ Đã lưu cài đặt!
+        </div>
+      )}
+
+      {/* Sound */}
+      <Section title={t.soundLabel}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 text-base font-black text-[#111] uppercase tracking-widest mb-1">
+              {muted ? <VolumeX size={24} strokeWidth={3} /> : <Volume2 size={24} strokeWidth={3} />}
+              Hiệu ứng âm thanh
+            </div>
+            <p className="text-sm text-[#888] font-bold">Tắt để học trong tĩnh lặng</p>
+          </div>
+          
+          <button onClick={toggleMute}
+            className={`relative w-20 h-10 rounded-full border-4 transition-all shadow-[4px_4px_0_#111] ${muted ? 'bg-gray-300 border-[#111]' : 'bg-[#23A094] border-[#111]'}`}
+          >
+            <span className={`absolute top-0.5 w-7 h-7 rounded-full border-3 border-[#111] bg-white transition-all ${muted ? 'left-1' : 'left-10'}`} />
+          </button>
+        </div>
+      </Section>
+
+      {/* Ollama */}
+      <Section title={t.connectionConfig}>
+        <form onSubmit={handleSave}>
+          <div className="flex items-center gap-3 text-base font-black text-[#111] uppercase tracking-widest mb-6">
+            <Database size={24} strokeWidth={3} /> LLM Địa phương (Ollama)
+          </div>
+          <input type="text" value={ollamaUrl} onChange={e => setOllamaUrl(e.target.value)}
+            className="input-brutal mb-6 text-lg py-4" placeholder="http://localhost:11434" />
+          <button type="submit" className="btn-brutal w-full bg-[#FFC900] text-xl py-4">{t.saveConfig}</button>
+        </form>
+      </Section>
+
+      {/* Logout */}
+      <button onClick={handleLogout}
+        className="btn-brutal w-full bg-white text-[#F24E1E] mt-4 py-5 text-xl"
+      >
+        <LogOut size={24} strokeWidth={3} /> {t.logout}
+      </button>
     </div>
   );
 }

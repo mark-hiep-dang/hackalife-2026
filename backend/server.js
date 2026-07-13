@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import { initDb, getDb } from './db.js';
-import { generateDynamicQuestion, generateLlamaQuestion } from './questions.js';
+import { generateDynamicQuestion, generateLlamaQuestion, questionBank } from './questions.js';
 
 dotenv.config();
 
@@ -303,44 +303,74 @@ app.post('/api/lessons/:id/complete', authenticateToken, async (req, res) => {
   }
 });
 
-// Generate dynamic quiz questions
+// Generate quiz questions
 app.get('/api/quiz/generate', authenticateToken, async (req, res) => {
-  const { topic, difficulty, type, ollamaUrl } = req.query; // type: 'practice' or 'exam'
+  const { topic, difficulty, type } = req.query; // type: 'practice' or 'exam'
+  const db = await getDb();
   
   try {
     if (type === 'exam') {
-      // Simulated Exam: 30 static/dynamic mixed questions (10 fundamentals, 8 products, 6 contracts, 6 regulations)
-      const examQuestions = [];
-      const topics = [
-        { name: 'fundamentals', count: 10 },
-        { name: 'products', count: 8 },
-        { name: 'contracts', count: 6 },
-        { name: 'regulations', count: 6 }
-      ];
-
-      for (const t of topics) {
-        for (let i = 0; i < t.count; i++) {
-          const q = generateDynamicQuestion(t.name, difficulty || 'intermediate');
-          examQuestions.push(q);
-        }
-      }
-      return res.json(examQuestions);
+      // Exam: 40 questions (according to "Đề mẫu 40 câu" standard)
+      const examQuestions = await db.all('SELECT * FROM test_questions ORDER BY RANDOM() LIMIT 40');
+      return res.json(examQuestions.map(q => ({
+        id: q.id,
+        stt: q.stt,
+        topic: q.topic,
+        difficulty: q.difficulty,
+        question: q.question,
+        options: [q.optA, q.optB, q.optC, q.optD].filter(Boolean),
+        correct_index: ['A', 'B', 'C', 'D'].indexOf(q.answer),
+        answer: q.answer,
+        explanation: q.explanation,
+        source: q.source,
+        type: 'mcq'
+      })));
     }
 
-    // Practice Mode: generate a set of 5 adaptive questions for the specific topic
-    const count = 5;
-    const questions = [];
-    for (let i = 0; i < count; i++) {
-      let q;
-      // If client requests Llama AI generation specifically and provides Ollama address
-      if (ollamaUrl && Math.random() > 0.6) { // 40% chance of triggering actual Llama gen to show dynamic AI power
-        q = await generateLlamaQuestion(topic, difficulty || 'intermediate', ollamaUrl);
-      } else {
-        q = generateDynamicQuestion(topic, difficulty || 'intermediate');
-      }
-      questions.push(q);
-    }
-    res.json(questions);
+    // Practice Mode: 5 questions
+    let query = 'SELECT * FROM test_questions WHERE 1=1';
+    const params = [];
+    
+    // In practice mode we can filter by topic if requested (though for now we might just randomize)
+    // if (topic && topic !== 'all') { query += ' AND topic LIKE ?'; params.push(`%${topic}%`); }
+    
+    query += ' ORDER BY RANDOM() LIMIT 5';
+    const questions = await db.all(query, params);
+    
+    res.json(questions.map(q => ({
+      id: q.id,
+      stt: q.stt,
+      topic: q.topic,
+      difficulty: q.difficulty,
+      question: q.question,
+      options: [q.optA, q.optB, q.optC, q.optD].filter(Boolean),
+      correct_index: ['A', 'B', 'C', 'D'].indexOf(q.answer),
+      answer: q.answer,
+      explanation: q.explanation,
+      source: q.source,
+      type: 'mcq'
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get flashcards
+app.get('/api/flashcards', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const cards = await db.all('SELECT * FROM flashcards ORDER BY RANDOM() LIMIT 20');
+    res.json(cards.map(c => ({
+      id: c.id,
+      stt: c.stt,
+      topic: c.topic,
+      card_type: c.card_type,
+      difficulty: c.difficulty,
+      front: c.front,
+      back: c.back,
+      keyword: c.keyword,
+      type: 'flashcard'
+    })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
