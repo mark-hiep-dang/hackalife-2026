@@ -26,47 +26,47 @@ export default function Auth({ setSession }) {
     <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-16">
       <div className="w-full max-w-lg pop-in">
         
-        <div className="card-brutal p-8 md:p-10 text-center">
+        <div className="card-pro p-8 md:p-10 text-center">
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-[#FF90E8] border-3 border-[#111] rounded-xl flex items-center justify-center shadow-[4px_4px_0_#111] -rotate-3">
-              <Target size={32} strokeWidth={3} className="text-[#111]" />
+            <div className="w-16 h-16 bg-[#9FE870] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-3">
+              <Target size={32} strokeWidth={3} className="text-[#101A24]" />
             </div>
           </div>
           
-          <h1 className="text-3xl font-black text-[#111] tracking-tight mb-2 uppercase">
+          <h1 className="text-3xl font-extrabold text-[#101A24] tracking-tight mb-2 uppercase">
             {isRegister ? t.registerTitle : t.loginTitle}
           </h1>
-          <p className="text-sm text-[#111] font-bold mb-8">{t.tagline}</p>
+          <p className="text-sm text-[#101A24] font-bold mb-8">{t.tagline}</p>
 
           {error && (
-            <div className="bg-[#F24E1E] border-3 border-[#111] text-white text-sm font-bold px-4 py-3 rounded-lg mb-6 shadow-[2px_2px_0_#111] uppercase tracking-wider">
+            <div className="bg-[#EF4444] border border-[#101A24]/10 text-white text-sm font-bold px-4 py-3 rounded-lg mb-6 shadow-sm uppercase tracking-wider">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5 text-left">
             <div>
-              <label className="block text-xs font-black text-[#111] uppercase tracking-widest mb-2">{t.usernameLabel}</label>
+              <label className="block text-xs font-extrabold text-[#101A24] uppercase tracking-widest mb-2">{t.usernameLabel}</label>
               <input
                 type="text" value={username}
                 onChange={e => setUsername(e.target.value)}
-                className="input-brutal"
+                className="input-pro"
                 placeholder="agent_007"
                 disabled={loading} required
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-[#111] uppercase tracking-widest mb-2">{t.passwordLabel}</label>
+              <label className="block text-xs font-extrabold text-[#101A24] uppercase tracking-widest mb-2">{t.passwordLabel}</label>
               <input
                 type="password" value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="input-brutal"
+                className="input-pro"
                 placeholder="••••••••"
                 disabled={loading} required
               />
             </div>
 
-            <button type="submit" disabled={loading} className="btn-brutal w-full mt-4 text-xl">
+            <button type="submit" disabled={loading} className="btn-pro-primary w-full mt-4 text-xl">
               {loading ? '...' : (isRegister ? t.registerBtn : t.loginBtn)}
             </button>
           </form>
@@ -74,7 +74,7 @@ export default function Auth({ setSession }) {
           <p className="text-center mt-8">
             <button
               onClick={() => { setIsRegister(r => !r); setError(''); }}
-              className="text-sm font-black text-[#111] border-b-3 border-[#111] hover:text-[#FF90E8] hover:border-[#FF90E8] transition-colors pb-0.5"
+              className="text-sm font-extrabold text-[#101A24] border-b-3 border-[#101A24]/10 hover:text-[#9FE870] hover:border-[#9FE870] transition-colors pb-0.5"
             >
               {isRegister ? t.switchLogin : t.switchRegister}
             </button>

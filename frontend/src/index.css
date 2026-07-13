@@ -1,211 +1,183 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-/* ─────────────────────────────────────────────────────────────
-   DESIGN SYSTEM — Pằng Chíu Á! (Gumroad Inspired)
-───────────────────────────────────────────────────────────── */
+/* 
+  WISE + GUMROAD HYBRID PRO AESTHETIC
+  -----------------------------------
+  Primary Dark: #101A24 (Deep Navy)
+  Primary Accent: #9FE870 (Wise Bright Green)
+  Secondary Accent: #00B4D8 (Vibrant Cyan)
+  Success: #2563EB (Pro Blue)
+  Background: #F9FAFB (Off-White)
+*/
 
 @theme {
-  --color-brand:   #FF90E8;    /* Hot pink */
-  --color-bg:      #F4F4F0;    /* Warm cream base */
-  --color-surface: #FFFFFF;    /* Pure white for cards */
-  --color-ink:     #111111;    /* Stark black */
+  --color-brand-dark: #101A24;
+  --color-brand-green: #9FE870;
+  --color-brand-cyan: #00B4D8;
+  --color-brand-blue: #2563EB;
+  --color-brand-bg: #F9FAFB;
+}
+
+@layer base {
+  body {
+    @apply bg-[#F9FAFB] text-[#101A24] font-sans antialiased selection:bg-[#9FE870] selection:text-[#101A24];
+  }
+}
+
+@layer utilities {
+  .card-pro {
+    @apply bg-white border border-[#101A24]/10 rounded-2xl shadow-[0_4px_20px_-4px_rgba(16,26,36,0.08)] transition-all duration-300;
+  }
   
-  --color-accent-1: #FFC900;   /* Yellow */
-  --color-accent-2: #23A094;   /* Teal */
-  --color-accent-3: #F24E1E;   /* Orange-red */
-  --color-accent-4: #90A8ED;   /* Periwinkle */
-}
-
-/* ─── Reset ─────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html { scroll-behavior: smooth; }
-
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #F4F4F0;
-  color: #111111;
-  min-height: 100vh;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  line-height: 1.5;
-}
-
-/* ─── Global Scroll ─────────────────────────────────────── */
-.custom-scrollbar::-webkit-scrollbar { width: 8px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; border-left: 2px solid #111; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #111; border-radius: 0; border: 2px solid #fff; }
-
-/* ─── Utilities ─────────────────────────────────────────── */
-
-@utility card-brutal {
-  background: #ffffff;
-  border: 3px solid #111;
-  border-radius: 12px;
-  box-shadow: 6px 6px 0px #111;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-
-@utility input-brutal {
-  background: #ffffff;
-  border: 3px solid #111;
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111;
-  outline: none;
-  width: 100%;
-  transition: box-shadow 0.1s ease, transform 0.1s ease;
-  &:focus {
-    box-shadow: 4px 4px 0px #FF90E8;
-    transform: translate(-2px, -2px);
+  .card-pro-interactive {
+    @apply bg-white border border-[#101A24]/10 rounded-2xl shadow-[0_4px_20px_-4px_rgba(16,26,36,0.08)] transition-all duration-300 hover:shadow-[0_8px_30px_-4px_rgba(16,26,36,0.12)] hover:-translate-y-1 cursor-pointer;
   }
-  &::placeholder { color: #888; font-weight: 500; }
-}
 
-@utility btn-brutal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: #FF90E8;
-  color: #111;
-  font-weight: 800;
-  font-size: 1rem;
-  padding: 14px 24px;
-  border-radius: 8px;
-  border: 3px solid #111;
-  cursor: pointer;
-  box-shadow: 4px 4px 0 #111;
-  transition: transform 100ms, box-shadow 100ms, background-color 100ms;
-  text-transform: none;
+  .btn-pro {
+    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden border border-transparent;
+  }
   
-  &:hover  { 
-    transform: translate(2px,2px); 
-    box-shadow: 2px 2px 0 #111; 
+  .btn-pro-primary {
+    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden border border-transparent bg-[#9FE870] text-[#101A24] hover:bg-[#8CD95C];
   }
-  &:active { 
-    transform: translate(4px,4px); 
-    box-shadow: 0 0 0 #111; 
-  }
-  &:disabled{ 
-    opacity: 0.5; 
-    cursor: not-allowed; 
-    transform: none;
-    box-shadow: 4px 4px 0 #111;
-  }
-}
 
-@utility btn-brutal-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: #FFFFFF;
-  color: #111;
-  font-weight: 800;
-  font-size: 1rem;
-  padding: 14px 24px;
-  border-radius: 8px;
-  border: 3px solid #111;
-  cursor: pointer;
-  box-shadow: 4px 4px 0 #111;
-  transition: transform 100ms, box-shadow 100ms, background-color 100ms;
-  text-transform: none;
+  .btn-pro-secondary {
+    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden bg-white text-[#101A24] border border-[#101A24]/20 hover:border-[#101A24]/40 hover:bg-gray-50;
+  }
   
-  &:hover  { 
-    background: #F4F4F0;
-    transform: translate(2px,2px); 
-    box-shadow: 2px 2px 0 #111; 
+  .btn-pro-dark {
+    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden border border-transparent bg-[#101A24] text-white hover:bg-[#1A2938];
   }
-  &:active { 
-    transform: translate(4px,4px); 
-    box-shadow: 0 0 0 #111; 
-  }
-  &:disabled{ 
-    opacity: 0.5; 
-    cursor: not-allowed; 
-    transform: none;
-    box-shadow: 4px 4px 0 #111;
+
+  .input-pro {
+    @apply w-full px-5 py-4 bg-white border border-[#101A24]/20 rounded-xl text-[#101A24] placeholder-gray-400 focus:outline-none focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 transition-all font-medium;
   }
 }
 
-
-/* ─── Animations ────────────────────────────────────────── */
+/* Animations */
 @keyframes popIn {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  0% { opacity: 0; transform: scale(0.98) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.pop-in { animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
-
-
-/* ─── Progress bar ──────────────────────────────────────── */
-.progress-bar-brutal {
-  background: #111;
-  border-right: 3px solid #111;
-  transition: width 0.3s cubic-bezier(.4,0,.2,1);
+.pop-in {
+  animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* ─── Gunshot FX ────────────────────────────────────────── */
+@keyframes scaleIn {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Visual FX */
 .shoot-feedback-container {
-  position: fixed; top: 0; left: 0;
-  width: 100vw; height: 100vh;
-  pointer-events: none; z-index: 9999; overflow: hidden;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
 }
+
+/* Pang! FX */
 .pang-ripple {
   position: absolute;
-  border: 4px solid #111;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle, rgba(159,232,112,0.8) 0%, rgba(159,232,112,0) 70%);
   border-radius: 50%;
-  animation: pangRipple 0.5s cubic-bezier(.1,.8,.3,1) forwards;
-  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  animation: pangRipple 0.6s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
 }
+
 .pang-target {
-  position: absolute; width: 64px; height: 64px;
-  background-image: radial-gradient(circle, #FF90E8 25%, #111 26%, #111 32%, transparent 33%, transparent 40%, #111 41%, #111 48%, transparent 49%, transparent 60%, #111 61%, #111 66%, transparent 67%);
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 4px solid #101A24;
   border-radius: 50%;
-  transform: translate(-50%,-50%) scale(0);
-  animation: pangTarget 0.4s cubic-bezier(.175,.885,.32,1.275) forwards;
-  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0) rotate(-45deg);
+  opacity: 1;
+  animation: pangTarget 0.5s cubic-bezier(0.3, 1.5, 0.4, 1) forwards;
 }
+.pang-target::after {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  background: #9FE870;
+  border-radius: 50%;
+}
+
 .pang-spark {
-  position: absolute; width: 8px; height: 8px;
-  background: #FFC900; border: 2px solid #111; border-radius: 50%;
-  animation: spark 0.5s ease-out forwards;
+  position: absolute;
+  width: 6px;
+  height: 12px;
+  background: #00B4D8;
+  border-radius: 4px;
+  transform: translate(-50%, -50%);
+  animation: pangSpark 0.5s ease-out forwards;
 }
-.chiu-line {
-  position: absolute; height: 6px;
-  background: #111;
-  transform: translateY(-50%) rotate(var(--angle));
-  animation: chiuLine 0.4s ease-out forwards;
-}
-.chiu-dust {
-  position: absolute; width: 24px; height: 24px;
-  background: #111; opacity: 0.1; border-radius: 50%;
-  animation: dust 0.4s ease-out forwards;
-}
+
 @keyframes pangRipple {
-  0%   { width:0; height:0; opacity:1; transform:translate(-50%,-50%); }
-  100% { width:200px; height:200px; opacity:0; transform:translate(-50%,-50%); border-width: 0px; }
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
 }
 @keyframes pangTarget {
-  0%  { transform:translate(-50%,-50%) scale(0); opacity:1; }
-  70% { transform:translate(-50%,-50%) scale(1.2); opacity:1; }
-  100%{ transform:translate(-50%,-50%) scale(1); opacity:0; }
+  0% { transform: translate(-50%, -50%) scale(0) rotate(-45deg); opacity: 0; }
+  50% { transform: translate(-50%, -50%) scale(1.2) rotate(10deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 0; }
 }
-@keyframes spark {
-  0%   { transform:translate(-50%,-50%) scale(1); opacity:1; }
-  100% { transform:translate(-50%,-50%) translate(var(--x),var(--y)) scale(0); opacity:0; }
+@keyframes pangSpark {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(0); opacity: 0; }
 }
+
+/* Chiu! FX */
+.chiu-line {
+  position: absolute;
+  left: -100px;
+  width: 100vw;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #EF4444, transparent);
+  transform-origin: left center;
+  transform: rotate(var(--angle)) scaleX(0);
+  animation: chiuLine 0.3s ease-in forwards;
+}
+
+.chiu-dust {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  background: #101A24;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  animation: chiuDust 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
 @keyframes chiuLine {
-  0%   { width:0; left:-10%; opacity:1; }
-  50%  { width:120px; opacity:1; }
-  100% { left:110%; width:20px; opacity:0; }
+  0% { transform: rotate(var(--angle)) scaleX(0); opacity: 1; }
+  50% { transform: rotate(var(--angle)) scaleX(1); opacity: 1; }
+  100% { transform: rotate(var(--angle)) scaleX(0); opacity: 0; left: 100vw; }
 }
-@keyframes dust {
-  0%   { transform:translate(-50%,-50%) scale(0.2); opacity:1; }
-  100% { transform:translate(-50%,-50%) scale(2) translate(var(--dx),var(--dy)); opacity:0; }
+@keyframes chiuDust {
+  0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0) rotate(180deg); opacity: 0; }
+}
+
+/* Custom scrollbar for flashcards */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(16, 26, 36, 0.2);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 26, 36, 0.4);
 }

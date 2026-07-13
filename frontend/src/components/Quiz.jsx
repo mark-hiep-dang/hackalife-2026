@@ -94,31 +94,31 @@ export default function Quiz({ onQuizFinished }) {
 
   /* ── Setup ─── */
   if (!started && !finished) return (
-    <div className="card-brutal p-8 md:p-10 pop-in bg-white">
+    <div className="card-pro p-8 md:p-10 pop-in bg-white">
       <div className="flex justify-center mb-6">
-        <div className="w-20 h-20 bg-[#FF90E8] border-4 border-[#111] rounded-xl flex items-center justify-center shadow-[6px_6px_0_#111] -rotate-6">
-          <Target size={40} strokeWidth={3} className="text-[#111]" />
+        <div className="w-20 h-20 bg-[#9FE870] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-6">
+          <Target size={40} strokeWidth={3} className="text-[#101A24]" />
         </div>
       </div>
       
-      <h2 className="text-4xl md:text-5xl font-black text-[#111] uppercase tracking-tighter text-center mb-8">{t.quizTitle}</h2>
+      <h2 className="text-4xl md:text-5xl font-extrabold text-[#101A24] uppercase tracking-tighter text-center mb-8">{t.quizTitle}</h2>
 
       <div className="flex flex-col gap-8">
         {/* Mode */}
         <div>
-          <label className="block text-sm font-black text-[#111] uppercase tracking-widest mb-3">Chế độ chiến</label>
+          <label className="block text-sm font-extrabold text-[#101A24] uppercase tracking-widest mb-3">Chế độ chiến</label>
           <div className="flex flex-col sm:flex-row gap-4">
             {[['practice', t.practiceMode], ['exam', t.examMode]].map(([v,label]) => (
               <button key={v} onClick={() => setMode(v)} disabled={loading}
-                className={`flex-1 py-4 px-6 rounded-xl border-3 font-black uppercase tracking-widest transition-all ${mode === v ? 'bg-[#FF90E8] border-[#111] text-[#111] shadow-[4px_4px_0_#111] -translate-y-1 -translate-x-1' : 'bg-white border-[#111] text-[#111] shadow-[4px_4px_0_#111] hover:-translate-y-0.5 hover:-translate-x-0.5'}`}
+                className={`flex-1 py-4 px-6 rounded-2xl border font-extrabold uppercase tracking-widest transition-all ${mode === v ? 'bg-[#9FE870] border-[#101A24]/10 text-[#101A24] shadow-sm -translate-y-1 -translate-x-1' : 'bg-white border-[#101A24]/10 text-[#101A24] shadow-sm hover:-translate-y-0.5 hover:-translate-x-0.5'}`}
               >{label}</button>
             ))}
           </div>
         </div>
 
-        {error && <div className="text-white text-sm font-black uppercase tracking-widest bg-[#F24E1E] border-3 border-[#111] shadow-[2px_2px_0_#111] px-4 py-3 rounded-lg">{error}</div>}
+        {error && <div className="text-white text-sm font-extrabold uppercase tracking-widest bg-[#EF4444] border border-[#101A24]/10 shadow-sm px-4 py-3 rounded-lg">{error}</div>}
 
-        <button onClick={startQuiz} disabled={loading} className="btn-brutal w-full text-xl mt-4 bg-[#FFC900] py-4">
+        <button onClick={startQuiz} disabled={loading} className="btn-pro-primary w-full text-xl mt-4 bg-[#00B4D8] py-4">
           {loading ? 'Đang chuẩn bị đạn...' : t.startQuizBtn}
         </button>
       </div>
@@ -131,33 +131,33 @@ export default function Quiz({ onQuizFinished }) {
     const pct = Math.round((fs / questions.length) * 100);
 
     return (
-      <div className="card-brutal p-8 md:p-10 pop-in bg-white text-center">
-        <h2 className="text-5xl md:text-6xl font-black text-[#111] uppercase tracking-tighter mb-4">{t.quizCompleted}</h2>
-        <p className="text-lg font-black uppercase tracking-widest text-[#888] mb-8">{mode === 'exam' ? t.examMode : t.practiceMode}</p>
+      <div className="card-pro p-8 md:p-10 pop-in bg-white text-center">
+        <h2 className="text-5xl md:text-6xl font-extrabold text-[#101A24] uppercase tracking-tighter mb-4">{t.quizCompleted}</h2>
+        <p className="text-lg font-extrabold uppercase tracking-widest text-[#888] mb-8">{mode === 'exam' ? t.examMode : t.practiceMode}</p>
 
-        <div className="inline-flex flex-col items-center justify-center w-40 h-40 rounded-full border-4 border-[#111] bg-[#FF90E8] shadow-[6px_6px_0_#111] mb-10 -rotate-2">
-          <span className="text-5xl font-black text-[#111]">{pct}%</span>
-          <span className="text-sm font-black text-[#111] uppercase tracking-widest bg-white border-2 border-[#111] px-2 py-0.5 rounded shadow-[2px_2px_0_#111] mt-2 -rotate-3">{fs}/{questions.length}</span>
+        <div className="inline-flex flex-col items-center justify-center w-40 h-40 rounded-full border border-[#101A24]/10 bg-[#9FE870] shadow-sm mb-10 -rotate-2">
+          <span className="text-5xl font-extrabold text-[#101A24]">{pct}%</span>
+          <span className="text-sm font-extrabold text-[#101A24] uppercase tracking-widest bg-white border border-[#101A24]/10 px-2 py-0.5 rounded shadow-sm mt-2 -rotate-3">{fs}/{questions.length}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-10">
-          <div className="bg-white border-3 border-[#111] rounded-xl p-5 shadow-[4px_4px_0_#111]">
-            <p className="text-xs font-black uppercase tracking-widest text-[#111] mb-1">{t.xpEarned}</p>
-            <p className="text-4xl font-black text-[#FF90E8]">+{xpEarned}</p>
+          <div className="bg-white border border-[#101A24]/10 rounded-2xl p-5 shadow-sm">
+            <p className="text-xs font-extrabold uppercase tracking-widest text-[#101A24] mb-1">{t.xpEarned}</p>
+            <p className="text-4xl font-extrabold text-[#9FE870]">+{xpEarned}</p>
           </div>
-          <div className="bg-white border-3 border-[#111] rounded-xl p-5 shadow-[4px_4px_0_#111]">
-            <p className="text-xs font-black uppercase tracking-widest text-[#111] mb-1">{t.comboBonus}</p>
-            <p className="text-4xl font-black text-[#FFC900]">{maxCombo > 1 ? `${(1 + Math.min((maxCombo-1)*0.05,0.25)).toFixed(2)}x` : '1.0x'}</p>
+          <div className="bg-white border border-[#101A24]/10 rounded-2xl p-5 shadow-sm">
+            <p className="text-xs font-extrabold uppercase tracking-widest text-[#101A24] mb-1">{t.comboBonus}</p>
+            <p className="text-4xl font-extrabold text-[#00B4D8]">{maxCombo > 1 ? `${(1 + Math.min((maxCombo-1)*0.05,0.25)).toFixed(2)}x` : '1.0x'}</p>
           </div>
         </div>
 
         {newBadges.length > 0 && (
-          <div className="bg-[#FFC900] border-3 border-[#111] rounded-xl p-6 shadow-[4px_4px_0_#111] text-left mb-10">
-            <p className="text-sm font-black uppercase tracking-widest text-[#111] mb-4">🏅 Huy hiệu mới</p>
+          <div className="bg-[#00B4D8] border border-[#101A24]/10 rounded-2xl p-6 shadow-sm text-left mb-10">
+            <p className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] mb-4">🏅 Huy hiệu mới</p>
             <div className="flex flex-col gap-3">
               {newBadges.map(bid => {
                 const Icon = BADGE_ICONS[bid] || Zap;
-                return <div key={bid} className="flex items-center gap-3 text-sm font-black text-[#111] uppercase bg-white border-2 border-[#111] px-3 py-2 rounded shadow-[2px_2px_0_#111]"><Icon size={20} strokeWidth={3} className="text-[#FF90E8]" /> {t[`badge_${bid}`] || bid}</div>;
+                return <div key={bid} className="flex items-center gap-3 text-sm font-extrabold text-[#101A24] uppercase bg-white border border-[#101A24]/10 px-3 py-2 rounded shadow-sm"><Icon size={20} strokeWidth={3} className="text-[#9FE870]" /> {t[`badge_${bid}`] || bid}</div>;
               })}
             </div>
           </div>
@@ -165,15 +165,15 @@ export default function Quiz({ onQuizFinished }) {
 
         {mode === 'exam' && examAnswers.length > 0 && (
           <div className="text-left mb-10">
-            <p className="text-xl font-black uppercase tracking-widest text-[#111] mb-4">Xem lại bài thi</p>
+            <p className="text-xl font-extrabold uppercase tracking-widest text-[#101A24] mb-4">Xem lại bài thi</p>
             <div className="flex flex-col gap-4">
               {examAnswers.map((a, i) => (
-                <div key={i} className={`p-6 rounded-xl border-3 border-[#111] shadow-[4px_4px_0_#111] ${a.isCorrect ? 'bg-[#23A094]' : 'bg-[#F24E1E]'}`}>
+                <div key={i} className={`p-6 rounded-2xl border border-[#101A24]/10 shadow-sm ${a.isCorrect ? 'bg-[#2563EB]' : 'bg-[#EF4444]'}`}>
                   <div className="flex items-start gap-4 text-white">
                     {a.isCorrect ? <CheckCircle2 size={28} strokeWidth={3} className="shrink-0 mt-0.5" /> : <XCircle size={28} strokeWidth={3} className="shrink-0 mt-0.5" />}
                     <div>
                       <p className="font-bold text-lg leading-snug mb-3">{a.question.question}</p>
-                      {!a.isCorrect && <p className="text-white text-sm font-black uppercase tracking-widest bg-[#111] inline-block px-3 py-1.5 rounded shadow-[2px_2px_0_#fff]">✓ {a.question.options[a.question.correct_index]}</p>}
+                      {!a.isCorrect && <p className="text-white text-sm font-extrabold uppercase tracking-widest bg-[#101A24] inline-block px-3 py-1.5 rounded shadow-sm">✓ {a.question.options[a.question.correct_index]}</p>}
                     </div>
                   </div>
                 </div>
@@ -182,7 +182,7 @@ export default function Quiz({ onQuizFinished }) {
           </div>
         )}
 
-        <button onClick={() => onQuizFinished()} className="btn-brutal w-full text-xl bg-[#23A094] text-white py-4">
+        <button onClick={() => onQuizFinished()} className="btn-pro-primary w-full text-xl bg-[#2563EB] text-white py-4">
           {t.backToDashboard}
         </button>
       </div>
@@ -199,32 +199,32 @@ export default function Quiz({ onQuizFinished }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {mode === 'exam' ? (
-            <span className={`flex items-center gap-2 text-sm font-black uppercase tracking-widest px-4 py-2 rounded-xl border-3 shadow-[2px_2px_0_#111] ${timeLeft < 300 ? 'bg-[#F24E1E] border-[#111] text-white animate-pulse' : 'bg-white border-[#111] text-[#111]'}`}>
+            <span className={`flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest px-4 py-2 rounded-2xl border shadow-sm ${timeLeft < 300 ? 'bg-[#EF4444] border-[#101A24]/10 text-white animate-pulse' : 'bg-white border-[#101A24]/10 text-[#101A24]'}`}>
               <Clock size={20} strokeWidth={3} /> {fmt(timeLeft)}
             </span>
           ) : combo > 1 ? (
-            <span className="flex items-center gap-1.5 text-sm font-black uppercase tracking-widest bg-[#FFC900] text-[#111] border-3 border-[#111] px-4 py-2 rounded-xl shadow-[2px_2px_0_#111] rotate-2">
-              <Flame size={20} strokeWidth={3} className="text-[#111]" /> {combo}x COMBO
+            <span className="flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-widest bg-[#00B4D8] text-[#101A24] border border-[#101A24]/10 px-4 py-2 rounded-2xl shadow-sm rotate-2">
+              <Flame size={20} strokeWidth={3} className="text-[#101A24]" /> {combo}x COMBO
             </span>
           ) : null}
         </div>
-        <span className="text-sm font-black uppercase tracking-widest text-[#111] bg-white border-3 border-[#111] px-4 py-2 rounded-xl shadow-[2px_2px_0_#111]">
+        <span className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] bg-white border border-[#101A24]/10 px-4 py-2 rounded-2xl shadow-sm">
           {t.questionIndicator.replace('{current}', cidx + 1).replace('{total}', questions.length)}
         </span>
       </div>
 
       {/* Progress */}
-      <div className="h-4 bg-white border-3 border-[#111] rounded-full overflow-hidden shadow-inner">
-        <div className="progress-bar-brutal h-full bg-[#FF90E8]" style={{ width: `${((cidx + 1) / questions.length) * 100}%` }} />
+      <div className="h-4 bg-white border border-[#101A24]/10 rounded-full overflow-hidden shadow-inner">
+        <div className="transition-all duration-300 rounded-full h-full bg-[#9FE870]" style={{ width: `${((cidx + 1) / questions.length) * 100}%` }} />
       </div>
 
       {/* Question */}
-      <div className="card-brutal p-8 md:p-12 bg-white relative mt-4">
-        <span className="absolute -top-5 -left-5 text-xs font-black uppercase tracking-widest text-white bg-[#111] px-4 py-2 rounded-xl border-3 border-[#111] shadow-[3px_3px_0_#FF90E8] -rotate-6">
+      <div className="card-pro p-8 md:p-12 bg-white relative mt-4">
+        <span className="absolute -top-5 -left-5 text-xs font-extrabold uppercase tracking-widest text-white bg-[#101A24] px-4 py-2 rounded-2xl border border-[#101A24]/10 shadow-sm -rotate-6">
           Câu {q.stt || cidx + 1}
         </span>
         
-        <h3 className="text-2xl md:text-4xl font-black text-[#111] leading-snug tracking-tight mb-10 mt-2">
+        <h3 className="text-2xl md:text-4xl font-extrabold text-[#101A24] leading-snug tracking-tight mb-10 mt-2">
           {q.question}
         </h3>
 
@@ -232,24 +232,24 @@ export default function Quiz({ onQuizFinished }) {
           {(opts || []).map((opt, i) => {
             const isCorr = i === q.correct_index;
             const isSel  = selected === i;
-            let cls = 'w-full text-left px-6 py-5 rounded-2xl border-3 border-[#111] text-lg font-bold transition-all flex items-center gap-5 ';
+            let cls = 'w-full text-left px-6 py-5 rounded-2xl border border-[#101A24]/10 text-lg font-bold transition-all flex items-center gap-5 ';
 
             if (answered && mode === 'practice') {
-              if (isCorr)      cls += 'bg-[#23A094] text-white shadow-[4px_4px_0_#111] -translate-y-1 -translate-x-1';
-              else if (isSel)  cls += 'bg-[#F24E1E] text-white shadow-none translate-y-1 translate-x-1';
-              else             cls += 'bg-[#F4F4F0] text-[#111] opacity-50 shadow-none';
+              if (isCorr)      cls += 'bg-[#2563EB] text-white shadow-sm -translate-y-1 -translate-x-1';
+              else if (isSel)  cls += 'bg-[#EF4444] text-white shadow-none translate-y-1 translate-x-1';
+              else             cls += 'bg-[#F9FAFB] text-[#101A24] opacity-50 shadow-none';
             } else if (isSel) {
-              cls += 'bg-[#FFC900] text-[#111] shadow-[4px_4px_0_#111] -translate-y-1 -translate-x-1';
+              cls += 'bg-[#00B4D8] text-[#101A24] shadow-sm -translate-y-1 -translate-x-1';
             } else {
-              cls += 'bg-white text-[#111] shadow-[4px_4px_0_#111] hover:-translate-y-0.5 hover:-translate-x-0.5 cursor-pointer';
+              cls += 'bg-white text-[#101A24] shadow-sm hover:-translate-y-0.5 hover:-translate-x-0.5 cursor-pointer';
             }
 
             return (
               <button key={i} onClick={e => pick(i, e)} disabled={answered} className={cls}>
-                <span className={`w-10 h-10 rounded-lg border-3 border-[#111] text-sm font-black flex items-center justify-center shrink-0 ${
-                  answered && isCorr ? 'bg-white text-[#111]'
-                  : answered && isSel ? 'bg-[#111] text-white'
-                  : 'bg-[#FF90E8] text-[#111] shadow-[2px_2px_0_#111]'
+                <span className={`w-10 h-10 rounded-lg border border-[#101A24]/10 text-sm font-extrabold flex items-center justify-center shrink-0 ${
+                  answered && isCorr ? 'bg-white text-[#101A24]'
+                  : answered && isSel ? 'bg-[#101A24] text-white'
+                  : 'bg-[#9FE870] text-[#101A24] shadow-sm'
                 }`}>{['A','B','C','D'][i]}</span>
                 <span className="flex-1">{opt}</span>
                 {answered && isCorr && <CheckCircle2 size={28} strokeWidth={3} className="text-white shrink-0" />}
@@ -262,25 +262,25 @@ export default function Quiz({ onQuizFinished }) {
 
       {/* Feedback */}
       {answered && mode === 'practice' && (
-        <div className={`card-brutal p-8 border-t-8 scale-in mt-4 ${isCorrect ? 'border-t-[#23A094] bg-white' : 'border-t-[#F24E1E] bg-[#F4F4F0]'}`}>
+        <div className={`card-pro p-8 border-t-8 scale-in mt-4 ${isCorrect ? 'border-t-[#2563EB] bg-white' : 'border-t-[#EF4444] bg-[#F9FAFB]'}`}>
           <div className="flex items-center gap-4 mb-4">
             {isCorrect
-              ? <><CheckCircle2 size={36} strokeWidth={3} className="text-[#23A094]" /> <span className="font-black text-3xl uppercase tracking-tighter text-[#111]">{t.correctFeedback}</span></>
-              : <><XCircle size={36} strokeWidth={3} className="text-[#F24E1E]" /> <span className="font-black text-3xl uppercase tracking-tighter text-[#111]">{t.incorrectFeedback}</span></>
+              ? <><CheckCircle2 size={36} strokeWidth={3} className="text-[#2563EB]" /> <span className="font-extrabold text-3xl uppercase tracking-tighter text-[#101A24]">{t.correctFeedback}</span></>
+              : <><XCircle size={36} strokeWidth={3} className="text-[#EF4444]" /> <span className="font-extrabold text-3xl uppercase tracking-tighter text-[#101A24]">{t.incorrectFeedback}</span></>
             }
           </div>
           {!isCorrect && (
-            <p className="text-base font-bold text-[#111] mb-6">
-              <strong className="uppercase tracking-widest bg-[#FFC900] border-2 border-[#111] px-3 py-1 rounded-lg mr-3 shadow-[2px_2px_0_#111]">{t.correctAnswerWas}</strong>
+            <p className="text-base font-bold text-[#101A24] mb-6">
+              <strong className="uppercase tracking-widest bg-[#00B4D8] border border-[#101A24]/10 px-3 py-1 rounded-lg mr-3 shadow-sm">{t.correctAnswerWas}</strong>
               {q.options[q.correct_index]}
             </p>
           )}
-          <div className="bg-white rounded-xl p-6 text-base text-[#111] font-bold leading-relaxed border-3 border-[#111] shadow-inner mb-6">
-            <strong className="block text-[#111] text-sm font-black uppercase tracking-widest mb-3 underline decoration-3 decoration-[#FF90E8] underline-offset-4">{t.explanationTitle}</strong>
+          <div className="bg-white rounded-2xl p-6 text-base text-[#101A24] font-bold leading-relaxed border border-[#101A24]/10 shadow-inner mb-6">
+            <strong className="block text-[#101A24] text-sm font-extrabold uppercase tracking-widest mb-3 underline decoration-3 decoration-[#9FE870] underline-offset-4">{t.explanationTitle}</strong>
             {q.explanation}
             {q.source && <p className="mt-4 text-xs font-medium text-[#666] italic">Nguồn: {q.source}</p>}
           </div>
-          <button onClick={advance} className="btn-brutal w-full text-2xl py-5 bg-[#FFC900]">
+          <button onClick={advance} className="btn-pro-primary w-full text-2xl py-5 bg-[#00B4D8]">
             {t.nextQuestionBtn} <ArrowRight size={24} strokeWidth={3} />
           </button>
         </div>
