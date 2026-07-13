@@ -72,12 +72,12 @@ export default function App() {
   /* ── Auth ─────────────────────────────────────────────── */
   if (!session) {
     return (
-      <div className="min-h-screen bg-[#F4F4F0] flex flex-col">
-        <header className="bg-white border-b-3 border-[#111] sticky top-0 z-50">
+      <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
+        <header className="bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
-            <span className="font-black text-2xl tracking-tight flex items-center gap-3 text-[#111]">
-              <span className="w-10 h-10 bg-[#FF90E8] border-3 border-[#111] rounded-lg shadow-[3px_3px_0_#111] flex items-center justify-center">
-                <Target size={18} strokeWidth={3} className="text-[#111]" />
+            <span className="font-extrabold text-2xl tracking-tight flex items-center gap-3 text-[#101A24]">
+              <span className="w-10 h-10 bg-[#9FE870] border border-[#101A24]/10 rounded-lg shadow-sm flex items-center justify-center">
+                <Target size={18} strokeWidth={3} className="text-[#101A24]" />
               </span>
               Pằng Chíu Á!
             </span>
@@ -92,14 +92,14 @@ export default function App() {
 
   /* ── Main App (Sidebar / Bottom Tab layout) ───────────────── */
   return (
-    <div className="min-h-screen bg-[#F4F4F0] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F9FAFB] flex flex-col md:flex-row">
       
       {/* ── Sidebar (Desktop) ─────────────────────────────────── */}
-      <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#111] sticky top-0 h-screen shrink-0">
-        <div className="p-6 border-b-3 border-[#111]">
-          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-3 font-black text-2xl tracking-tight text-[#111]">
-            <span className="w-10 h-10 bg-[#FF90E8] border-3 border-[#111] rounded shadow-[3px_3px_0_#111] flex items-center justify-center">
-              <Target size={20} strokeWidth={3} className="text-[#111]" />
+      <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
+        <div className="p-6 border-b-3 border-[#101A24]/10">
+          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-3 font-extrabold text-2xl tracking-tight text-[#101A24]">
+            <span className="w-10 h-10 bg-[#9FE870] border border-[#101A24]/10 rounded shadow-sm flex items-center justify-center">
+              <Target size={20} strokeWidth={3} className="text-[#101A24]" />
             </span>
             <span>Pằng Chíu!</span>
           </button>
@@ -110,10 +110,10 @@ export default function App() {
             const active = activeTab === id && !activeLesson;
             return (
               <button key={id} onClick={() => { setActiveLesson(null); setActiveTab(id); }}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-black uppercase tracking-widest transition-all border-3 ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-base font-extrabold uppercase tracking-widest transition-all border ${
                   active
-                    ? 'bg-[#111] border-[#111] text-white shadow-[4px_4px_0_#FF90E8] -translate-y-1 -translate-x-1'
-                    : 'bg-white border-transparent text-[#111] hover:border-[#111] hover:shadow-[4px_4px_0_#111]'
+                    ? 'bg-[#101A24] border-[#101A24]/10 text-white shadow-sm -translate-y-1 -translate-x-1'
+                    : 'bg-white border-transparent text-[#101A24] hover:border-[#101A24]/10 hover:shadow-sm'
                 }`}
               >
                 <Icon size={24} strokeWidth={active ? 3 : 2} /> {label}
@@ -123,19 +123,19 @@ export default function App() {
         </nav>
 
         {profile && (
-          <div className="p-6 border-t-3 border-[#111] bg-[#F4F4F0] flex flex-col gap-4">
+          <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#F9FAFB] flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#888]">{profile.username}</span>
-                <span className="text-sm font-black uppercase tracking-widest text-[#111]">LV. {profile.level}</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{profile.username}</span>
+                <span className="text-sm font-extrabold uppercase tracking-widest text-[#101A24]">LV. {profile.level}</span>
               </div>
-              <span className="text-sm font-black uppercase tracking-widest bg-[#FFC900] text-[#111] px-3 py-1.5 rounded-lg border-3 border-[#111] shadow-[2px_2px_0_#111] -rotate-3">
+              <span className="text-sm font-extrabold uppercase tracking-widest bg-[#00B4D8] text-[#101A24] px-3 py-1.5 rounded-lg border border-[#101A24]/10 shadow-sm -rotate-3">
                 {profile.xp.toLocaleString()} XP
               </span>
             </div>
             
             <button onClick={() => { const n = !muted; setMuted(n); setMuteState(n); }}
-              className="w-full py-2 rounded-lg border-3 border-[#111] bg-white shadow-[2px_2px_0_#111] flex items-center justify-center text-[#111] hover:bg-[#FF90E8] transition-colors font-black text-xs uppercase tracking-widest gap-2"
+              className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center text-[#101A24] hover:bg-[#9FE870] transition-colors font-extrabold text-xs uppercase tracking-widest gap-2"
             >
               {muted ? <VolumeX size={16} strokeWidth={3} /> : <Volume2 size={16} strokeWidth={3} />}
               {muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
@@ -145,21 +145,21 @@ export default function App() {
       </aside>
 
       {/* ── Top Bar (Mobile Only) ─────────────────────────────── */}
-      <header className="md:hidden bg-white border-b-3 border-[#111] sticky top-0 z-50 shadow-[0_4px_0_rgba(0,0,0,0.05)]">
+      <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50 shadow-[0_4px_0_rgba(0,0,0,0.05)]">
         <div className="px-4 h-16 flex items-center justify-between">
-          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-black text-xl tracking-tight text-[#111]">
-            <span className="w-8 h-8 bg-[#FF90E8] border-2 border-[#111] rounded shadow-[2px_2px_0_#111] flex items-center justify-center">
-              <Target size={16} strokeWidth={3} className="text-[#111]" />
+          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-extrabold text-xl tracking-tight text-[#101A24]">
+            <span className="w-8 h-8 bg-[#9FE870] border border-[#101A24]/10 rounded shadow-sm flex items-center justify-center">
+              <Target size={16} strokeWidth={3} className="text-[#101A24]" />
             </span>
             Pằng Chíu!
           </button>
           
           {profile && (
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest bg-[#FFC900] text-[#111] px-2 py-1 rounded border-2 border-[#111] shadow-[2px_2px_0_#111]">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest bg-[#00B4D8] text-[#101A24] px-2 py-1 rounded border border-[#101A24]/10 shadow-sm">
                 {profile.xp} XP
               </span>
-              <button onClick={() => { const n = !muted; setMuted(n); setMuteState(n); }} className="w-8 h-8 rounded border-2 border-[#111] bg-white shadow-[2px_2px_0_#111] flex items-center justify-center text-[#111] active:translate-y-1 active:translate-x-1 active:shadow-none">
+              <button onClick={() => { const n = !muted; setMuted(n); setMuteState(n); }} className="w-8 h-8 rounded border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center text-[#101A24] active:translate-y-1 active:translate-x-1 active:shadow-none">
                 {muted ? <VolumeX size={16} strokeWidth={2.5} /> : <Volume2 size={16} strokeWidth={2.5} />}
               </button>
             </div>
@@ -187,18 +187,18 @@ export default function App() {
       </main>
 
       {/* ── Bottom Tab Bar (Mobile Only) ──────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t-3 border-[#111] pb-safe shadow-[0_-4px_0_rgba(0,0,0,0.05)] z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t-3 border-[#101A24]/10 pb-safe shadow-[0_-4px_0_rgba(0,0,0,0.05)] z-50">
         <div className="flex items-center justify-around px-2 py-3">
           {NAV.map(({ id, icon: Icon, label }) => {
             const active = activeTab === id && !activeLesson;
             return (
               <button key={id} onClick={() => { setActiveLesson(null); setActiveTab(id); }}
-                className={`flex flex-col items-center gap-1 w-16 transition-colors ${active ? 'text-[#111]' : 'text-[#888]'}`}
+                className={`flex flex-col items-center gap-1 w-16 transition-colors ${active ? 'text-[#101A24]' : 'text-[#888]'}`}
               >
-                <div className={`flex items-center justify-center w-12 h-10 rounded-xl border-2 ${active ? 'bg-[#FF90E8] border-[#111] shadow-[2px_2px_0_#111] -translate-y-1' : 'bg-transparent border-transparent'}`}>
+                <div className={`flex items-center justify-center w-12 h-10 rounded-2xl border ${active ? 'bg-[#9FE870] border-[#101A24]/10 shadow-sm -translate-y-1' : 'bg-transparent border-transparent'}`}>
                   <Icon size={20} strokeWidth={active ? 3 : 2} />
                 </div>
-                <span className={`text-[9px] font-black uppercase tracking-wider ${active ? 'opacity-100' : 'opacity-0'} transition-opacity`}>{label}</span>
+                <span className={`text-[9px] font-extrabold uppercase tracking-wider ${active ? 'opacity-100' : 'opacity-0'} transition-opacity`}>{label}</span>
               </button>
             );
           })}
