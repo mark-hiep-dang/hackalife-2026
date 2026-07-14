@@ -20,7 +20,7 @@ export default function Quiz({ onQuizFinished }) {
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(2400);
+  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes, matching the real MOF exam
   const timerRef = useRef(null);
   const [finished, setFinished] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
@@ -45,7 +45,7 @@ export default function Quiz({ onQuizFinished }) {
       const qs = await generateQuiz(topic, difficulty, mode);
       if (qs.length === 0) throw new Error("Không có câu hỏi nào cho chủ đề này.");
       setQuestions(qs); setCidx(0); setScore(0); setCombo(0); setMaxCombo(0);
-      setSelected(null); setAnswered(false); setTimeLeft(2400);
+      setSelected(null); setAnswered(false); setTimeLeft(3600);
       setExamAnswers([]); setStarted(true); setFinished(false);
     } catch (e) { setError(e.message || 'Lỗi tải đề thi'); }
     finally { setLoading(false); }
@@ -114,6 +114,11 @@ export default function Quiz({ onQuizFinished }) {
               >{label}</button>
             ))}
           </div>
+          {mode === 'exam' && (
+            <p className="mt-3 text-xs font-extrabold uppercase tracking-widest text-[#888] text-center">
+              40 câu hỏi • 60 phút • cần đạt 70% mới đỗ (đúng chuẩn thi thật)
+            </p>
+          )}
         </div>
 
         {error && <div className="text-white text-sm font-extrabold uppercase tracking-widest bg-[#EF4444] border border-[#101A24]/10 shadow-sm px-4 py-3 rounded-lg">{error}</div>}
@@ -135,10 +140,16 @@ export default function Quiz({ onQuizFinished }) {
         <h2 className="text-5xl md:text-6xl font-extrabold text-[#101A24] uppercase tracking-tighter mb-4">{t.quizCompleted}</h2>
         <p className="text-lg font-extrabold uppercase tracking-widest text-[#888] mb-8">{mode === 'exam' ? t.examMode : t.practiceMode}</p>
 
-        <div className="inline-flex flex-col items-center justify-center w-40 h-40 rounded-full border border-[#101A24]/10 bg-[#9FE870] shadow-sm mb-10 -rotate-2">
+        <div className="inline-flex flex-col items-center justify-center w-40 h-40 rounded-full border border-[#101A24]/10 bg-[#9FE870] shadow-sm mb-6 -rotate-2">
           <span className="text-5xl font-extrabold text-[#101A24]">{pct}%</span>
           <span className="text-sm font-extrabold text-[#101A24] uppercase tracking-widest bg-white border border-[#101A24]/10 px-2 py-0.5 rounded shadow-sm mt-2 -rotate-3">{fs}/{questions.length}</span>
         </div>
+
+        {mode === 'exam' && (
+          <div className={`inline-block mb-10 px-6 py-3 rounded-2xl border border-[#101A24]/10 shadow-sm font-extrabold uppercase tracking-widest text-white ${pct >= 70 ? 'bg-[#2563EB]' : 'bg-[#EF4444]'}`}>
+            {pct >= 70 ? 'ĐẠT RỒI! 🎉 Xạ thủ đúng chuẩn đại lý tương lai đây!' : 'Chưa đủ 70% đâu nha, đừng buồn! Xạ thủ giỏi cỡ nào cũng từng bắn trượt trước khi trăm phát trăm trúng 💪'}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-6 mb-10">
           <div className="bg-white border border-[#101A24]/10 rounded-2xl p-5 shadow-sm">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getProfile, getLessons } from './utils/api';
 import { translations } from './translations';
 import { getMuteState, setMuteState } from './utils/sound';
+import { markStudiedToday, ensureStudyTrackingInitialized } from './utils/streak';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Learn from './components/Learn';
@@ -25,7 +26,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (session) { fetchUserDossier(); }
+    if (session) { ensureStudyTrackingInitialized(); fetchUserDossier(); }
     else { setProfile(null); setLessons([]); setActiveTab('home'); setActiveLesson(null); }
   }, [session]);
 
@@ -56,8 +57,8 @@ export default function App() {
     catch { handleLogout(); }
   }
   function handleLogout() { localStorage.removeItem('pang_chiu_token'); setSession(null); }
-  function handleLessonFinished(xp) { setActiveLesson(null); if (xp !== null) fetchUserDossier(); }
-  function handleQuizFinished() { fetchUserDossier(); setActiveTab('home'); }
+  function handleLessonFinished(xp) { setActiveLesson(null); if (xp !== null) { markStudiedToday(); fetchUserDossier(); } }
+  function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); setActiveTab('home'); }
 
   const t = translations; // Now just a single dict
 
