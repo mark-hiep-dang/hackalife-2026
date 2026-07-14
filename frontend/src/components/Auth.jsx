@@ -76,7 +76,7 @@ export default function Auth({ setSession }) {
               onClick={() => { setIsRegister(r => !r); setError(''); }}
               className="text-sm font-extrabold text-[#101A24] border-b-3 border-[#101A24]/10 hover:text-[#9FE870] hover:border-[#9FE870] transition-colors pb-0.5"
             >
-              {isRegister ? t.switchLogin : t.switchRegister}
+              {isRegister ? t.registerToggle : t.loginToggle}
             </button>
           </p>
         </div>
