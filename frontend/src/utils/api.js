@@ -75,8 +75,18 @@ export async function completeLesson(lessonId) {
   return data;
 }
 
-export async function getFlashcards() {
-  const res = await fetch(`${API_BASE}/flashcards`, {
+export async function getFlashcardTopics() {
+  const res = await fetch(`${API_BASE}/flashcards/topics`, {
+    headers: getHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch flashcard topics');
+  return data;
+}
+
+export async function getFlashcards(topic) {
+  const query = topic ? `?topic=${encodeURIComponent(topic)}` : '';
+  const res = await fetch(`${API_BASE}/flashcards${query}`, {
     headers: getHeaders()
   });
   const data = await res.json();
