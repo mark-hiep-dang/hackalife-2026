@@ -129,6 +129,52 @@ export async function sendChatMessage(message, history) {
   return data.response;
 }
 
+export async function getKnowledgeDocs() {
+  const res = await fetch(`${API_BASE}/knowledge`, {
+    headers: getHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch knowledge documents');
+  return data;
+}
+
+export async function uploadKnowledgeFile(file, title) {
+  const token = localStorage.getItem('pang_chiu_token');
+  const formData = new FormData();
+  formData.append('file', file);
+  if (title) formData.append('title', title);
+
+  const res = await fetch(`${API_BASE}/knowledge/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to upload document');
+  return data;
+}
+
+export async function pasteKnowledgeText(title, text) {
+  const res = await fetch(`${API_BASE}/knowledge/paste`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ title, text })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to save document');
+  return data;
+}
+
+export async function deleteKnowledgeDoc(id) {
+  const res = await fetch(`${API_BASE}/knowledge/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to delete document');
+  return data;
+}
+
 export async function getLeaderboard() {
   const res = await fetch(`${API_BASE}/leaderboard`, {
     headers: getHeaders()

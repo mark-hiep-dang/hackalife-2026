@@ -126,6 +126,37 @@ export async function initDb() {
     )
   `);
 
+  // Knowledge base for the Llama RAG chat — documents agents upload get chunked and
+  // indexed here so the chat endpoint can retrieve relevant passages to ground its answers.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      uploaded_by INTEGER,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_chunks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      document_id INTEGER NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      FOREIGN KEY (document_id) REFERENCES knowledge_documents(id) ON DELETE CASCADE
+    )
+  `);
+
+  await db.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_fts USING fts5(
+      content,
+      chunk_id UNINDEXED,
+      document_id UNINDEXED
+    )
+  `);
+
   // Lessons are static reference content controlled by the codebase, so we upsert them
   // on every boot (keeping user progress in user_lessons untouched) instead of seeding once.
   {

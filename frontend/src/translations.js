@@ -4,6 +4,7 @@ export const translations = {
   navQuiz: 'Đề thi',
   navFlashcards: 'Thẻ bài',
   navLeaderboard: 'Xếp hạng',
+  navChat: 'Hỏi Llama',
   navSettings: 'Cài đặt',
   
   // Auth
@@ -64,6 +65,23 @@ export const translations = {
   leaderboardTitle: 'Bảng Xếp Hạng Xạ Thủ Techcom Life 🏆',
   leaderboardEmpty: 'Chưa có cao thủ nào xuất hiện.',
   
+  // Chat
+  chatTitle: 'Hỏi Llama Đại Lý 🦙',
+  chatSubtitle: 'Hỏi gì cũng được, Llama tra tài liệu rồi trả lời liền!',
+  chatPlaceholder: 'Hỏi về thời gian gia hạn, quyền lợi bảo hiểm...',
+  chatSendBtn: 'Gửi',
+  chatThinking: 'Llama đang lục tài liệu...',
+  chatEmptyState: 'Chào bạn! Hỏi mình bất cứ điều gì về bảo hiểm nhé 🦙',
+  knowledgeTitle: 'Tài liệu tham khảo',
+  knowledgeSubtitle: 'Tải tài liệu lên để Llama trả lời chính xác hơn',
+  knowledgeUploadFile: 'Tải file lên (PDF / TXT)',
+  knowledgePasteText: 'Hoặc dán văn bản',
+  knowledgePasteTitlePlaceholder: 'Tên tài liệu (không bắt buộc)',
+  knowledgePasteTextPlaceholder: 'Dán nội dung tài liệu vào đây...',
+  knowledgeSaveBtn: 'Lưu vào kho tài liệu',
+  knowledgeEmptyState: 'Chưa có tài liệu nào. Tải lên để bắt đầu!',
+  knowledgeDeleteBtn: 'Xóa',
+
   // Settings
   settingsTitle: 'Cài đặt',
   languageLabel: 'Ngôn ngữ',

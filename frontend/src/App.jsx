@@ -9,8 +9,9 @@ import Learn from './components/Learn';
 import Quiz from './components/Quiz';
 import Flashcards from './components/Flashcards';
 import Leaderboard from './components/Leaderboard';
+import Chat from './components/Chat';
 import Settings from './components/Settings';
-import { Home, Target, Layers, Trophy, Settings as SettingsIcon, Volume2, VolumeX, BookOpen } from 'lucide-react';
+import { Home, Target, Layers, Trophy, Settings as SettingsIcon, Volume2, VolumeX, BookOpen, MessageCircle } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -66,6 +67,7 @@ export default function App() {
     { id: 'home',        icon: Home,        label: t.navHome },
     { id: 'quiz',        icon: Target,      label: t.navQuiz },
     { id: 'flashcards',  icon: Layers,      label: t.navFlashcards },
+    { id: 'chat',        icon: MessageCircle, label: t.navChat },
     { id: 'leaderboard', icon: Trophy,      label: t.navLeaderboard },
     { id: 'settings',    icon: SettingsIcon,label: t.navSettings },
   ];
@@ -180,6 +182,7 @@ export default function App() {
               {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} />}
               {activeTab === 'quiz' && <div className="max-w-4xl mx-auto"><Quiz onQuizFinished={handleQuizFinished} /></div>}
               {activeTab === 'flashcards' && <div className="max-w-4xl mx-auto"><Flashcards /></div>}
+              {activeTab === 'chat' && <Chat />}
               {activeTab === 'leaderboard' && <div className="max-w-3xl mx-auto"><Leaderboard profile={profile} /></div>}
               {activeTab === 'settings' && <div className="max-w-2xl mx-auto"><Settings profile={profile} setSession={setSession} onMuteToggled={setMuted} /></div>}
             </>
