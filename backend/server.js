@@ -3,6 +3,8 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import multer from 'multer';
+import { PDFParse } from 'pdf-parse';
 import { initDb, getDb } from './db.js';
 import { generateDynamicQuestion, generateLlamaQuestion, questionBank } from './questions.js';
 
@@ -11,6 +13,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5005;
 const JWT_SECRET = process.env.JWT_SECRET || 'pang_chiu_secret_key_2026';
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
@@ -434,9 +437,163 @@ app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
   }
 });
 
-// Chatbot: Proxy to Ollama/Llama with local rule-based bilingual fallback
-app.post('/api/chat', async (req, res) => {
+// --- KNOWLEDGE BASE (RAG documents for Llama chat) ---
+
+// Splits raw text into ~700-char chunks along paragraph boundaries.
+function chunkText(text, maxLen = 700) {
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter((p) => p.length > 30);
+
+  const chunks = [];
+  let current = '';
+  for (const p of paragraphs) {
+    if (current && (current.length + p.length + 1) > maxLen) {
+      chunks.push(current.trim());
+      current = p;
+    } else {
+      current = current ? `${current} ${p}` : p;
+    }
+  }
+  if (current) chunks.push(current.trim());
+  return chunks;
+}
+
+// Builds a permissive FTS5 MATCH query (prefix-match each word, OR'd together)
+// from free-text user input, since raw chat messages aren't valid FTS5 syntax.
+function buildFtsQuery(message) {
+  const words = message
+    .toLowerCase()
+    .replace(/["*:^]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2);
+  if (words.length === 0) return null;
+  return words.map((w) => `"${w}"*`).join(' OR ');
+}
+
+async function retrieveKnowledge(db, message, limit = 5) {
+  const ftsQuery = buildFtsQuery(message);
+  if (!ftsQuery) return [];
+  try {
+    return await db.all(
+      `SELECT chunk_id, document_id, content, bm25(knowledge_chunks_fts) as score
+       FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ? ORDER BY score LIMIT ?`,
+      [ftsQuery, limit]
+    );
+  } catch (err) {
+    console.warn('Knowledge retrieval failed:', err.message);
+    return [];
+  }
+}
+
+async function storeDocument(db, title, sourceType, text, userId) {
+  const chunks = chunkText(text);
+  if (chunks.length === 0) throw new Error('Không trích xuất được nội dung từ tài liệu.');
+
+  const doc = await db.run(
+    'INSERT INTO knowledge_documents (title, source_type, uploaded_by) VALUES (?, ?, ?)',
+    [title, sourceType, userId]
+  );
+  const documentId = doc.lastID;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = await db.run(
+      'INSERT INTO knowledge_chunks (document_id, chunk_index, content) VALUES (?, ?, ?)',
+      [documentId, i, chunks[i]]
+    );
+    await db.run(
+      'INSERT INTO knowledge_chunks_fts (content, chunk_id, document_id) VALUES (?, ?, ?)',
+      [chunks[i], chunk.lastID, documentId]
+    );
+  }
+  return { documentId, chunkCount: chunks.length };
+}
+
+// List uploaded knowledge documents
+app.get('/api/knowledge', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const docs = await db.all(`
+      SELECT d.id, d.title, d.source_type, d.created_at, COUNT(c.id) as chunk_count
+      FROM knowledge_documents d
+      LEFT JOIN knowledge_chunks c ON c.document_id = d.id
+      GROUP BY d.id ORDER BY d.created_at DESC
+    `);
+    res.json(docs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Upload a PDF or text file into the knowledge base
+app.post('/api/knowledge/upload', authenticateToken, upload.single('file'), async (req, res) => {
+  const db = await getDb();
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file để tải lên' });
+
+    const { originalname, mimetype, buffer } = req.file;
+    let text = '';
+    let sourceType = 'txt';
+
+    if (mimetype === 'application/pdf' || originalname.toLowerCase().endsWith('.pdf')) {
+      sourceType = 'pdf';
+      const parser = new PDFParse({ data: buffer });
+      text = (await parser.getText()).text;
+      await parser.destroy();
+    } else {
+      text = buffer.toString('utf-8');
+    }
+
+    const title = (req.body.title || '').trim() || originalname;
+    const result = await storeDocument(db, title, sourceType, text, req.user.id);
+    res.status(201).json({ message: 'Tải tài liệu thành công', title, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Paste raw text directly into the knowledge base (no file needed)
+app.post('/api/knowledge/paste', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const { title, text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Nội dung không được để trống' });
+
+    const finalTitle = (title || '').trim() || 'Ghi chú dán tay';
+    const result = await storeDocument(db, finalTitle, 'paste', text, req.user.id);
+    res.status(201).json({ message: 'Lưu tài liệu thành công', title: finalTitle, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a knowledge document and its chunks
+app.delete('/api/knowledge/:id', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    // FTS5 columns aren't type-affinity-coerced like normal tables, so the string
+    // route param must be parsed to a number or it silently matches nothing.
+    const documentId = Number(req.params.id);
+    if (!Number.isInteger(documentId)) return res.status(400).json({ error: 'ID tài liệu không hợp lệ' });
+
+    await db.run('DELETE FROM knowledge_chunks_fts WHERE document_id = ?', [documentId]);
+    await db.run('DELETE FROM knowledge_documents WHERE id = ?', [documentId]); // cascades to knowledge_chunks
+    res.json({ message: 'Đã xóa tài liệu' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Chatbot: Proxy to Ollama/Llama, grounded with retrieved knowledge chunks, with a local fallback
+app.post('/api/chat', authenticateToken, async (req, res) => {
   const { message, history, ollamaUrl } = req.body;
+  const db = await getDb();
+
+  const retrieved = await retrieveKnowledge(db, message, 5);
+  const contextBlock = retrieved.length > 0
+    ? retrieved.map((r, i) => `[Đoạn ${i + 1}] ${r.content}`).join('\n\n')
+    : '';
 
   const insuranceContext = `You are "Llama Đại Lý", a friendly, encouraging, and highly knowledgeable bilingual AI tutor specializing in the Vietnam Ministry of Finance (MOF) Insurance Agent Certification.
 You reply in both English and Vietnamese. Keep answers simple, bite-sized, and structure them with bullet points.
@@ -448,7 +605,11 @@ Knowledge Base Guidelines:
    - Contracts: 60-day grace period, 21-day free look period, void states, rights/obligations.
    - Regulations: Ministry of Finance (MOF) regulates licensing and solvency. Agent certification is required. Rebating/discounting commissions is illegal.
 3. If the user asks you to "quiz me", output a brief MCQ question.
-4. Keep the tone snappy, game-like, and use target/gunshot references occasionally (e.g. "Hãy nhắm thẳng mục tiêu! / Shoot straight to the target!").`;
+4. Keep the tone snappy, game-like, and use target/gunshot references occasionally (e.g. "Hãy nhắm thẳng mục tiêu! / Shoot straight to the target!").${contextBlock ? `
+
+Bên dưới là các đoạn tài liệu do agent tự tải lên, hãy ƯU TIÊN dùng các đoạn này để trả lời nếu chúng liên quan đến câu hỏi. Trích dẫn ngắn gọn nếu phù hợp. Nếu tài liệu không đủ thông tin, hãy dùng kiến thức chung của bạn và nói rõ điều đó:
+
+${contextBlock}` : ''}`;
 
   const cleanOllamaUrl = ollamaUrl || 'http://localhost:11434';
 
@@ -478,7 +639,16 @@ Knowledge Base Guidelines:
     throw new Error('Ollama endpoint returned non-ok status');
   } catch (err) {
     console.warn('Ollama proxy failed, running bilingual dictionary agent fallback. Reason:', err.message);
-    
+
+    // If we found relevant uploaded material, surface it directly instead of the canned replies below —
+    // raw retrieved passages are far more useful than a generic fallback when Ollama isn't reachable.
+    if (retrieved.length > 0) {
+      const passages = retrieved.map((r, i) => `**Đoạn ${i + 1}:** ${r.content}`).join('\n\n');
+      return res.json({
+        response: `**[Llama AI Fallback Mode — Không kết nối được Ollama]**\nMình chưa nối được AI để tổng hợp câu trả lời, nhưng đây là những đoạn tài liệu bạn đã tải lên có vẻ liên quan nhất:\n\n${passages}\n\n*Kết nối Ollama trong Cài đặt để Llama tổng hợp câu trả lời mượt hơn nhé!*`
+      });
+    }
+
     // Smart Local Fallback
     const msg = message.toLowerCase();
     let reply = '';
