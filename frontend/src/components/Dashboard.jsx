@@ -1,11 +1,22 @@
-import { Target, Lock, Play, RotateCcw, Trophy, CheckCircle2 } from 'lucide-react';
+import { Target, Trophy } from 'lucide-react';
 import { translations as t } from '../translations';
+import { getDaysSinceLastStudy } from '../utils/streak';
+import LlamaNag from './LlamaNag';
+import LessonPath from './LessonPath';
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate }) {
   if (!profile) return null;
 
+  function handleStudyNow() {
+    const nextLesson = lessons.find((l) => l.isUnlocked && !l.isCompleted);
+    if (nextLesson) onSelectLesson(nextLesson);
+    else onNavigate('quiz');
+  }
+
   return (
     <div className="flex flex-col gap-12 pop-in w-full max-w-5xl mx-auto">
+      <LlamaNag daysSince={getDaysSinceLastStudy()} onStudyNow={handleStudyNow} />
+
       {/* Hero */}
       <div className="card-pro p-8 md:p-14 bg-[#9FE870] text-[#101A24]">
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
@@ -46,59 +57,13 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
         </button>
       </div>
 
-      {/* Lessons */}
+      {/* Lessons — Llama's climb to the MOF summit */}
       <div>
         <h2 className="text-3xl font-extrabold text-[#101A24] uppercase tracking-tighter mb-8 flex items-center gap-3">
-          <span className="w-4 h-8 bg-[#101A24] inline-block -skew-x-12" /> {t.lessonsTitle}
+          <span className="w-4 h-8 bg-[#101A24] inline-block -skew-x-12" /> Llama Cùng Bạn Tiến Đến Đỉnh MOF
         </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {lessons.map((l, i) => {
-            const isCompleted = l.isCompleted;
-            const isUnlocked = l.isUnlocked;
-            
-            return (
-              <div key={l.id} 
-                className={`card-pro p-6 flex flex-col justify-between transition-all duration-300 ${
-                  !isUnlocked ? 'bg-[#F9FAFB] border-dashed border-[#888] shadow-none opacity-80' : 
-                  isCompleted ? 'bg-white border-[#101A24]/10' : 
-                  'bg-[#101A24] text-white border-[#101A24]/10 -translate-y-1 shadow-sm'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2 py-1 border rounded ${
-                      !isUnlocked ? 'bg-gray-200 text-gray-500 border-gray-400' :
-                      isCompleted ? 'bg-[#2563EB] text-white border-[#101A24]/10' : 
-                      'bg-[#9FE870] text-[#101A24] border-[#101A24]/10'
-                    }`}>
-                      {t.progressLabel} {i + 1}/{lessons.length}
-                    </span>
-                    {isCompleted && <CheckCircle2 size={24} strokeWidth={3} className="text-[#2563EB]" />}
-                    {!isUnlocked && <Lock size={20} strokeWidth={3} className="text-[#888]" />}
-                  </div>
-                  <h3 className={`text-2xl font-extrabold uppercase tracking-tight mb-2 ${!isUnlocked ? 'text-[#888]' : isCompleted ? 'text-[#101A24]' : 'text-white'}`}>
-                    {l.title_vn}
-                  </h3>
-                </div>
-                
-                <button
-                  onClick={() => isUnlocked && onSelectLesson(l)}
-                  disabled={!isUnlocked}
-                  className={`mt-8 py-3 px-4 rounded-2xl font-extrabold uppercase tracking-widest border flex items-center justify-center gap-2 transition-all ${
-                    !isUnlocked ? 'bg-gray-200 text-gray-500 border-gray-400 cursor-not-allowed' :
-                    isCompleted ? 'bg-[#F9FAFB] text-[#101A24] border-[#101A24]/10 shadow-sm hover:-translate-y-0.5 hover:shadow-sm' :
-                    'bg-[#00B4D8] text-[#101A24] border-[#101A24]/10 shadow-sm hover:-translate-y-1 hover:shadow-sm active:translate-y-1 active:translate-x-1 active:shadow-none'
-                  }`}
-                >
-                  {isCompleted ? <><RotateCcw size={18} strokeWidth={3} /> {t.lessonCompletedBtn}</> :
-                   isUnlocked ? <><Play size={18} strokeWidth={3} fill="currentColor" /> {t.lessonStartBtn}</> :
-                   <><Lock size={18} strokeWidth={3} /> {t.lockedBtn}</>}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+
+        <LessonPath lessons={lessons} onSelectLesson={onSelectLesson} />
       </div>
     </div>
   );

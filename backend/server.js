@@ -355,11 +355,25 @@ app.get('/api/quiz/generate', authenticateToken, async (req, res) => {
   }
 });
 
-// Get flashcards
+// Get flashcard topic sets with counts
+app.get('/api/flashcards/topics', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const topics = await db.all('SELECT topic, COUNT(*) as count FROM flashcards GROUP BY topic ORDER BY topic ASC');
+    res.json(topics);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get flashcards — pass ?topic= to get a full topic set, otherwise a random sample
 app.get('/api/flashcards', authenticateToken, async (req, res) => {
   const db = await getDb();
   try {
-    const cards = await db.all('SELECT * FROM flashcards ORDER BY RANDOM() LIMIT 20');
+    const { topic } = req.query;
+    const cards = topic
+      ? await db.all('SELECT * FROM flashcards WHERE topic = ? ORDER BY stt ASC', [topic])
+      : await db.all('SELECT * FROM flashcards ORDER BY RANDOM() LIMIT 20');
     res.json(cards.map(c => ({
       id: c.id,
       stt: c.stt,
@@ -531,11 +545,10 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
     
     // Add mock competitive users to simulate a lively community
     const mockCompetitors = [
-      { id: 991, username: '🎯 Pằng_Chíu_Sniper', xp: 850, level: 3, streak: 9 },
-      { id: 992, username: '🥇 MOF_Master_99', xp: 720, level: 2, streak: 12 },
-      { id: 993, username: '💡 Llama_Fan_Boy', xp: 580, level: 2, streak: 5 },
-      { id: 994, username: '🛡️ Bảo_Việt_Pro', xp: 450, level: 2, streak: 4 },
-      { id: 995, username: '🔥 Học_Bất_Chấp', xp: 320, level: 1, streak: 8 }
+      { id: 991, username: '🎯 Britto Laban', xp: 850, level: 3, streak: 9 },
+      { id: 992, username: '🥇 Khắc Báu', xp: 720, level: 2, streak: 12 },
+      { id: 993, username: '💡 Khánh Linh', xp: 580, level: 2, streak: 5 },
+      { id: 994, username: '🛡️ Mai Anh', xp: 450, level: 2, streak: 4 }
     ];
 
     // Combine and sort

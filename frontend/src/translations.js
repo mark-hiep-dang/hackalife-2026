@@ -61,7 +61,7 @@ export const translations = {
   emptyState: 'Chưa có thẻ nào.',
   
   // Leaderboard
-  leaderboardTitle: 'Bảng Vàng 🏆',
+  leaderboardTitle: 'Bảng Xếp Hạng Xạ Thủ Techcom Life 🏆',
   leaderboardEmpty: 'Chưa có cao thủ nào xuất hiện.',
   
   // Settings
