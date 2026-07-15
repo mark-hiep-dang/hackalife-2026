@@ -5,6 +5,7 @@ import { playPang, playChiu } from '../utils/sound';
 import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import llamaSpit from '../assets/llama-spit.webp';
 import llamaCheer from '../assets/llama-cheer.webp';
+import { pickCorrectResponse, pickWrongResponse } from '../llamaResponses';
 
 const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame, pang_sniper: Zap, topic_master: Medal, xp_1000: Crown };
 const CARD_SHADOW = '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)';
@@ -23,6 +24,8 @@ export default function Quiz({ onQuizFinished }) {
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
+  const [wrongStreak, setWrongStreak] = useState(0);
+  const [feedbackText, setFeedbackText] = useState('');
   const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes, matching the real MOF exam
   const timerRef = useRef(null);
   const [finished, setFinished] = useState(false);
@@ -63,9 +66,13 @@ export default function Quiz({ onQuizFinished }) {
     if (correct) {
       playPang(); setScore(p => p + 1);
       const nc = combo + 1; setCombo(nc); if (nc > maxCombo) setMaxCombo(nc);
+      setWrongStreak(0);
+      setFeedbackText(pickCorrectResponse({ streak: nc, difficulty: q.difficulty, topic: q.topic }));
       window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'pang', x: e.clientX, y: e.clientY } }));
     } else {
       playChiu(); setCombo(0);
+      const nw = wrongStreak + 1; setWrongStreak(nw);
+      setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx] }));
       window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'chiu', x: e.clientX, y: e.clientY } }));
     }
     if (mode === 'exam') {
@@ -332,14 +339,14 @@ export default function Quiz({ onQuizFinished }) {
             </div>
 
             <div className="p-7">
-              <h4 className="font-comic font-extrabold text-xl text-[#101A24] mb-2">
-                {isCorrect ? t.correctFeedback : t.incorrectFeedback}
+              <h4 className="font-comic font-extrabold text-xl text-[#101A24] mb-2 leading-snug">
+                {feedbackText}
               </h4>
-              <p className="text-sm font-bold text-[#8A8A8A] mb-5 leading-relaxed">
-                {isCorrect
-                  ? t.correctFeedbackSub
-                  : <>{t.correctAnswerWas} <strong className="text-[#101A24]">{q.options[q.correct_index]}</strong></>}
-              </p>
+              {!isCorrect && (
+                <p className="text-sm font-bold text-[#8A8A8A] mb-5 leading-relaxed">
+                  {t.correctAnswerWas} <strong className="text-[#101A24]">{q.options[q.correct_index]}</strong>
+                </p>
+              )}
 
               <div className="text-left bg-[#F9FAFB] rounded-2xl p-5 mb-6">
                 <strong className="block text-[#101A24] text-xs font-extrabold uppercase tracking-widest mb-2">{t.explanationTitle}</strong>
