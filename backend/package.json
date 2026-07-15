@@ -1,7 +1,7 @@
 {
   "name": "hackalife-2026-backend",
   "version": "1.0.0",
-  "description": "Backend API for Pằng Chíu Á MOF exam prep app",
+  "description": "Backend API for LLAMA MOF exam prep app",
   "main": "server.js",
   "type": "module",
   "scripts": {
