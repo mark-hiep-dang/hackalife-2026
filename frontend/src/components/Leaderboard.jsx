@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { getLeaderboard } from '../utils/api';
-import { translations as t } from '../translations';
-import { Trophy, Flame } from 'lucide-react';
+
+const STAND_STYLE = {
+  1: { height: 64, width: 96, color: '#FFD34D', medal: '🥇', emojiSize: 56, bobSpeed: '2.4s' },
+  2: { height: 46, width: 88, color: '#D8DEE6', medal: '🥈', emojiSize: 42, bobSpeed: '3s' },
+  3: { height: 32, width: 88, color: '#E8B98A', medal: '🥉', emojiSize: 42, bobSpeed: '3s' }
+};
+const PODIUM_ORDER = [2, 1, 3]; // classic podium visual order: 2nd, 1st, 3rd
 
 export default function Leaderboard({ profile }) {
   const [data, setData] = useState([]);
@@ -17,73 +22,117 @@ export default function Leaderboard({ profile }) {
     })();
   }, []);
 
-  const rows = tab === 'daily'
-    ? data.map((r,i) => ({ ...r, xp: Math.round(r.xp*.12), rank: i+1 })).sort((a,b) => b.xp-a.xp)
-    : tab === 'monthly'
-    ? data.map((r,i) => ({ ...r, xp: Math.round(r.xp*3.4), rank: i+1 })).sort((a,b) => b.xp-a.xp)
-    : data;
+  const mult = tab === 'daily' ? 0.12 : tab === 'monthly' ? 3.4 : 1;
+  const rows = data
+    .map((r) => ({ ...r, xp: Math.round(r.xp * mult) }))
+    .sort((a, b) => b.xp - a.xp)
+    .map((r, i) => ({ ...r, rank: i + 1, isMe: r.username === profile?.username }));
 
-  const podium = (rank) => {
-    if (rank === 1) return <span className="text-3xl font-extrabold">🥇</span>;
-    if (rank === 2) return <span className="text-3xl font-extrabold">🥈</span>;
-    if (rank === 3) return <span className="text-3xl font-extrabold">🥉</span>;
-    return <span className="text-2xl font-extrabold text-[#101A24]">{rank}</span>;
-  };
+  const podium = PODIUM_ORDER.map((rank) => rows.find((r) => r.rank === rank)).filter(Boolean);
+  const restRows = rows.filter((r) => r.rank > 3);
+
+  const tabs = [
+    { id: 'daily', label: 'Hôm nay' },
+    { id: 'weekly', label: 'Tuần này' },
+    { id: 'monthly', label: 'Tháng này' }
+  ];
 
   return (
-    <div className="card-pro overflow-hidden pop-in bg-white flex flex-col max-w-4xl mx-auto w-full">
-      {/* Header */}
-      <div className="px-6 py-10 bg-[#00B4D8] border-b-4 border-[#101A24]/10 flex flex-col items-center justify-center gap-4">
-        <Trophy size={56} strokeWidth={3} className="text-[#101A24]" />
-        <h2 className="text-5xl font-extrabold text-[#101A24] uppercase tracking-tighter">{t.leaderboardTitle}</h2>
-      </div>
+    <div className="pop-in max-w-3xl mx-auto w-full">
+      <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide mb-1 flex items-center gap-2">
+        <span>🏁</span> Đường Đua Llama
+      </h2>
+      <p className="text-sm font-bold text-[#8A8A8A] mb-4">Ai chạy nhanh nhất tuần này? Cán đích để giành huy chương! 🥇</p>
 
-      {/* Tab bar */}
-      <div className="flex border-b-4 border-[#101A24]/10 bg-[#F9FAFB]">
-        {['daily', 'weekly', 'monthly'].map(v => (
-          <button key={v} onClick={() => setTab(v)}
-            className={`flex-1 py-5 text-sm md:text-base font-extrabold uppercase tracking-widest transition-all border-r-3 border-[#101A24]/10 last:border-r-0 ${tab === v ? 'bg-[#101A24] text-white shadow-inner' : 'text-[#101A24] hover:bg-white'}`}
-          >{v === 'daily' ? 'Hôm nay' : v === 'weekly' ? 'Tuần này' : 'Tháng này'}</button>
-        ))}
-      </div>
+      <div
+        className="relative rounded-[2rem] overflow-hidden"
+        style={{
+          background: 'linear-gradient(180deg, #DCF0FF 0%, #EEF7E8 100%)',
+          boxShadow: '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)'
+        }}
+      >
+        {/* Tab bar */}
+        <div className="flex gap-2 px-5 pt-5">
+          {tabs.map((tb) => {
+            const active = tab === tb.id;
+            return (
+              <button
+                key={tb.id}
+                onClick={() => setTab(tb.id)}
+                className="flex-1 border-none cursor-pointer py-2.5 px-3.5 font-comic font-bold text-[13px]"
+                style={{
+                  borderRadius: '16px 16px 4px 4px',
+                  background: active ? '#101A24' : '#fff',
+                  color: active ? '#fff' : '#101A24',
+                  boxShadow: active ? '0 3px 0 rgba(0,0,0,0.2)' : '0 3px 0 rgba(16,26,36,0.1)'
+                }}
+              >
+                {tb.label}
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Body */}
-      <div className="divide-y-3 divide-[#101A24] bg-white">
         {loading && (
-          <div className="py-20 text-center text-[#101A24] text-lg font-extrabold uppercase tracking-widest">
-            Đang tải BXH...
-          </div>
+          <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang tải BXH...</div>
         )}
-        {error && <div className="py-12 mx-6 my-6 text-center text-white bg-[#EF4444] border border-[#101A24]/10 rounded-2xl font-extrabold uppercase tracking-widest">{error}</div>}
-        
-        {!loading && !error && rows.map(row => {
-          const isMe = row.username === profile?.username;
-          return (
-            <div key={row.rank} className={`flex items-center gap-6 px-6 md:px-8 py-6 transition-colors ${isMe ? 'bg-[#9FE870]' : 'hover:bg-[#F9FAFB]'}`}>
-              <div className="w-16 h-16 rounded-full border border-[#101A24]/10 flex items-center justify-center shrink-0 bg-white shadow-sm">
-                {podium(row.rank)}
-              </div>
-              
-              <div className="flex-1 min-w-0 ml-2">
-                <div className="flex items-center gap-3">
-                  <span className={`text-2xl font-extrabold truncate uppercase ${isMe ? 'text-[#101A24]' : 'text-[#101A24]'}`}>{row.username}</span>
-                  {isMe && <span className="text-[11px] font-extrabold bg-[#101A24] text-white px-3 py-1 rounded shadow-sm uppercase">Bạn</span>}
-                </div>
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="text-sm text-[#101A24] font-bold uppercase tracking-widest bg-white border border-[#101A24]/10 px-3 py-1 rounded shadow-sm">Lv {row.level}</span>
-                  <span className="text-sm text-[#101A24] font-bold uppercase tracking-widest flex items-center gap-1.5 bg-white border border-[#101A24]/10 px-3 py-1 rounded shadow-sm">
-                    <Flame size={16} strokeWidth={3} className="text-[#EF4444]" /> {row.streak}d
-                  </span>
-                </div>
-              </div>
-              
-              <div className="text-right shrink-0 bg-white border border-[#101A24]/10 px-6 py-3 rounded-2xl shadow-sm">
-                <span className="text-4xl font-extrabold text-[#101A24]">{row.xp.toLocaleString()}</span>
-                <span className="text-xs text-[#101A24] font-extrabold uppercase tracking-widest ml-1">XP</span>
-              </div>
+        {error && (
+          <div className="mx-5 my-6 py-6 text-center text-white bg-[#EF4444] rounded-2xl font-bold uppercase tracking-widest">{error}</div>
+        )}
+
+        {!loading && !error && (
+          <>
+            {/* Podium */}
+            <div className="flex items-end justify-center gap-4 px-6 pt-6 pb-2.5">
+              {podium.map((p) => {
+                const stand = STAND_STYLE[p.rank];
+                return (
+                  <div key={p.rank} className="flex flex-col items-center gap-2">
+                    <span className="leading-none" style={{ fontSize: `${stand.emojiSize}px`, animation: `bob ${stand.bobSpeed} ease-in-out infinite` }}>🦙</span>
+                    <div className="font-comic font-extrabold text-[13px] text-[#101A24] text-center truncate" style={{ maxWidth: '90px' }}>
+                      {p.username}
+                    </div>
+                    <div className="text-[11px] font-extrabold text-[#0E7C99]">{p.xp.toLocaleString()} XP</div>
+                    <div
+                      className="flex items-start justify-center pt-2"
+                      style={{ width: `${stand.width}px`, height: `${stand.height}px`, background: stand.color, borderRadius: '12px 12px 0 0', boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.08)' }}
+                    >
+                      <span className="text-2xl">{stand.medal}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+
+            {/* Rest of the list */}
+            <div className="bg-white mx-4 mb-5 rounded-[1.25rem] overflow-hidden" style={{ boxShadow: '0 2px 10px rgba(16,26,36,0.06)' }}>
+              {restRows.map((row) => (
+                <div
+                  key={row.rank}
+                  className="flex items-center gap-3.5 px-4 py-3 border-b-2 border-[#F3F3F3] last:border-b-0"
+                  style={{ background: row.isMe ? '#EFFBEA' : 'transparent' }}
+                >
+                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[#F9FAFB] flex items-center justify-center font-comic font-extrabold text-sm text-[#101A24] shrink-0">
+                    {row.rank}
+                  </div>
+                  <span className="text-2xl shrink-0">🦙</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-comic font-bold text-sm text-[#101A24] truncate">{row.username}</span>
+                      {row.isMe && (
+                        <span className="text-[9px] font-extrabold bg-[#101A24] text-white px-2 py-0.5 rounded-lg uppercase tracking-wide shrink-0">Bạn</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] font-bold text-[#8A8A8A] mt-0.5">🔥 {row.streak} ngày · Lv {row.level}</div>
+                  </div>
+                  <div className="font-comic font-extrabold text-base text-[#101A24] shrink-0">
+                    {row.xp.toLocaleString()} <span className="text-[10px] text-[#8A8A8A]">XP</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
