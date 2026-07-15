@@ -4,6 +4,15 @@ import { translations as t } from '../translations';
 import { Send, BookOpen, Upload, FileText, Trash2, X, Loader2 } from 'lucide-react';
 import llamaWalk from '../assets/llama-walk.webp';
 
+const SUGGESTED_QUESTIONS = [
+  'Thời gian cân nhắc là gì?',
+  'Bảo hiểm Tử kỳ là gì?',
+  'Phân biệt BMBH và NĐBH?',
+  '60 ngày gia hạn là sao?',
+  'Điều kiện để làm đại lý bảo hiểm?',
+  'Cho tôi mẹo nhớ các con số quan trọng'
+];
+
 export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -37,9 +46,7 @@ export default function Chat() {
     if (next) loadDocs();
   }
 
-  async function handleSend(e) {
-    e.preventDefault();
-    const text = input.trim();
+  async function sendMessage(text) {
     if (!text || loading) return;
 
     const history = messages.map(m => ({ role: m.role, content: m.content }));
@@ -54,6 +61,11 @@ export default function Chat() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSend(e) {
+    e.preventDefault();
+    await sendMessage(input.trim());
   }
 
   async function handleFilePicked(e) {
@@ -168,6 +180,17 @@ export default function Chat() {
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 px-8">
               <img src={llamaWalk} alt="Llama đang đi dạo chờ bạn hỏi" className="w-full max-w-xs rounded-2xl border border-[#101A24]/10 shadow-sm wiggle" />
               <p className="text-[#888] font-bold">{t.chatEmptyState}</p>
+              <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                {SUGGESTED_QUESTIONS.map(q => (
+                  <button
+                    key={q}
+                    onClick={() => sendMessage(q)}
+                    className="text-xs font-bold text-[#101A24] bg-[#F9FAFB] border border-[#101A24]/10 rounded-full px-3.5 py-2 shadow-sm hover:bg-[#9FE870] transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {messages.map((m, i) => (

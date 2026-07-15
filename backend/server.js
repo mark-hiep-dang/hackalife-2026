@@ -644,9 +644,9 @@ ${contextBlock}` : ''}`;
     // If we found relevant uploaded material, surface it directly instead of the canned replies below —
     // raw retrieved passages are far more useful than a generic fallback when Ollama isn't reachable.
     if (retrieved.length > 0) {
-      const passages = retrieved.map((r, i) => `**Đoạn ${i + 1}:** ${r.content}`).join('\n\n');
+      const passages = retrieved.map((r, i) => `Đoạn ${i + 1}: ${r.content}`).join('\n\n');
       return res.json({
-        response: `😏 Mình chưa nối được AI để tổng hợp câu trả lời mượt, nhưng đây là những đoạn tài liệu bạn đã tải lên có vẻ liên quan nhất:\n\n${passages}\n\n*Kết nối Ollama trong Cài đặt để Llama tổng hợp câu trả lời mượt hơn nhé!*`
+        response: `😏 Mình chưa nối được AI để tổng hợp câu trả lời mượt, nhưng đây là những đoạn tài liệu bạn đã tải lên có vẻ liên quan nhất:\n\n${passages}\n\nKết nối Ollama trong Cài đặt để Llama tổng hợp câu trả lời mượt hơn nhé!`
       });
     }
 
