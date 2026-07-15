@@ -372,5 +372,88 @@ export async function initDb() {
     }
   }
 
+  // Seed a starter FAQ knowledge base for the "Hỏi Llama" chat feature, so common
+  // exam terms are retrievable even before an agent uploads their own materials.
+  {
+    const faqTitle = 'Bộ câu hỏi thường gặp - Thuật ngữ & Nghiệp vụ bảo hiểm';
+    const existingFaq = await db.get('SELECT id FROM knowledge_documents WHERE title = ?', [faqTitle]);
+    if (!existingFaq) {
+      const faqEntries = [
+        {
+          q: 'Thời gian cân nhắc là gì?',
+          a: 'Thời gian cân nhắc giống như mua đồ online có "21 ngày đổi trả" vậy. Theo quy định, đây là 21 ngày kể từ ngày nhận hợp đồng bảo hiểm (áp dụng với hợp đồng có thời hạn trên 1 năm). Trong 21 ngày này, bên mua bảo hiểm có quyền hủy hợp đồng và được hoàn lại phí đã đóng. Ví dụ: nhận hợp đồng ngày 1/7, đến 22/7 nếu thấy không phù hợp thì có thể hủy và lấy lại tiền. Lưu ý bẫy thi MOF: đề hay cho 30 ngày hoặc 15 ngày là sai, đáp án đúng luôn là 21 ngày.'
+        },
+        {
+          q: 'Giải thích nguyên tắc thế quyền',
+          a: 'Nguyên tắc thế quyền (Subrogation) giống như khi bạn bị đánh, bên bảo hiểm trả viện phí cho bạn trước, rồi bên bảo hiểm sẽ đi đòi lại người gây ra thiệt hại. Theo quy định, doanh nghiệp bảo hiểm sau khi đã bồi thường cho người được bảo hiểm thì có quyền yêu cầu bên thứ ba gây ra tổn thất phải hoàn trả trong phạm vi số tiền đã bồi thường. Ví dụ: xe A bị xe B đâm, doanh nghiệp bảo hiểm trả tiền sửa xe A trước, sau đó đi đòi xe B hoàn lại. Lưu ý quan trọng: nguyên tắc này không áp dụng cho bảo hiểm nhân thọ và bảo hiểm sức khỏe con người, đây là điểm đề thi hay hỏi.'
+        },
+        {
+          q: 'Phân biệt BMBH và NĐBH?',
+          a: 'Bên mua bảo hiểm (BMBH) là người ký hợp đồng và đóng phí bảo hiểm, có thể chuyển nhượng quyền và nghĩa vụ này cho người khác. Người được bảo hiểm (NĐBH) là người được bảo vệ bởi hợp đồng, và không thể thay đổi người này khi hợp đồng đang có hiệu lực. Ví dụ đời thường: bố mua bảo hiểm cho con, thì bố là bên mua bảo hiểm (người ký và đóng tiền), còn con là người được bảo hiểm (người được bảo vệ) — giống như bố mua bảo hành laptop cho con vậy. Lưu ý bẫy thi MOF: người được bảo hiểm không thể thay đổi khi hợp đồng đã có hiệu lực, nhiều người hay nhầm chỗ này.'
+        },
+        {
+          q: '60 ngày gia hạn là sao?',
+          a: 'Thời gian gia hạn đóng phí giống như nhà mạng cho bạn nợ cước 60 ngày mà điện thoại vẫn dùng được bình thường. Theo quy định, đây là 60 ngày kể từ ngày đến hạn đóng phí, và trong thời gian này hợp đồng vẫn có hiệu lực dù chưa đóng phí. Ví dụ: phí đến hạn ngày 1/7, bạn quên đóng, thì đến hết ngày 30/8 vẫn được bảo vệ bình thường; nhưng sau mốc đó mà vẫn chưa đóng phí thì hợp đồng sẽ mất hiệu lực. Lưu ý bẫy thi MOF: đề hay cho 30 ngày hoặc 90 ngày là sai, đáp án đúng luôn là 60 ngày.'
+        },
+        {
+          q: 'Tại sao BH nhân thọ không áp dụng nguyên tắc bồi thường?',
+          a: 'Lý do là vì mạng người không thể định giá được. Với bảo hiểm xe, nếu xe hư hại 50 triệu thì được bồi thường đúng 50 triệu (bồi thường theo tổn thất thực tế). Nhưng với bảo hiểm nhân thọ, khi người được bảo hiểm qua đời thì không thể tính tổn thất thực tế bằng tiền, nên sẽ chi trả theo số tiền bảo hiểm đã thỏa thuận từ đầu, chứ không theo nguyên tắc bồi thường. Kết luận: bảo hiểm phi nhân thọ và bảo hiểm sức khỏe áp dụng nguyên tắc bồi thường, còn bảo hiểm nhân thọ thì không. Lưu ý bẫy thi MOF: đề hay hỏi nguyên tắc nào không áp dụng cho bảo hiểm nhân thọ — câu trả lời là cả nguyên tắc bồi thường và nguyên tắc thế quyền, cần nhớ cả hai.'
+        },
+        {
+          q: 'Cho tôi mẹo nhớ các con số quan trọng',
+          a: 'Một số mốc thời gian quan trọng hay ra trong đề thi MOF: 21 ngày là thời gian cân nhắc (mẹo nhớ: hối hận thì 21 ngày sau vẫn hủy được); 60 ngày là thời gian gia hạn đóng phí (mẹo nhớ: 60 ngày là 2 tháng, đủ thời gian tìm tiền đóng phí); 2 năm đầu là thời gian loại trừ chi trả do tự tử; 1 năm là thời hiệu khiếu nại đòi bồi thường; 18 tuổi là độ tuổi tối thiểu để làm đại lý bảo hiểm. Học thuộc 5 con số này sẽ giúp ăn chắc nhiều câu trong đề thi.'
+        },
+        {
+          q: 'BH tử kỳ khác BH trọn đời chỗ nào?',
+          a: 'Bảo hiểm tử kỳ có thời hạn nhất định (ví dụ 10 hoặc 20 năm), chỉ chi trả nếu người được bảo hiểm qua đời trong thời hạn đó, không có giá trị hoàn lại, và phí thường rẻ hơn — giống như đi thuê nhà, hết hạn thuê thì ra đi tay trắng. Bảo hiểm trọn đời bảo vệ suốt đời, chắc chắn sẽ chi trả, có giá trị hoàn lại, nhưng phí đắt hơn — giống như mua nhà trả góp, chắc chắn sẽ có nhà. Lưu ý bẫy thi MOF: nói bảo hiểm tử kỳ có giá trị hoàn lại là sai, bảo hiểm tử kỳ không có giá trị hoàn lại.'
+        },
+        {
+          q: 'Tôi sắp thi, cho tips ôn nhanh',
+          a: 'Một vài mẹo ôn nhanh: thuộc 5 con số quan trọng (21 ngày, 60 ngày, 2 năm, 1 năm, 18 tuổi); nhớ 5 nguyên tắc cơ bản (trung thực tuyệt đối, quyền lợi có thể được bảo hiểm, bồi thường, thế quyền, nguyên nhân trực tiếp); phân biệt rõ 5 loại bảo hiểm nhân thọ (tử kỳ, sinh kỳ, hỗn hợp, trọn đời, liên kết đầu tư); tập trung ôn kỹ phần đại lý bảo hiểm vì chiếm tỷ trọng lớn trong đề thi; và nên làm đi làm lại bộ câu hỏi luyện tập nhiều lần, lần đầu để học, lần sau để nhớ, lần cuối để thành thạo.'
+        },
+        {
+          q: 'Giải thích sự kiện bảo hiểm',
+          a: 'Sự kiện bảo hiểm là thời điểm mà doanh nghiệp bảo hiểm phải chi trả tiền. Theo quy định, đây là sự kiện khách quan do các bên thỏa thuận hoặc pháp luật quy định, khi xảy ra thì doanh nghiệp bảo hiểm phải chi trả bảo hiểm hoặc bồi thường. Ví dụ: mua bảo hiểm nhân thọ, người được bảo hiểm qua đời do tai nạn — đây là một sự kiện bảo hiểm nên doanh nghiệp phải chi trả. Từ khóa cần nhớ là khách quan, tức là không phải do cố ý gây ra. Lưu ý bẫy thi MOF: nói sự kiện bảo hiểm là sự kiện chủ quan là sai, phải là khách quan.'
+        },
+        {
+          q: 'Điều kiện để làm đại lý bảo hiểm?',
+          a: 'Có 3 điều kiện để làm đại lý bảo hiểm: đủ 18 tuổi trở lên; có năng lực hành vi dân sự đầy đủ (tỉnh táo, minh mẫn); và có chứng chỉ đại lý bảo hiểm do cơ sở đào tạo được Bộ Tài chính chấp thuận cấp. Ví dụ: một người 20 tuổi, tỉnh táo, có chứng chỉ MOF là đủ điều kiện; nhưng một người 17 tuổi dù giỏi đến đâu vẫn chưa đủ điều kiện. Lưu ý bẫy thi MOF: chứng chỉ đại lý phải do cơ sở đào tạo được Bộ Tài chính chấp thuận cấp, không phải do doanh nghiệp bảo hiểm tự cấp.'
+        },
+        {
+          q: 'Tóm tắt Chapter 3 cho tôi',
+          a: 'Chapter 3 tập trung vào các điều khoản và mốc thời gian quan trọng trong hợp đồng bảo hiểm: bảo hiểm tạm thời có hiệu lực từ khi nộp hồ sơ và phí; thời gian cân nhắc là 21 ngày; thời gian gia hạn đóng phí là 60 ngày; thời hiệu khiếu nại đòi bồi thường là 1 năm; loại trừ chi trả do tự tử trong 2 năm đầu hợp đồng; thời gian chờ là 30 ngày với bệnh thông thường và 0 ngày với tai nạn; và hợp đồng có thể được khôi phục hiệu lực sau khi đã mất hiệu lực. Mẹo nhớ: chương này chủ yếu xoay quanh các con số, nên thuộc số là thuộc được phần lớn nội dung chương.'
+        },
+        {
+          q: 'Bảo hiểm liên kết đầu tư là gì?',
+          a: 'Bảo hiểm liên kết đầu tư (ILP) là sản phẩm kết hợp giữa bảo hiểm và đầu tư — vừa được bảo vệ vừa có cơ hội sinh lời. Phí đóng được chia làm hai phần: một phần dùng để bảo vệ giống bảo hiểm thông thường, phần còn lại được đầu tư vào quỹ và có thể lời hoặc lỗ tùy theo thị trường. Ví dụ: đóng 10 triệu mỗi tháng, trong đó 3 triệu dùng để mua bảo hiểm và 7 triệu được đầu tư vào quỹ; nếu quỹ tăng trưởng thì có lời, nếu quỹ giảm thì chịu lỗ. Lưu ý bẫy thi MOF: điểm khác biệt lớn nhất so với bảo hiểm truyền thống là rủi ro đầu tư do khách hàng chịu, không phải doanh nghiệp bảo hiểm.'
+        },
+        {
+          q: 'So sánh quyền của BMBH và DNBH',
+          a: 'Bên mua bảo hiểm (BMBH) có các quyền chính như: yêu cầu doanh nghiệp bảo hiểm giải thích điều khoản, được chọn doanh nghiệp bảo hiểm, được hủy hợp đồng, và được đòi bồi thường khi có sự kiện bảo hiểm xảy ra — trong đó quyền hủy hợp đồng có thể thực hiện bất cứ lúc nào. Doanh nghiệp bảo hiểm (DNBH) có quyền thu phí, được từ chối chi trả nếu bên mua bảo hiểm gian lận, và được điều tra sự kiện bảo hiểm — nhưng chỉ được đơn phương hủy hợp đồng khi bên mua bảo hiểm gian lận, không phải bất cứ lúc nào. Nhìn chung bên mua bảo hiểm có nhiều quyền hơn, còn doanh nghiệp bảo hiểm có nhiều nghĩa vụ hơn. Lưu ý bẫy thi MOF: nói doanh nghiệp bảo hiểm có quyền đơn phương hủy hợp đồng bất cứ lúc nào là sai, chỉ được hủy khi bên mua bảo hiểm gian lận.'
+        },
+        {
+          q: 'Nguyên tắc trung thực tuyệt đối áp dụng cho ai?',
+          a: 'Nguyên tắc trung thực tuyệt đối áp dụng cho cả hai bên trong hợp đồng bảo hiểm, không phải chỉ riêng bên mua bảo hiểm. Bên mua bảo hiểm phải khai báo trung thực, đầy đủ các thông tin liên quan như tình trạng sức khỏe, tiền sử bệnh, mục đích sử dụng đối tượng bảo hiểm. Doanh nghiệp bảo hiểm cũng phải trung thực, giải thích rõ ràng đầy đủ các điều khoản, quyền lợi, và điều khoản loại trừ cho khách hàng. Ví dụ vi phạm: bên mua bảo hiểm giấu bệnh tim khi kê khai sức khỏe — đây là vi phạm nguyên tắc trung thực tuyệt đối và doanh nghiệp bảo hiểm có quyền từ chối chi trả bảo hiểm. Lưu ý bẫy thi MOF: nhiều người tưởng nguyên tắc này chỉ áp dụng cho bên mua bảo hiểm, nhưng thực tế áp dụng cho cả hai bên.'
+        }
+      ];
+
+      const faqDoc = await db.run(
+        'INSERT INTO knowledge_documents (title, source_type, uploaded_by) VALUES (?, ?, ?)',
+        [faqTitle, 'paste', null]
+      );
+      for (let i = 0; i < faqEntries.length; i++) {
+        const content = `Câu hỏi: ${faqEntries[i].q} Trả lời: ${faqEntries[i].a}`;
+        const chunk = await db.run(
+          'INSERT INTO knowledge_chunks (document_id, chunk_index, content) VALUES (?, ?, ?)',
+          [faqDoc.lastID, i, content]
+        );
+        await db.run(
+          'INSERT INTO knowledge_chunks_fts (content, chunk_id, document_id) VALUES (?, ?, ?)',
+          [content, chunk.lastID, faqDoc.lastID]
+        );
+      }
+    }
+  }
+
   console.log('Database initialized and seeded successfully.');
 }
