@@ -78,10 +78,8 @@ export default function App() {
       <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
         <header className="bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
-            <span className="font-extrabold text-2xl tracking-tight flex items-center gap-3 text-[#101A24]">
-              <span className="w-10 h-10 bg-[#9FE870] border border-[#101A24]/10 rounded-lg shadow-sm flex items-center justify-center">
-                <Target size={18} strokeWidth={3} className="text-[#101A24]" />
-              </span>
+            <span className="font-comic font-extrabold text-2xl tracking-tight flex items-center gap-3 text-[#101A24]">
+              <span className="text-2xl wiggle inline-block">🦙</span>
               Pằng Chíu Á!
             </span>
           </div>
@@ -100,10 +98,8 @@ export default function App() {
       {/* ── Sidebar (Desktop) ─────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
         <div className="p-6 border-b-3 border-[#101A24]/10">
-          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-3 font-extrabold text-2xl tracking-tight text-[#101A24]">
-            <span className="w-10 h-10 bg-[#9FE870] border border-[#101A24]/10 rounded shadow-sm flex items-center justify-center">
-              <Target size={20} strokeWidth={3} className="text-[#101A24]" />
-            </span>
+          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-3 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
+            <span className="text-2xl wiggle inline-block">🦙</span>
             <span>Pằng Chíu!</span>
           </button>
         </div>
@@ -150,10 +146,8 @@ export default function App() {
       {/* ── Top Bar (Mobile Only) ─────────────────────────────── */}
       <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50 shadow-[0_4px_0_rgba(0,0,0,0.05)]">
         <div className="px-4 h-16 flex items-center justify-between">
-          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-extrabold text-xl tracking-tight text-[#101A24]">
-            <span className="w-8 h-8 bg-[#9FE870] border border-[#101A24]/10 rounded shadow-sm flex items-center justify-center">
-              <Target size={16} strokeWidth={3} className="text-[#101A24]" />
-            </span>
+          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-xl tracking-tight text-[#101A24]">
+            <span className="text-xl wiggle inline-block">🦙</span>
             Pằng Chíu!
           </button>
           

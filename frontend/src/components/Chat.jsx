@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { sendChatMessage, getKnowledgeDocs, uploadKnowledgeFile, pasteKnowledgeText, deleteKnowledgeDoc } from '../utils/api';
 import { translations as t } from '../translations';
 import { Send, BookOpen, Upload, FileText, Trash2, X, Loader2 } from 'lucide-react';
+import llamaWalk from '../assets/llama-walk.webp';
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -164,8 +165,9 @@ export default function Chat() {
       <div className="card-pro bg-white flex flex-col" style={{ height: '520px' }}>
         <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-4">
           {messages.length === 0 && (
-            <div className="flex-1 flex items-center justify-center text-center text-[#888] font-bold px-8">
-              🦙 {t.chatEmptyState}
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 px-8">
+              <img src={llamaWalk} alt="Llama đang đi dạo chờ bạn hỏi" className="w-full max-w-xs rounded-2xl border border-[#101A24]/10 shadow-sm wiggle" />
+              <p className="text-[#888] font-bold">{t.chatEmptyState}</p>
             </div>
           )}
           {messages.map((m, i) => (

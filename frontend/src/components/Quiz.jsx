@@ -3,8 +3,11 @@ import { generateQuiz, submitQuizScore } from '../utils/api';
 import { translations as t } from '../translations';
 import { playPang, playChiu } from '../utils/sound';
 import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import llamaSpit from '../assets/llama-spit.webp';
+import llamaCheer from '../assets/llama-cheer.webp';
 
 const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame, pang_sniper: Zap, topic_master: Medal, xp_1000: Crown };
+const CARD_SHADOW = '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)';
 
 export default function Quiz({ onQuizFinished }) {
   const [topic, setTopic] = useState('all');
@@ -54,9 +57,9 @@ export default function Quiz({ onQuizFinished }) {
   function pick(optIdx, e) {
     if (answered) return;
     setSelected(optIdx); setAnswered(true);
-    
+
     const correct = optIdx === q.correct_index;
-    
+
     if (correct) {
       playPang(); setScore(p => p + 1);
       const nc = combo + 1; setCombo(nc); if (nc > maxCombo) setMaxCombo(nc);
@@ -92,41 +95,65 @@ export default function Quiz({ onQuizFinished }) {
 
   const isCorrect = answered && selected === q?.correct_index;
 
-  /* ── Setup ─── */
+  /* ── Setup: "Chọn chế độ chiến!" ─── */
   if (!started && !finished) return (
-    <div className="card-pro p-8 md:p-10 pop-in bg-white">
-      <div className="flex justify-center mb-6">
-        <div className="w-20 h-20 bg-[#9FE870] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-6">
-          <Target size={40} strokeWidth={3} className="text-[#101A24]" />
-        </div>
+    <div className="bg-white pop-in text-center max-w-xl mx-auto" style={{ borderRadius: '2rem', boxShadow: CARD_SHADOW, padding: '44px 40px' }}>
+      <div
+        className="w-24 h-24 rounded-full bg-[#9FE870] flex items-center justify-center text-5xl mx-auto mb-5 wiggle"
+        style={{ boxShadow: '0 5px 0 #6BAE2E', transform: 'rotate(-6deg)' }}
+      >
+        🎯
       </div>
-      
-      <h2 className="text-4xl md:text-5xl font-extrabold text-[#101A24] uppercase tracking-tighter text-center mb-8">{t.quizTitle}</h2>
+      <h2 className="font-comic font-extrabold text-3xl text-[#101A24] uppercase mb-2">Chọn chế độ chiến!</h2>
+      <p className="text-sm font-bold text-[#8A8A8A] mb-7">Luyện súng nhẹ nhàng hay thử lửa thi thật?</p>
 
-      <div className="flex flex-col gap-8">
-        {/* Mode */}
-        <div>
-          <label className="block text-sm font-extrabold text-[#101A24] uppercase tracking-widest mb-3">Chế độ chiến</label>
-          <div className="flex flex-col sm:flex-row gap-4">
-            {[['practice', t.practiceMode], ['exam', t.examMode]].map(([v,label]) => (
-              <button key={v} onClick={() => setMode(v)} disabled={loading}
-                className={`flex-1 py-4 px-6 rounded-2xl border font-extrabold uppercase tracking-widest transition-all ${mode === v ? 'bg-[#9FE870] border-[#101A24]/10 text-[#101A24] shadow-sm -translate-y-1 -translate-x-1' : 'bg-white border-[#101A24]/10 text-[#101A24] shadow-sm hover:-translate-y-0.5 hover:-translate-x-0.5'}`}
-              >{label}</button>
-            ))}
-          </div>
-          {mode === 'exam' && (
-            <p className="mt-3 text-xs font-extrabold uppercase tracking-widest text-[#888] text-center">
-              40 câu hỏi • 60 phút • cần đạt 70% mới đỗ (đúng chuẩn thi thật)
-            </p>
-          )}
-        </div>
-
-        {error && <div className="text-white text-sm font-extrabold uppercase tracking-widest bg-[#EF4444] border border-[#101A24]/10 shadow-sm px-4 py-3 rounded-lg">{error}</div>}
-
-        <button onClick={startQuiz} disabled={loading} className="btn-pro-primary w-full text-xl mt-4 bg-[#00B4D8] py-4">
-          {loading ? 'Đang chuẩn bị đạn...' : t.startQuizBtn}
+      <div className="flex gap-4 mb-3">
+        <button
+          onClick={() => setMode('practice')}
+          disabled={loading}
+          className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
+          style={{
+            background: mode === 'practice' ? '#9FE870' : '#F9FAFB',
+            boxShadow: mode === 'practice' ? '0 4px 0 #6BAE2E' : '0 3px 0 rgba(16,26,36,0.1)'
+          }}
+        >
+          <span className="text-4xl">🔫</span>
+          <span className="font-comic font-extrabold text-base text-[#101A24]">{t.practiceMode}</span>
+          <span className="text-xs font-bold text-[#5C5C5C]">5 câu, thoải mái xem giải thích</span>
+        </button>
+        <button
+          onClick={() => setMode('exam')}
+          disabled={loading}
+          className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
+          style={{
+            background: mode === 'exam' ? '#101A24' : '#F9FAFB',
+            boxShadow: mode === 'exam' ? '0 4px 0 rgba(0,0,0,0.3)' : '0 3px 0 rgba(16,26,36,0.1)'
+          }}
+        >
+          <span className="text-4xl">⏱️</span>
+          <span className="font-comic font-extrabold text-base" style={{ color: mode === 'exam' ? '#fff' : '#101A24' }}>{t.examMode}</span>
+          <span className="text-xs font-bold" style={{ color: mode === 'exam' ? '#DFF3E4' : '#5C5C5C' }}>Mô phỏng thi thật, tính giờ nghiêm túc</span>
         </button>
       </div>
+
+      {mode === 'exam' && (
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#8A8A8A] mb-6">
+          40 câu hỏi • 60 phút • cần đạt 70% mới đỗ (đúng chuẩn thi thật)
+        </p>
+      )}
+
+      {error && (
+        <div className="text-white text-sm font-bold rounded-2xl bg-[#EF4444] px-4 py-3 mb-4">{error}</div>
+      )}
+
+      <button
+        onClick={startQuiz}
+        disabled={loading}
+        className="w-full border-none cursor-pointer bg-[#00B4D8] rounded-2xl py-4 font-comic font-extrabold text-lg text-[#101A24]"
+        style={{ boxShadow: '0 5px 0 #0E7C99' }}
+      >
+        {loading ? 'Đang chuẩn bị đạn...' : 'Vào trận thôi! 🚀'}
+      </button>
     </div>
   );
 
@@ -205,95 +232,130 @@ export default function Quiz({ onQuizFinished }) {
   const opts = q.options;
 
   return (
-    <div className="flex flex-col gap-6 pop-in max-w-4xl mx-auto w-full">
+    <div className="flex flex-col gap-5 pop-in max-w-3xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {mode === 'exam' ? (
-            <span className={`flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest px-4 py-2 rounded-2xl border shadow-sm ${timeLeft < 300 ? 'bg-[#EF4444] border-[#101A24]/10 text-white animate-pulse' : 'bg-white border-[#101A24]/10 text-[#101A24]'}`}>
+            <span className={`flex items-center gap-2 font-comic font-extrabold text-sm px-4 py-2 rounded-2xl ${timeLeft < 300 ? 'bg-[#EF4444] text-white animate-pulse' : 'bg-white text-[#101A24]'}`} style={{ boxShadow: timeLeft < 300 ? 'none' : '0 3px 0 rgba(16,26,36,0.1)' }}>
               <Clock size={20} strokeWidth={3} /> {fmt(timeLeft)}
             </span>
           ) : combo > 1 ? (
-            <span className="flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-widest bg-[#00B4D8] text-[#101A24] border border-[#101A24]/10 px-4 py-2 rounded-2xl shadow-sm rotate-2">
-              <Flame size={20} strokeWidth={3} className="text-[#101A24]" /> {combo}x COMBO
+            <span className="flex items-center gap-1.5 font-comic font-extrabold text-sm px-4 py-2 rounded-2xl" style={{ background: '#FFCF56', color: '#101A24', boxShadow: '0 3px 0 #E0A82E', transform: 'rotate(-2deg)' }}>
+              🔥 Combo {combo}x
             </span>
           ) : null}
         </div>
-        <span className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] bg-white border border-[#101A24]/10 px-4 py-2 rounded-2xl shadow-sm">
+        <span className="font-comic font-extrabold text-sm text-[#101A24] bg-white px-4 py-2 rounded-2xl" style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}>
           {t.questionIndicator.replace('{current}', cidx + 1).replace('{total}', questions.length)}
         </span>
       </div>
 
       {/* Progress */}
-      <div className="h-4 bg-white border border-[#101A24]/10 rounded-full overflow-hidden shadow-inner">
-        <div className="transition-all duration-300 rounded-full h-full bg-[#9FE870]" style={{ width: `${((cidx + 1) / questions.length) * 100}%` }} />
+      <div className="h-4 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'inset 0 2px 4px rgba(16,26,36,0.1)' }}>
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${((cidx + 1) / questions.length) * 100}%`, background: 'linear-gradient(90deg, #9FE870, #6BAE2E)' }} />
       </div>
 
       {/* Question */}
-      <div className="card-pro p-8 md:p-12 bg-white relative mt-4">
-        <span className="absolute -top-5 -left-5 text-xs font-extrabold uppercase tracking-widest text-white bg-[#101A24] px-4 py-2 rounded-2xl border border-[#101A24]/10 shadow-sm -rotate-6">
-          Câu {q.stt || cidx + 1}
+      <div className="relative bg-white mt-2" style={{ borderRadius: '2rem', boxShadow: CARD_SHADOW, padding: '36px 32px' }}>
+        <span
+          className="absolute font-comic font-bold text-xs text-white bg-[#101A24] px-4 py-2 rounded-full"
+          style={{ top: '-18px', left: '28px', boxShadow: '0 3px 0 rgba(0,0,0,0.2)', transform: 'rotate(-3deg)' }}
+        >
+          🎯 Sẵn sàng bắn chưa?
         </span>
-        
-        <h3 className="text-2xl md:text-4xl font-extrabold text-[#101A24] leading-snug tracking-tight mb-10 mt-2">
+
+        <h3 className="font-comic font-extrabold text-xl md:text-2xl text-[#101A24] leading-snug mt-3 mb-7">
           {q.question}
         </h3>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3.5">
           {(opts || []).map((opt, i) => {
             const isCorr = i === q.correct_index;
-            const isSel  = selected === i;
-            let cls = 'w-full text-left px-6 py-5 rounded-2xl border border-[#101A24]/10 text-lg font-bold transition-all flex items-center gap-5 ';
+            const isSel = selected === i;
 
-            if (answered && mode === 'practice') {
-              if (isCorr)      cls += 'bg-[#2563EB] text-white shadow-sm -translate-y-1 -translate-x-1';
-              else if (isSel)  cls += 'bg-[#EF4444] text-white shadow-none translate-y-1 translate-x-1';
-              else             cls += 'bg-[#F9FAFB] text-[#101A24] opacity-50 shadow-none';
-            } else if (isSel) {
-              cls += 'bg-[#00B4D8] text-[#101A24] shadow-sm -translate-y-1 -translate-x-1';
-            } else {
-              cls += 'bg-white text-[#101A24] shadow-sm hover:-translate-y-0.5 hover:-translate-x-0.5 cursor-pointer';
+            let bg = '#F9FAFB', color = '#101A24', shadow = '0 3px 0 rgba(16,26,36,0.08)', letterBg = '#9FE870', letterColor = '#101A24', mark = '';
+            if (answered) {
+              if (isCorr) { bg = '#2563EB'; color = '#fff'; shadow = '0 3px 0 #17408F'; letterBg = '#fff'; letterColor = '#101A24'; mark = '✓'; }
+              else if (isSel) { bg = '#EF4444'; color = '#fff'; shadow = 'none'; letterBg = '#101A24'; letterColor = '#fff'; mark = '✕'; }
+              else { bg = '#F0EFE9'; color = '#A69B87'; shadow = 'none'; letterBg = '#E5E0D3'; letterColor = '#A69B87'; }
             }
 
             return (
-              <button key={i} onClick={e => pick(i, e)} disabled={answered} className={cls}>
-                <span className={`w-10 h-10 rounded-lg border border-[#101A24]/10 text-sm font-extrabold flex items-center justify-center shrink-0 ${
-                  answered && isCorr ? 'bg-white text-[#101A24]'
-                  : answered && isSel ? 'bg-[#101A24] text-white'
-                  : 'bg-[#9FE870] text-[#101A24] shadow-sm'
-                }`}>{['A','B','C','D'][i]}</span>
+              <button
+                key={i}
+                onClick={e => pick(i, e)}
+                disabled={answered}
+                className="flex items-center gap-4 text-left border-none cursor-pointer rounded-[20px] py-4 px-5 text-base font-bold transition-transform hover:-translate-y-0.5"
+                style={{ background: bg, color, boxShadow: shadow }}
+              >
+                <span
+                  className="w-9 h-9 rounded-[10px] font-comic font-extrabold text-sm flex items-center justify-center shrink-0"
+                  style={{ background: letterBg, color: letterColor }}
+                >
+                  {['A', 'B', 'C', 'D'][i]}
+                </span>
                 <span className="flex-1">{opt}</span>
-                {answered && isCorr && <CheckCircle2 size={28} strokeWidth={3} className="text-white shrink-0" />}
-                {answered && isSel && !isCorr && <XCircle size={28} strokeWidth={3} className="text-white shrink-0" />}
+                {mark && <span className="text-xl">{mark}</span>}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Feedback */}
+      {/* Feedback — centered popup with a Llama mascot bubble, impossible to miss */}
       {answered && mode === 'practice' && (
-        <div className={`card-pro p-8 border-t-8 scale-in mt-4 ${isCorrect ? 'border-t-[#2563EB] bg-white' : 'border-t-[#EF4444] bg-[#F9FAFB]'}`}>
-          <div className="flex items-center gap-4 mb-4">
-            {isCorrect
-              ? <><CheckCircle2 size={36} strokeWidth={3} className="text-[#2563EB]" /> <span className="font-extrabold text-3xl uppercase tracking-tighter text-[#101A24]">{t.correctFeedback}</span></>
-              : <><XCircle size={36} strokeWidth={3} className="text-[#EF4444]" /> <span className="font-extrabold text-3xl uppercase tracking-tighter text-[#101A24]">{t.incorrectFeedback}</span></>
-            }
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101A24]/55 p-5">
+          <div className="bounce-in bg-white w-full max-w-md overflow-hidden text-center" style={{ borderRadius: '2rem', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.3)' }}>
+            <div className="flex justify-center py-8" style={{ background: isCorrect ? '#DFF3E4' : '#FFE8E4' }}>
+              <div
+                className="relative w-[140px] h-[140px]"
+                style={{ animation: 'bob 2.2s ease-in-out infinite' }}
+              >
+                <div
+                  className="w-full h-full rounded-full overflow-hidden"
+                  style={{ boxShadow: `0 6px 0 ${isCorrect ? '#6BAE2E' : '#F2A48F'}` }}
+                >
+                  <img
+                    src={isCorrect ? llamaCheer : llamaSpit}
+                    alt={isCorrect ? 'Llama hoan hô vì bạn trả lời đúng' : 'Llama phun nước vào mặt vì bạn trả lời sai'}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span
+                  className="absolute -bottom-1.5 -right-1.5 text-2xl bg-white rounded-full w-[52px] h-[52px] flex items-center justify-center"
+                  style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.15)' }}
+                >
+                  {isCorrect ? '🎉' : '💦'}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-7">
+              <h4 className="font-comic font-extrabold text-xl text-[#101A24] mb-2">
+                {isCorrect ? t.correctFeedback : t.incorrectFeedback}
+              </h4>
+              <p className="text-sm font-bold text-[#8A8A8A] mb-5 leading-relaxed">
+                {isCorrect
+                  ? t.correctFeedbackSub
+                  : <>{t.correctAnswerWas} <strong className="text-[#101A24]">{q.options[q.correct_index]}</strong></>}
+              </p>
+
+              <div className="text-left bg-[#F9FAFB] rounded-2xl p-5 mb-6">
+                <strong className="block text-[#101A24] text-xs font-extrabold uppercase tracking-widest mb-2">{t.explanationTitle}</strong>
+                <p className="text-sm font-bold text-[#3A3A3A] leading-relaxed">{q.explanation}</p>
+                {q.source && <p className="mt-3 text-xs font-medium text-[#8A8A8A] italic">Nguồn: {q.source}</p>}
+              </div>
+
+              <button
+                onClick={advance}
+                className="w-full border-none cursor-pointer bg-[#00B4D8] rounded-2xl py-4 font-comic font-extrabold text-base text-[#101A24] flex items-center justify-center gap-2"
+                style={{ boxShadow: '0 4px 0 #0E7C99' }}
+              >
+                {t.nextQuestionBtn} <ArrowRight size={20} strokeWidth={3} />
+              </button>
+            </div>
           </div>
-          {!isCorrect && (
-            <p className="text-base font-bold text-[#101A24] mb-6">
-              <strong className="uppercase tracking-widest bg-[#00B4D8] border border-[#101A24]/10 px-3 py-1 rounded-lg mr-3 shadow-sm">{t.correctAnswerWas}</strong>
-              {q.options[q.correct_index]}
-            </p>
-          )}
-          <div className="bg-white rounded-2xl p-6 text-base text-[#101A24] font-bold leading-relaxed border border-[#101A24]/10 shadow-inner mb-6">
-            <strong className="block text-[#101A24] text-sm font-extrabold uppercase tracking-widest mb-3 underline decoration-3 decoration-[#9FE870] underline-offset-4">{t.explanationTitle}</strong>
-            {q.explanation}
-            {q.source && <p className="mt-4 text-xs font-medium text-[#666] italic">Nguồn: {q.source}</p>}
-          </div>
-          <button onClick={advance} className="btn-pro-primary w-full text-2xl py-5 bg-[#00B4D8]">
-            {t.nextQuestionBtn} <ArrowRight size={24} strokeWidth={3} />
-          </button>
         </div>
       )}
     </div>
