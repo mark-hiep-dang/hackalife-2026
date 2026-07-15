@@ -80,7 +80,7 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
             <span className="font-comic font-extrabold text-2xl tracking-tight flex items-center gap-3 text-[#101A24]">
               <span className="text-2xl wiggle inline-block">🦙</span>
-              Pằng Chíu Á!
+              LLAMA
             </span>
           </div>
         </header>
@@ -100,7 +100,7 @@ export default function App() {
         <div className="p-6 border-b-3 border-[#101A24]/10">
           <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-3 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
             <span className="text-2xl wiggle inline-block">🦙</span>
-            <span>Pằng Chíu!</span>
+            <span>LLAMA</span>
           </button>
         </div>
 
@@ -148,7 +148,7 @@ export default function App() {
         <div className="px-4 h-16 flex items-center justify-between">
           <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-xl tracking-tight text-[#101A24]">
             <span className="text-xl wiggle inline-block">🦙</span>
-            Pằng Chíu!
+            LLAMA
           </button>
           
           {profile && (

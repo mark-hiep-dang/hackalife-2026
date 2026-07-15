@@ -1718,7 +1718,7 @@ export const questionBank = [
 
 // List of client names and values for dynamic question template randomization
 const mockNames = ['An', 'Bình', 'Chi', 'Dũng', 'Hương', 'Nam', 'Trang', 'Tuấn', 'Yến'];
-const mockCompanies = ['Pằng Chíu Life', 'Đại Dương Bảo Việt', 'Dai-ichi Á', 'Prudential Á', 'Manulife Á'];
+const mockCompanies = ['LLAMA Life', 'Đại Dương Bảo Việt', 'Dai-ichi Á', 'Prudential Á', 'Manulife Á'];
 
 /**
  * Generates a randomized variation of a question based on static templates

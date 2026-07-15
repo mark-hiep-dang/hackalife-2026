@@ -8,8 +8,13 @@ export const translations = {
   navSettings: 'Cài đặt',
   
   // Auth
-  authTitle: 'Pằng Chíu Á! 🎯',
+  authTitle: 'LLAMA 🦙',
   authSubtitle: 'Đăng nhập để chiến nghiệm',
+  loginTitle: 'LLAMA 🦙',
+  registerTitle: 'LLAMA 🦙',
+  tagline: 'Learning Like A Master Agent',
+  usernameLabel: 'Tên đăng nhập',
+  passwordLabel: 'Mật khẩu',
   loginBtn: 'Đăng nhập ngay',
   registerBtn: 'Tạo tài khoản',
   usernamePlaceholder: 'Tên chiến binh...',
