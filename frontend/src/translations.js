@@ -25,7 +25,6 @@ export const translations = {
   
   // Dashboard
   welcomeLabel: 'Chào buổi sáng,',
-  welcomeSubtitle: 'Hôm nay học gì đây? Lên đồ thôi! 🎒',
   streakLabel: 'Chuỗi học',
   levelLabel: 'Cấp độ',
   lessonsTitle: 'Bài học 📚',
