@@ -127,6 +127,25 @@ const WRONG_POOL = {
   ]
 };
 
+const FLASHCARD_TIPS = [
+  '🦙 Mẹo nhớ: Đọc to \'{term}\' 3 lần, tưởng tượng khách hàng gật đầu lia lịa!',
+  '🦙 Bí kíp Llama: Liên tưởng \'{term}\' với 1 tình huống bán hàng thực tế, nhớ dai như đỉa!',
+  '🦙 Muốn nhớ \'{term}\'? Kể lại cho đồng nghiệp nghe, vừa vui vừa nhớ luôn đó!',
+  '🦙 Note nhỏ: \'{term}\' là kiểu kiến thức khách hàng hay hỏi vặn đại lý đó, học chắc vào nha!',
+  '🦙 Mẹo của Llama: Dán \'{term}\' lên màn hình máy tính, nhìn hoài rồi cũng thuộc thôi!',
+  '🦙 Pro tip: Thử giải thích \'{term}\' cho con mèo nhà bạn nghe xem, hiểu thì mới giải thích được!',
+  '🦙 Nhớ nhanh: \'{term}\' + 1 câu chuyện hài hước = ghi nhớ vĩnh viễn. Thử đi!',
+  '🦙 Llama thì thầm: đừng học vẹt \'{term}\', hiểu bản chất là tự nhiên nhớ luôn á!',
+  '🦙 Mẹo bán hàng: Thuộc nằm lòng \'{term}\' là ghi điểm ngay với khách khó tính đó nha!',
+  '🦙 Bí quyết: Lặp lại \'{term}\' trước gương mỗi sáng, vừa nhớ vừa tự tin nói chuyện với khách!',
+  '🦙 Fun fact: Não nhớ tốt hơn khi có cảm xúc — cứ thấy \'{term}\' buồn cười là tự nhiên nhớ lâu!',
+  '🦙 Mẹo Llama: Ghép \'{term}\' vào 1 câu vè tự chế, đọc vài lần là thuộc luôn!'
+];
+
+export function pickFlashcardTip({ term = '' } = {}) {
+  return fill(pickFrom(FLASHCARD_TIPS), { term: term || 'cái này' });
+}
+
 export function topicLabel(topic) {
   if (!topic) return 'chương này';
   // Question topics are stored as "3. Nguyên tắc & phân loại bảo hiểm" — drop the leading index.

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getFlashcards, getFlashcardTopics } from '../utils/api';
 import { playPang, playChiu } from '../utils/sound';
+import { pickFlashcardTip } from '../llamaResponses';
 
 const CARD_SHADOW = '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)';
 
@@ -56,6 +57,7 @@ export default function Flashcards() {
 
   const card = cards[idx];
   const flip = () => { setFlipped(f => !f); flipped ? playChiu() : playPang(); };
+  const tip = useMemo(() => (card ? pickFlashcardTip({ term: card.keyword || card.front }) : ''), [idx, cards]);
 
   function mark(isKnown) {
     isKnown ? setKnown(k => k + 1) : setUnknown(u => u + 1);
@@ -196,6 +198,13 @@ export default function Flashcards() {
               </div>
             </div>
           </div>
+
+          {flipped && tip && (
+            <div className="flex items-start gap-2.5 bg-[#FFF9E8] rounded-2xl px-4 py-3 mt-4 text-left bounce-in">
+              <span className="text-lg shrink-0">🦙</span>
+              <p className="text-xs font-bold text-[#8A6D1F] leading-relaxed">{tip}</p>
+            </div>
+          )}
 
           {flipped ? (
             <div className="flex gap-3.5 mt-7">

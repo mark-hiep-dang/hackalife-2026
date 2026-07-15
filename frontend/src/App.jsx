@@ -173,7 +173,7 @@ export default function App() {
             </div>
           ) : (
             <>
-              {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} />}
+              {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} onLogout={handleLogout} />}
               {activeTab === 'quiz' && <div className="max-w-4xl mx-auto"><Quiz onQuizFinished={handleQuizFinished} /></div>}
               {activeTab === 'flashcards' && <div className="max-w-4xl mx-auto"><Flashcards /></div>}
               {activeTab === 'chat' && <Chat />}

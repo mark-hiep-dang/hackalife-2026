@@ -2,8 +2,9 @@ import { translations as t } from '../translations';
 import { getDaysSinceLastStudy } from '../utils/streak';
 import { getNagTier } from '../nagMessages';
 import LessonPath from './LessonPath';
+import { LogOut } from 'lucide-react';
 
-export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate }) {
+export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
   if (!profile) return null;
 
   function handleStudyNow() {
@@ -29,6 +30,15 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
           <div className="flex items-center gap-1.5 bg-white border-2 border-[#00B4D8] rounded-full px-3.5 py-2 font-comic font-bold text-sm text-[#0E7C99]" style={{ boxShadow: '0 3px 0 #00B4D8' }}>
             <span className="text-lg">💎</span>{profile.xp} XP
           </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1.5 border-none cursor-pointer bg-white border-2 border-[#101A24]/10 rounded-full px-3.5 py-2 font-comic font-bold text-sm text-[#101A24] transition-transform hover:-translate-y-0.5"
+              style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.15)' }}
+            >
+              <LogOut size={16} strokeWidth={3} />{t.logout}
+            </button>
+          )}
         </div>
       </div>
 
