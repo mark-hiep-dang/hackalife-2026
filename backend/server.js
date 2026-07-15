@@ -595,7 +595,8 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
     ? retrieved.map((r, i) => `[Đoạn ${i + 1}] ${r.content}`).join('\n\n')
     : '';
 
-  const insuranceContext = `You are "Llama Đại Lý", a friendly, encouraging, and highly knowledgeable bilingual AI tutor specializing in the Vietnam Ministry of Finance (MOF) Insurance Agent Certification.
+  const insuranceContext = `You are "Llama Đại Lý", a sharp-tongued, sarcastic, and very funny bilingual AI tutor specializing in the Vietnam Ministry of Finance (MOF) Insurance Agent Certification.
+Persona: You tease the user a bit before helping them — a light "ơ, câu này cơ bản mà bạn cũng hỏi Llama à? 😏" style jab — but you ALWAYS follow up with the correct, accurate, genuinely helpful answer. The sarcasm is affectionate and playful, never mean, never discouraging, and never at the expense of correctness. Vary your teasing opener each time so it doesn't feel repetitive. If the user asks something genuinely hard or shows they're struggling, dial the sarcasm down and be warmer/more encouraging instead.
 You reply in both English and Vietnamese. Keep answers simple, bite-sized, and structure them with bullet points.
 Knowledge Base Guidelines:
 1. Vietnam Law on Insurance Business 2022 is the legal basis.
@@ -655,6 +656,8 @@ ${contextBlock}` : ''}`;
 
     if (msg.includes('quiz') || msg.includes('thi') || msg.includes('hỏi')) {
       reply = `**[Llama AI Fallback Mode / Chế độ Llama Dự phòng]**
+😈 Ohh, đòi quiz hả? Được thôi, đừng có mà khóc nếu sai đó nha:
+
 🎯 Let's do a quick quiz! / Hãy trả lời câu hỏi nhanh sau:
 
 **Question:** Under Vietnam law, how long is the grace period for paying overdue premiums?
@@ -667,29 +670,38 @@ ${contextBlock}` : ''}`;
 *Reply with the letter of your choice! / Trả lời bằng chữ cái bạn chọn!*`;
     } else if (msg.includes('grace') || msg.includes('gia hạn') || msg.includes('đóng phí')) {
       reply = `**[Llama AI Fallback Mode]**
+😏 Ơ, câu này cơ bản mà bạn cũng phải hỏi Llama à? Thôi được, để Llama giải thích:
+
 ⏰ **Grace Period (Thời gian gia hạn nộp phí):**
 - **Duration / Thời gian:** 60 days / 60 ngày.
 - **Rule / Quy tắc:** During these 60 days, the policy remains active and the insurer must pay claims if an event occurs. If unpaid after 60 days, the policy is suspended.
 - **Tiếng Việt:** Trong 60 ngày này, hợp đồng vẫn có hiệu lực và doanh nghiệp vẫn phải bồi thường nếu có sự kiện xảy ra. Quá 60 ngày mà không đóng phí, hợp đồng sẽ bị tạm dừng hiệu lực.`;
     } else if (msg.includes('look') || msg.includes('cân nhắc') || msg.includes('21')) {
       reply = `**[Llama AI Fallback Mode]**
+🦙 Hỏi cái này là biết bạn chưa đọc kỹ hợp đồng mẫu rồi đó nha. May mà có Llama:
+
 👁️ **21-day Free Look Period (21 ngày tự do cân nhắc):**
 - **Applies to / Áp dụng cho:** Life insurance contracts with a term over 1 year.
 - **Description:** The policyholder can cancel the policy within 21 days of receiving it and get a full refund of premiums paid.
 - **Tiếng Việt:** Áp dụng cho hợp đồng nhân thọ dài hạn (>1 năm). Khách hàng có 21 ngày kể từ lúc nhận bộ hợp đồng để từ chối tiếp tục tham gia và được hoàn trả phí bảo hiểm đã đóng (sau khi trừ chi phí khám sức khỏe nếu có).`;
     } else if (msg.includes('mof') || msg.includes('bộ tài chính') || msg.includes('chứng chỉ')) {
       reply = `**[Llama AI Fallback Mode]**
+🙄 Định thi chứng chỉ mà còn chưa biết ai cấp á? Thôi, Llama cứu bàn thua trông thấy:
+
 🏛️ **Ministry of Finance (Bộ Tài chính - MOF):**
 - **Role:** The official regulator of all insurance business activities in Vietnam. They issue certificates, authorize licenses, inspect solvency margins, and administer the agent certification exams.
 - **Tiếng Việt:** Cơ quan quản lý nhà nước về kinh doanh bảo hiểm. Bộ Tài chính cấp phép thành lập doanh nghiệp bảo hiểm, quản lý biên khả năng thanh toán và tổ chức thi/cấp chứng chỉ đại lý bảo hiểm.`;
     } else if (msg.includes('rebate') || msg.includes('chiết khấu') || msg.includes('commission') || msg.includes('hoa hồng')) {
       reply = `**[Llama AI Fallback Mode]**
+😤 Ê ê, đang tính chiết khấu hoa hồng cho khách hả? Llama phải chặn lại ngay:
+
 🚫 **Rebating Rules (Quy định chiết khấu hoa hồng đại lý):**
 - **Law:** It is strictly ILLEGAL for an agent to rebate commission or discount premiums to entice customers into buying policies (Article 125, Law on Insurance Business).
 - **Tiếng Việt:** Đại lý bảo hiểm bị CẤM hoàn phí bảo hiểm hoặc chiết khấu hoa hồng cho khách hàng dưới mọi hình thức để lôi kéo mua bảo hiểm. Đây là hành vi vi phạm pháp luật nghiêm trọng.`;
     } else {
       reply = `**[Llama AI Fallback Mode / Chế độ Llama Dự phòng]**
-Hello! I am **Llama Đại Lý**, your MOF exam study coach. I am currently running in fallback mode because Ollama was not detected on port 11434. 
+🦙 Hmm, Llama không kết nối được não bộ chính (Ollama) nên đang chạy chế độ dự phòng — nói vui vậy chứ vẫn đủ sức trêu bạn được!
+Hello! I am **Llama Đại Lý**, your MOF exam study coach.
 You can ask me about:
 1. **Grace Period** / Thời gian gia hạn đóng phí (60 days)
 2. **Free Look Period** / 21 ngày tự do cân nhắc
@@ -698,7 +710,7 @@ You can ask me about:
 5. Type **"quiz me"** to trigger a test question!
 
 ---
-Xin chào! Tôi là **Llama Đại Lý**, gia sư luyện thi chứng chỉ Bộ Tài chính của bạn. Hiện tôi đang chạy ở chế độ dự phòng.
+Xin chào! Tôi là **Llama Đại Lý**, gia sư luyện thi chứng chỉ Bộ Tài chính của bạn (đang chạy chế độ dự phòng, nhưng độ lầy vẫn full công suất 😏).
 Bạn có thể hỏi tôi về các chủ đề trên hoặc gõ **"quiz me"** để thử làm câu hỏi trắc nghiệm!`;
     }
 
