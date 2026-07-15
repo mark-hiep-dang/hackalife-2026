@@ -1,10 +1,14 @@
+import { useMemo } from 'react';
 import { translations as t } from '../translations';
 import { getDaysSinceLastStudy } from '../utils/streak';
-import { getNagTier } from '../nagMessages';
+import { getNagTier, getRandomWelcomeMessage } from '../nagMessages';
 import LessonPath from './LessonPath';
 import { LogOut } from 'lucide-react';
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
+  const nagTier = useMemo(() => getNagTier(getDaysSinceLastStudy()), []);
+  const welcomeMessage = useMemo(() => getRandomWelcomeMessage(), []);
+
   if (!profile) return null;
 
   function handleStudyNow() {
@@ -13,8 +17,7 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
     else onNavigate('quiz');
   }
 
-  const nagTier = getNagTier(getDaysSinceLastStudy());
-  const heroMessage = nagTier ? nagTier.message : t.welcomeSubtitle;
+  const heroMessage = nagTier ? nagTier.message : welcomeMessage;
 
   return (
     <div className="flex flex-col gap-8 pop-in w-full max-w-5xl mx-auto">
