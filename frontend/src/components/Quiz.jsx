@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateQuiz, submitQuizScore } from '../utils/api';
 import { translations as t } from '../translations';
-import { playPang, playChiu } from '../utils/sound';
+import { playPang, playCheer, playScream } from '../utils/sound';
 import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import llamaSpit from '../assets/llama-spit.webp';
 import llamaCheer from '../assets/llama-cheer.webp';
@@ -64,16 +64,22 @@ export default function Quiz({ onQuizFinished }) {
     const correct = optIdx === q.correct_index;
 
     if (correct) {
-      playPang(); setScore(p => p + 1);
+      setScore(p => p + 1);
       const nc = combo + 1; setCombo(nc); if (nc > maxCombo) setMaxCombo(nc);
       setWrongStreak(0);
-      setFeedbackText(pickCorrectResponse({ streak: nc, difficulty: q.difficulty, topic: q.topic }));
-      window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'pang', x: e.clientX, y: e.clientY } }));
+      if (mode === 'practice') {
+        playCheer();
+        setFeedbackText(pickCorrectResponse({ streak: nc, difficulty: q.difficulty, topic: q.topic }));
+        window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'pang', x: e.clientX, y: e.clientY } }));
+      }
     } else {
-      playChiu(); setCombo(0);
+      setCombo(0);
       const nw = wrongStreak + 1; setWrongStreak(nw);
-      setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx] }));
-      window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'chiu', x: e.clientX, y: e.clientY } }));
+      if (mode === 'practice') {
+        playScream();
+        setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx] }));
+        window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'chiu', x: e.clientX, y: e.clientY } }));
+      }
     }
     if (mode === 'exam') {
       setExamAnswers(p => [...p, { question: q, selected: optIdx, isCorrect: correct }]);
@@ -282,10 +288,13 @@ export default function Quiz({ onQuizFinished }) {
             const isSel = selected === i;
 
             let bg = '#F9FAFB', color = '#101A24', shadow = '0 3px 0 rgba(16,26,36,0.08)', letterBg = '#9FE870', letterColor = '#101A24', mark = '';
-            if (answered) {
+            if (answered && mode === 'practice') {
               if (isCorr) { bg = '#2563EB'; color = '#fff'; shadow = '0 3px 0 #17408F'; letterBg = '#fff'; letterColor = '#101A24'; mark = '✓'; }
               else if (isSel) { bg = '#EF4444'; color = '#fff'; shadow = 'none'; letterBg = '#101A24'; letterColor = '#fff'; mark = '✕'; }
               else { bg = '#F0EFE9'; color = '#A69B87'; shadow = 'none'; letterBg = '#E5E0D3'; letterColor = '#A69B87'; }
+            } else if (answered && mode === 'exam' && isSel) {
+              // Real-exam behavior: just mark what you picked, no correctness reveal until results.
+              bg = '#101A24'; color = '#fff'; shadow = '0 3px 0 rgba(0,0,0,0.3)'; letterBg = '#fff'; letterColor = '#101A24';
             }
 
             return (
