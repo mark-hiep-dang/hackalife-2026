@@ -4,6 +4,25 @@ import { getDaysSinceLastStudy } from '../utils/streak';
 import { getNagTier, getRandomWelcomeMessage, getLlamaAnimation } from '../nagMessages';
 import LessonPath from './LessonPath';
 import { LogOut } from 'lucide-react';
+import llamaMoodChill from '../assets/llama-mood-chill.webp';
+import llamaMoodCozy from '../assets/llama-mood-cozy.webp';
+import llamaMoodFire from '../assets/llama-mood-fire.webp';
+import llamaMoodIdle from '../assets/llama-mood-idle.webp';
+import llamaMoodSleepy from '../assets/llama-mood-sleepy.webp';
+import llamaMoodZombie from '../assets/llama-mood-zombie.webp';
+import llamaSpit from '../assets/llama-spit.webp';
+
+// Maps each getLlamaAnimation() state to the matching mascot art — absence states
+// reuse the closest existing mood since there's no dedicated art for them yet.
+const LLAMA_MOOD_IMAGES = {
+  'llama-chill': llamaMoodChill,
+  'llama-cozy': llamaMoodCozy,
+  'llama-fire': llamaMoodFire,
+  'llama-sleepy': llamaMoodSleepy,
+  'llama-zombie': llamaMoodZombie,
+  'llama-return': llamaMoodIdle,
+  'llama-angry-return': llamaSpit,
+};
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
   const daysAbsent = getDaysSinceLastStudy();
@@ -59,9 +78,11 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
       >
         <div className="relative z-10 flex items-end gap-3 flex-1 min-w-0">
           <div className="relative shrink-0">
-            <div className={`w-14 h-14 rounded-full bg-white flex items-center justify-center text-3xl shadow-sm ${llamaAnim}`}>
-              🦙
-            </div>
+            <img
+              src={LLAMA_MOOD_IMAGES[llamaAnim] || llamaMoodIdle}
+              alt="Llama"
+              className={`w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-2 border-white shadow-sm ${llamaAnim}`}
+            />
             <span
               className="absolute -bottom-1 -right-1 text-sm bg-white rounded-full w-6 h-6 flex items-center justify-center"
               style={{ boxShadow: '0 2px 0 rgba(16,26,36,0.15)' }}
