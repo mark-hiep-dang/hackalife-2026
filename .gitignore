@@ -19,6 +19,7 @@ backend/*.db-journal
 .env.local
 .env.*.local
 .agents
+.mcp.json
 
 # IDEs & System files
 .idea/
