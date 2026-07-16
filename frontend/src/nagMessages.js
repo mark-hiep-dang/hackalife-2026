@@ -69,3 +69,17 @@ export function getNagTier(daysSince) {
   const message = tier.messages[Math.floor(Math.random() * tier.messages.length)];
   return { icon: tier.icon, color: tier.color, message };
 }
+
+// Picks a CSS animation class for the dashboard llama mascot: returning after
+// a long absence beats a hot streak beats the default time-of-day mood.
+export function getLlamaAnimation({ daysAbsent = 0, streak = 0 } = {}) {
+  if (daysAbsent >= 7) return 'llama-angry-return';
+  if (daysAbsent >= 1) return 'llama-return';
+  if (streak >= 3) return 'llama-fire';
+
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return 'llama-sleepy';
+  if (hour >= 11 && hour < 17) return 'llama-chill';
+  if (hour >= 17 && hour < 22) return 'llama-cozy';
+  return 'llama-zombie';
+}

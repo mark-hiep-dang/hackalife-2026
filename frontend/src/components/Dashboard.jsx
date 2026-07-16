@@ -1,13 +1,15 @@
 import { useMemo } from 'react';
 import { translations as t } from '../translations';
 import { getDaysSinceLastStudy } from '../utils/streak';
-import { getNagTier, getRandomWelcomeMessage } from '../nagMessages';
+import { getNagTier, getRandomWelcomeMessage, getLlamaAnimation } from '../nagMessages';
 import LessonPath from './LessonPath';
 import { LogOut } from 'lucide-react';
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
-  const nagTier = useMemo(() => getNagTier(getDaysSinceLastStudy()), []);
+  const daysAbsent = getDaysSinceLastStudy();
+  const nagTier = useMemo(() => getNagTier(daysAbsent), [daysAbsent]);
   const welcome = useMemo(() => getRandomWelcomeMessage(), []);
+  const llamaAnim = useMemo(() => getLlamaAnimation({ daysAbsent, streak: profile?.streak ?? 0 }), [daysAbsent, profile?.streak]);
 
   if (!profile) return null;
 
@@ -56,8 +58,8 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
         }}
       >
         <div className="relative z-10 flex items-end gap-3 flex-1 min-w-0">
-          <div className="relative shrink-0" style={{ animation: 'bob 2.4s ease-in-out infinite' }}>
-            <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-3xl shadow-sm">
+          <div className="relative shrink-0">
+            <div className={`w-14 h-14 rounded-full bg-white flex items-center justify-center text-3xl shadow-sm ${llamaAnim}`}>
               🦙
             </div>
             <span

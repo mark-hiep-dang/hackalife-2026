@@ -124,6 +124,84 @@
   50% { box-shadow: 0 6px 0 #6BAE2E, 0 0 0 16px rgba(159,232,112,0); }
 }
 
+/* Dashboard llama mascot moods — CSS fallback tier from llama-animations.json
+   (time-of-day / streak / return-from-absence states; no Lottie assets needed) */
+@keyframes llama-chew {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(2deg) translateY(-2px); }
+  50% { transform: rotate(-1deg); }
+  75% { transform: rotate(1deg) translateY(-1px); }
+}
+.llama-chew { animation: llama-chew 3s ease-in-out infinite; }
+
+@keyframes llama-sleepy {
+  0% { transform: rotate(0); }
+  20% { transform: rotate(-3deg) scale(1.02); }
+  40% { transform: rotate(0) scale(1); }
+  60% { transform: translateY(-3px); }
+  80% { transform: rotate(2deg); }
+  100% { transform: rotate(0); }
+}
+.llama-sleepy { animation: llama-sleepy 4s ease-in-out infinite; }
+
+@keyframes llama-chill {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(5deg); }
+  30% { transform: rotate(-5deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+  70% { transform: translateY(0) rotate(-2deg); }
+}
+.llama-chill { animation: llama-chill 3.5s ease-in-out infinite; }
+
+@keyframes llama-cozy {
+  0%, 100% { transform: scale(1) rotate(0); }
+  25% { transform: scale(1.02) rotate(-1deg); }
+  50% { transform: scale(1) rotate(1deg); }
+  75% { transform: scale(1.01) translateY(-2px); }
+}
+.llama-cozy { animation: llama-cozy 4s ease-in-out infinite; }
+
+@keyframes llama-zombie {
+  0% { transform: rotate(0); opacity: 0.9; }
+  20% { transform: rotate(5deg) translateY(3px); opacity: 0.85; }
+  40% { transform: rotate(-2deg) translateY(0); opacity: 1; }
+  60% { transform: rotate(3deg) translateY(2px); opacity: 0.9; }
+  80% { transform: rotate(0) scale(1.03); }
+  100% { transform: rotate(0); opacity: 0.9; }
+}
+.llama-zombie { animation: llama-zombie 5s ease-in-out infinite; }
+
+@keyframes llama-fire {
+  0%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-8px) scale(1.05); }
+  40% { transform: translateY(-2px) scale(1.02); }
+  60% { transform: translateY(-6px) scale(1.04); }
+  80% { transform: translateY(-1px) scale(1.01); }
+}
+.llama-fire { animation: llama-fire 2.5s ease-in-out infinite; }
+
+@keyframes llama-return {
+  0% { transform: translateY(0) scale(1); }
+  15% { transform: translateY(-15px) scale(1.1); }
+  30% { transform: translateY(0) scale(0.95); }
+  45% { transform: translateY(-8px) rotate(10deg); }
+  60% { transform: translateY(0) rotate(-10deg); }
+  75% { transform: rotate(5deg) scale(1.05); }
+  100% { transform: rotate(0) scale(1); }
+}
+.llama-return { animation: llama-return 3s ease-out both; }
+
+@keyframes llama-angry-return {
+  0% { transform: rotate(-30deg) scale(0.95); }
+  20% { transform: rotate(-15deg) scale(1); }
+  40% { transform: rotate(0) translateX(3px); }
+  50% { transform: translateX(-3px); }
+  60% { transform: translateX(2px) scale(1.05); }
+  80% { transform: rotate(5deg); }
+  100% { transform: rotate(0) scale(1); }
+}
+.llama-angry-return { animation: llama-angry-return 3.5s ease-out both; }
+
 /* Visual FX */
 .shoot-feedback-container {
   position: fixed;
