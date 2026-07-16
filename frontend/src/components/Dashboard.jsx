@@ -7,7 +7,7 @@ import { LogOut } from 'lucide-react';
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
   const nagTier = useMemo(() => getNagTier(getDaysSinceLastStudy()), []);
-  const welcomeMessage = useMemo(() => getRandomWelcomeMessage(), []);
+  const welcome = useMemo(() => getRandomWelcomeMessage(), []);
 
   if (!profile) return null;
 
@@ -17,7 +17,8 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
     else onNavigate('quiz');
   }
 
-  const heroMessage = nagTier ? nagTier.message : welcomeMessage;
+  const heroMessage = nagTier ? nagTier.message : welcome.message;
+  const heroMood = nagTier ? nagTier.icon : welcome.icon;
 
   return (
     <div className="flex flex-col gap-8 pop-in w-full max-w-5xl mx-auto">
@@ -54,7 +55,18 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
           boxShadow: '0 8px 0 #6BAE2E, 0 14px 30px -10px rgba(16,26,36,0.2)'
         }}
       >
-        <div className="relative z-10 flex-1 min-w-0">
+        <div className="relative z-10 flex items-end gap-3 flex-1 min-w-0">
+          <div className="relative shrink-0" style={{ animation: 'bob 2.4s ease-in-out infinite' }}>
+            <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-3xl shadow-sm">
+              🦙
+            </div>
+            <span
+              className="absolute -bottom-1 -right-1 text-sm bg-white rounded-full w-6 h-6 flex items-center justify-center"
+              style={{ boxShadow: '0 2px 0 rgba(16,26,36,0.15)' }}
+            >
+              {heroMood}
+            </span>
+          </div>
           <div className="inline-block bg-white rounded-[20px] rounded-bl-md px-4 md:px-5 py-3 font-comic font-extrabold text-base md:text-lg text-[#101A24] shadow-sm max-w-full">
             {heroMessage}
           </div>
