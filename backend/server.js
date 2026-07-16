@@ -395,25 +395,37 @@ app.get('/api/flashcards', authenticateToken, async (req, res) => {
 
 // Submit Quiz score
 app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
-  const { score, totalQuestions, topic, type, maxCombo } = req.body;
+  const { score, totalQuestions, topic, type, maxCombo, answers } = req.body;
   const db = await getDb();
   try {
     // Base XP: 10 XP per correct answer
     let xpEarned = score * 10;
-    
+
     // Combo multiplier bonus: 5% bonus per max combo item, up to 25% (max combo of 5+)
     let comboMultiplier = 1;
     if (maxCombo && maxCombo > 1) {
       comboMultiplier = 1 + Math.min((maxCombo - 1) * 0.05, 0.25);
     }
-    
+
     xpEarned = Math.round(xpEarned * comboMultiplier);
 
     // Save quiz attempt
-    await db.run(
+    const quizResult = await db.run(
       'INSERT INTO user_quizzes (user_id, score, total_questions, topic, type, xp_earned) VALUES (?, ?, ?, ?, ?, ?)',
       [req.user.id, score, totalQuestions, topic, type, xpEarned]
     );
+
+    // Exam mode: persist the full per-question breakdown so this attempt's
+    // study report (topic chart, roadmap, per-question review) can be reopened later.
+    if (type === 'exam' && Array.isArray(answers) && answers.length > 0) {
+      for (const a of answers) {
+        await db.run(
+          `INSERT INTO user_quiz_answers (quiz_id, question, topic, options, correct_index, selected_index, is_correct, explanation)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [quizResult.lastID, a.question, a.topic || '', JSON.stringify(a.options || []), a.correct_index, a.selected_index, a.isCorrect ? 1 : 0, a.explanation || '']
+        );
+      }
+    }
 
     // Update user stats
     const user = await db.get('SELECT xp FROM users WHERE id = ?', [req.user.id]);
@@ -431,6 +443,54 @@ app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
       level: updatedUser.level,
       combo_applied: comboMultiplier,
       newBadges: newlyUnlockedBadges
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List past exam attempts (score summary only) for the "Lịch sử thi thử" screen
+app.get('/api/quiz/history', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const rows = await db.all(
+      `SELECT id, score, total_questions, xp_earned, created_at
+       FROM user_quizzes WHERE user_id = ? AND type = 'exam' ORDER BY created_at DESC LIMIT 50`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Full per-question detail for one past exam attempt, to reopen its study report
+app.get('/api/quiz/history/:id', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const quiz = await db.get(
+      `SELECT id, score, total_questions, xp_earned, created_at
+       FROM user_quizzes WHERE id = ? AND user_id = ? AND type = 'exam'`,
+      [req.params.id, req.user.id]
+    );
+    if (!quiz) return res.status(404).json({ error: 'Không tìm thấy lượt thi này' });
+
+    const answers = await db.all(
+      'SELECT question, topic, options, correct_index, selected_index, is_correct, explanation FROM user_quiz_answers WHERE quiz_id = ?',
+      [quiz.id]
+    );
+
+    res.json({
+      ...quiz,
+      answers: answers.map((a) => ({
+        question: a.question,
+        topic: a.topic,
+        options: JSON.parse(a.options),
+        correct_index: a.correct_index,
+        selected_index: a.selected_index,
+        isCorrect: !!a.is_correct,
+        explanation: a.explanation
+      }))
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

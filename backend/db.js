@@ -91,6 +91,23 @@ export async function initDb() {
     )
   `);
 
+  // Per-question answer log for exam attempts, so a past exam's full study
+  // report (topic breakdown, roadmap, per-question review) can be reopened later.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS user_quiz_answers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      quiz_id INTEGER NOT NULL,
+      question TEXT NOT NULL,
+      topic TEXT,
+      options TEXT NOT NULL,
+      correct_index INTEGER NOT NULL,
+      selected_index INTEGER,
+      is_correct INTEGER NOT NULL,
+      explanation TEXT,
+      FOREIGN KEY (quiz_id) REFERENCES user_quizzes(id) ON DELETE CASCADE
+    )
+  `);
+
   // Create Flashcards table (imported from Excel)
   await db.exec(`
     CREATE TABLE IF NOT EXISTS flashcards (
