@@ -6,16 +6,16 @@ import LessonPath from './LessonPath';
 import { LogOut } from 'lucide-react';
 import llamaMoodChill from '../assets/llama-mood-chill.webp';
 import llamaMoodCozy from '../assets/llama-mood-cozy.webp';
-import llamaMoodFire from '../assets/llama-mood-fire.webp';
 import llamaMoodIdle from '../assets/llama-mood-idle.webp';
 import llamaMoodSleepy from '../assets/llama-mood-sleepy.webp';
 import llamaMoodZombie from '../assets/llama-mood-zombie.webp';
 import llamaMoodReturn from '../assets/llama-mood-return.webp';
 import llamaMoodAngry from '../assets/llama-mood-angry.webp';
+import llamaMoodFire from '../assets/quiz-mode-select.webp';
 
-// Maps each getLlamaAnimation() state to the matching mascot art — llama-chill,
-// llama-fire and llama-zombie still reuse the older mood renders since there's
-// no dedicated professor-style art for those yet.
+// Maps each getLlamaAnimation() state to the matching mascot art — llama-chill
+// and llama-zombie still reuse the older mood renders since there's no
+// dedicated professor-style art for those yet.
 const LLAMA_MOOD_IMAGES = {
   'llama-chill': llamaMoodChill,
   'llama-cozy': llamaMoodCozy,
