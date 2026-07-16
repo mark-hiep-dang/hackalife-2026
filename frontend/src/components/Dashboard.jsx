@@ -65,10 +65,6 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
             <div className="font-comic font-extrabold text-2xl text-[#101A24]">🔥 {profile.streak}</div>
             <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#00B4D8] mt-0.5">{t.streakLabel}</div>
           </div>
-          <div className="bg-[#101A24] rounded-2xl px-5 py-3 text-center shadow-sm" style={{ minWidth: '80px' }}>
-            <div className="font-comic font-extrabold text-2xl text-[#9FE870]">{profile.level}</div>
-            <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#DFF3E4] mt-0.5">{t.levelLabel}</div>
-          </div>
         </div>
       </button>
 
