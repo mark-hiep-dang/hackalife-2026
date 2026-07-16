@@ -1,6 +1,6 @@
 export const translations = {
   // Navigation
-  navHome: 'Học tập',
+  navHome: 'Trang chủ',
   navQuiz: 'Đề thi',
   navFlashcards: 'Thẻ bài',
   navLeaderboard: 'Xếp hạng',
