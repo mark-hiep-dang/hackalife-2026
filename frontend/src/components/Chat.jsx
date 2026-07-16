@@ -182,7 +182,7 @@ export default function Chat() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-4">
           {messages.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 px-8">
-              <img src={llamaWalk} alt="Llama đang đi dạo chờ bạn hỏi" className="w-full max-w-xs rounded-2xl border border-[#101A24]/10 shadow-sm wiggle" />
+              <img src={llamaWalk} alt="Llama đang đi dạo chờ bạn hỏi" className="w-28 md:w-32 rounded-2xl border border-[#101A24]/10 shadow-sm wiggle" />
               <p className="text-[#888] font-bold">{t.chatEmptyState}</p>
               <div className="flex flex-wrap justify-center gap-2 max-w-md">
                 {SUGGESTED_QUESTIONS.map(q => (
