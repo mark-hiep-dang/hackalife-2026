@@ -39,7 +39,6 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
   }
 
   const heroMessage = nagTier ? nagTier.message : welcome.message;
-  const heroMood = nagTier ? nagTier.icon : welcome.icon;
 
   return (
     <div className="flex flex-col gap-8 pop-in w-full max-w-5xl mx-auto">
@@ -77,28 +76,13 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
         }}
       >
         <div className="relative z-10 flex items-end gap-3 flex-1 min-w-0">
-          <div className="relative shrink-0">
-            <img
-              src={LLAMA_MOOD_IMAGES[llamaAnim] || llamaMoodIdle}
-              alt="Llama"
-              className={`w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-2 border-white shadow-sm ${llamaAnim}`}
-            />
-            <span
-              className="absolute -bottom-1 -right-1 text-sm bg-white rounded-full w-6 h-6 flex items-center justify-center"
-              style={{ boxShadow: '0 2px 0 rgba(16,26,36,0.15)' }}
-            >
-              {heroMood}
-            </span>
-          </div>
+          <img
+            src={LLAMA_MOOD_IMAGES[llamaAnim] || llamaMoodIdle}
+            alt="Llama"
+            className={`w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-2 border-white shadow-sm shrink-0 ${llamaAnim}`}
+          />
           <div className="inline-block bg-white rounded-[20px] rounded-bl-md px-4 md:px-5 py-3 font-comic font-extrabold text-base md:text-lg text-[#101A24] shadow-sm max-w-full">
             {heroMessage}
-          </div>
-        </div>
-
-        <div className="relative z-10 flex gap-3 shrink-0">
-          <div className="bg-white rounded-2xl px-5 py-3 text-center shadow-sm" style={{ minWidth: '80px' }}>
-            <div className="font-comic font-extrabold text-2xl text-[#101A24]">🔥 {profile.streak}</div>
-            <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#00B4D8] mt-0.5">{t.streakLabel}</div>
           </div>
         </div>
       </button>
