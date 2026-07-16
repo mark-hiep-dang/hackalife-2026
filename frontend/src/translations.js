@@ -72,7 +72,7 @@ export const translations = {
   chatSubtitle: 'Hỏi gì cũng được, Llama tra tài liệu rồi trả lời liền!',
   chatPlaceholder: 'Hỏi về thời gian gia hạn, quyền lợi bảo hiểm...',
   chatSendBtn: 'Gửi',
-  chatThinking: 'Llama đang lục tài liệu...',
+  chatThinking: 'Llama đang suy nghĩ, bạn đợi chút nhé...',
   chatEmptyState: 'Chào bạn! Hỏi mình bất cứ điều gì về bảo hiểm nhé 🦙',
   knowledgeTitle: 'Tài liệu tham khảo',
   knowledgeSubtitle: 'Tải tài liệu lên để Llama trả lời chính xác hơn',
