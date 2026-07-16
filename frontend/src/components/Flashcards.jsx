@@ -16,7 +16,7 @@ const TOPIC_STYLES = [
   { bg: '#FFF1EC', shadow: '#FFD3C7', color: '#C2410C', subColor: '#FDA98A' }
 ];
 
-export default function Flashcards() {
+export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
   const [topics, setTopics] = useState([]);
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState('');
@@ -38,6 +38,15 @@ export default function Flashcards() {
       finally { setTopicsLoading(false); }
     })();
   }, []);
+
+  // Deep-link: jump straight into a specific deck (e.g. from the exam report's roadmap)
+  useEffect(() => {
+    if (initialTopic) {
+      openDeck(initialTopic);
+      onConsumeInitialTopic?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTopic]);
 
   async function openDeck(topic) {
     setSelectedTopic(topic);

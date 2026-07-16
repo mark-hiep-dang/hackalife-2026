@@ -5,7 +5,7 @@ import { playPang, playCheer, playScream } from '../utils/sound';
 import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, ArrowRight } from 'lucide-react';
 import llamaSpit from '../assets/llama-spit.webp';
 import llamaCheer from '../assets/llama-cheer.webp';
-import { pickCorrectResponse, pickWrongResponse, generateExamReport, topicLabel } from '../llamaResponses';
+import { pickCorrectResponse, pickWrongResponse, generateExamReport, topicLabel, pickFlashcardTip } from '../llamaResponses';
 
 const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame, pang_sniper: Zap, topic_master: Medal, xp_1000: Crown };
 const TIER_COLORS = {
@@ -15,7 +15,7 @@ const TIER_COLORS = {
 };
 const CARD_SHADOW = '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)';
 
-export default function Quiz({ onQuizFinished }) {
+export default function Quiz({ onQuizFinished, onStudyTopic }) {
   const [topic, setTopic] = useState('all');
   const [difficulty, setDifficulty] = useState('intermediate');
   const [mode, setMode] = useState('practice');
@@ -38,6 +38,7 @@ export default function Quiz({ onQuizFinished }) {
   const [newBadges, setNewBadges] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [examAnswers, setExamAnswers] = useState([]);
+  const [showDetailedReport, setShowDetailedReport] = useState(false);
 
   useEffect(() => {
     if (started && mode === 'exam' && !finished) {
@@ -57,7 +58,7 @@ export default function Quiz({ onQuizFinished }) {
       if (qs.length === 0) throw new Error("Không có câu hỏi nào cho chủ đề này.");
       setQuestions(qs); setCidx(0); setScore(0); setCombo(0); setMaxCombo(0);
       setSelected(null); setAnswered(false); setTimeLeft(3600);
-      setExamAnswers([]); setStarted(true); setFinished(false);
+      setExamAnswers([]); setStarted(true); setFinished(false); setShowDetailedReport(false);
     } catch (e) { setError(e.message || 'Lỗi tải đề thi'); }
     finally { setLoading(false); }
   }
@@ -120,7 +121,7 @@ export default function Quiz({ onQuizFinished }) {
       if (a.isCorrect) byTopic[key].correct += 1;
     });
     return Object.entries(byTopic)
-      .map(([key, { correct, total }]) => ({ topic: topicLabel(key), correct, total, pct: Math.round((correct / total) * 100) }))
+      .map(([key, { correct, total }]) => ({ topicKey: key, topic: topicLabel(key), correct, total, pct: Math.round((correct / total) * 100) }))
       .sort((a, b) => a.pct - b.pct);
   }
 
@@ -282,21 +283,94 @@ export default function Quiz({ onQuizFinished }) {
                 ))}
               </div>
 
-              {/* Llama's assessment + roadmap */}
-              <div className="bg-[#101A24] rounded-2xl p-6 text-white">
+              {/* Llama's assessment */}
+              <div className="bg-[#101A24] rounded-2xl p-6 text-white mb-7">
                 <p className="font-comic font-extrabold text-base mb-4 leading-relaxed">{report.opener}</p>
-                <div className="flex flex-col gap-2 mb-5">
+                <div className="flex flex-col gap-2">
                   {report.lines.map((line) => (
                     <p key={line.topic} className="text-sm font-bold leading-relaxed">
                       {TIER_COLORS[line.tier].emoji} <strong>{line.topic}</strong> ({line.correct}/{line.total} - {line.pct}%): {line.remark}
                     </p>
                   ))}
                 </div>
-                <div className="bg-white/10 rounded-xl p-4">
-                  <p className="text-xs font-extrabold uppercase tracking-widest text-[#9FE870] mb-1">🗺️ Lộ trình đề xuất</p>
-                  <p className="text-sm font-bold leading-relaxed">{report.roadmap}</p>
-                </div>
               </div>
+
+              {/* Roadmap — separate, ordered, clickable straight into the matching flashcard deck */}
+              <div className="mb-7">
+                <p className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] mb-1">🗺️ Lộ trình đề xuất</p>
+                {report.roadmap.length === 0 ? (
+                  <p className="text-sm font-bold text-[#5C5C5C] mt-2">Không có lĩnh vực nào đáng lo cả! Ôn lại tổng quan một lượt trước khi thi thật là đủ rồi, xạ thủ ạ! 🎯</p>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold text-[#8A8A8A] mb-3">Bấm vào từng chương để vào Thẻ bài ôn lại nhé!</p>
+                    <ol className="flex flex-col gap-2.5">
+                      {report.roadmap.map((item, i) => {
+                        const c = TIER_COLORS[item.tier];
+                        return (
+                          <li key={item.topicKey}>
+                            <button
+                              onClick={() => onStudyTopic?.(item.topicKey)}
+                              className="w-full flex items-center gap-3.5 text-left border-none cursor-pointer bg-white rounded-2xl py-3.5 px-4 transition-transform hover:-translate-y-0.5"
+                              style={{ boxShadow: `0 3px 0 ${c.shadow}` }}
+                            >
+                              <span
+                                className="w-7 h-7 rounded-full flex items-center justify-center font-comic font-extrabold text-xs text-white shrink-0"
+                                style={{ background: c.bar }}
+                              >
+                                {i + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-comic font-extrabold text-sm text-[#101A24] truncate">{item.topic}</p>
+                                <p className="text-xs font-bold" style={{ color: c.bar }}>{c.label} · {item.correct}/{item.total} ({item.pct}%)</p>
+                              </div>
+                              <ArrowRight size={20} strokeWidth={3} className="shrink-0 text-[#8A8A8A]" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </>
+                )}
+              </div>
+
+              {/* Detailed per-question report */}
+              <button
+                onClick={() => setShowDetailedReport((v) => !v)}
+                className="w-full border-none cursor-pointer bg-white rounded-2xl py-3.5 font-comic font-extrabold text-sm text-[#101A24] mb-4"
+                style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}
+              >
+                {showDetailedReport ? '▲ Ẩn báo cáo chi tiết' : '📋 Xem báo cáo chi tiết từng câu'}
+              </button>
+
+              {showDetailedReport && (
+                <div className="flex flex-col gap-4">
+                  {examAnswers.map((a, i) => {
+                    const tip = pickFlashcardTip({ term: a.question.options[a.question.correct_index] });
+                    return (
+                      <div key={i} className={`p-6 rounded-2xl border border-[#101A24]/10 shadow-sm ${a.isCorrect ? 'bg-[#EFFBEA]' : 'bg-[#FFF1EC]'}`}>
+                        <p className="font-comic font-extrabold text-sm text-[#101A24] mb-1">Câu {i + 1}</p>
+                        <p className="font-bold text-base text-[#101A24] leading-snug mb-3">{a.question.question}</p>
+                        {a.isCorrect ? (
+                          <p className="text-sm font-extrabold text-[#4B9A1E] mb-3">✓ Bạn đã trả lời đúng: {a.question.options[a.question.correct_index]}</p>
+                        ) : (
+                          <>
+                            <p className="text-sm font-extrabold text-[#D9603F] mb-1">✕ Bạn chọn: {a.question.options[a.selected]}</p>
+                            <p className="text-sm font-extrabold text-[#4B9A1E] mb-3">✓ Đáp án đúng: {a.question.options[a.question.correct_index]}</p>
+                          </>
+                        )}
+                        <div className="bg-white rounded-xl p-4 mb-3">
+                          <p className="text-xs font-extrabold uppercase tracking-widest text-[#101A24] mb-1">Giải thích</p>
+                          <p className="text-sm font-bold text-[#3A3A3A] leading-relaxed">{a.question.explanation}</p>
+                        </div>
+                        <div className="flex items-start gap-2 bg-[#FFF9E8] rounded-xl px-4 py-3">
+                          <span className="text-lg shrink-0">🦙</span>
+                          <p className="text-xs font-bold text-[#8A6D1F] leading-relaxed">{tip}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })()}
