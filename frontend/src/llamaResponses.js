@@ -178,3 +178,76 @@ export function pickWrongResponse({ wrongStreak = 1, difficulty = 'intermediate'
 
   return fill(pickFrom(pool), { streak_wrong: wrongStreak, correct_answer, wrong_answer });
 }
+
+const REPORT_OPENERS_HIGH = [
+  'PẰNG! 🏆 Nhìn phong độ này Llama chỉ biết đứng dậy vỗ tay thôi!',
+  'PẰNG! 🎓 Xuất sắc! Đề này mà rớt thì chắc lỗi ở đề chứ không phải ở bạn!',
+  'PẰNG! 😎 Quá đỉnh! Sếp tương lai của bạn đang xếp hàng chờ tuyển đó!'
+];
+const REPORT_OPENERS_MID = [
+  'CHÍU! 😐 Tạm ổn... nhưng "tạm ổn" không có trong từ điển của chứng chỉ MOF đâu nha!',
+  'CHÍU! 🤔 Được đó, nhưng Llama cảm giác bạn học kiểu "hôm nay chăm, mai lười" đúng không?',
+  'CHÍU! 📖 Nửa vời rồi bạn ơi! Cố thêm chút nữa là ngon lành cành đào!'
+];
+const REPORT_OPENERS_LOW = [
+  'CHÍU! 💦💦💦 Ôi trời... Llama phải ngồi xuống hít thở sâu trước khi nói tiếp đây.',
+  'CHÍU! 😭 Bài này mà nộp thi thật chắc Llama phải nhổ nước bọt cả tuần liền!',
+  'CHÍU! 🚨 Báo động đỏ! Cần cấp cứu kiến thức GẤP trước khi đụng đề thi thật!'
+];
+
+const WEAK_TOPIC_REMARKS = [
+  'Llama nghĩ bạn chưa từng mở sách chương này thì phải? 😏',
+  'Chương này mà Llama hỏi vấn đáp chắc bạn đoán mò luôn quá!',
+  'Đọc lại chương này đi, không là Llama khóc thật đó!'
+];
+const MID_TOPIC_REMARKS = [
+  'Gần được rồi, đừng chủ quan nha!',
+  'Ôn thêm chút xíu nữa là chắc kèo!',
+  'Biết sơ sơ vậy thôi hả? Đào sâu thêm đi bạn ơi!'
+];
+const STRONG_TOPIC_REMARKS = [
+  'Quá vững! Llama an tâm phần này!',
+  'Chuẩn không cần chỉnh, qua môn ngon ơ!',
+  'Đỉnh! Cứ đà này mà phát huy nha!'
+];
+
+function tierFor(pct) {
+  if (pct < 40) return 'weak';
+  if (pct < 70) return 'mid';
+  return 'strong';
+}
+
+function remarkFor(tier) {
+  if (tier === 'weak') return pickFrom(WEAK_TOPIC_REMARKS);
+  if (tier === 'mid') return pickFrom(MID_TOPIC_REMARKS);
+  return pickFrom(STRONG_TOPIC_REMARKS);
+}
+
+function buildRoadmap(topicStats) {
+  const weak = topicStats.filter((t) => t.tier === 'weak').map((t) => t.topic);
+  const mid = topicStats.filter((t) => t.tier === 'mid').map((t) => t.topic);
+  if (weak.length === 0 && mid.length === 0) {
+    return 'Không có lĩnh vực nào đáng lo cả! Ôn lại tổng quan một lượt trước khi thi thật là đủ rồi, xạ thủ ạ! 🎯';
+  }
+  const parts = [];
+  if (weak.length > 0) parts.push(`Ưu tiên học lại NGAY: ${weak.join(', ')}`);
+  if (mid.length > 0) parts.push(`Nên ôn thêm cho chắc: ${mid.join(', ')}`);
+  return parts.join('. ') + '.';
+}
+
+/**
+ * Builds a study report from per-topic exam stats: an opening remark scaled to
+ * overall score, a tiered (weak/mid/strong) remark per topic, and a suggested
+ * review roadmap — all in Llama's teasing persona.
+ */
+export function generateExamReport(topicStatsInput, overallPct) {
+  const topicStats = topicStatsInput.map((t) => ({ ...t, tier: tierFor(t.pct) }));
+  const lines = topicStats.map((t) => ({ ...t, remark: remarkFor(t.tier) }));
+
+  let opener;
+  if (overallPct >= 70) opener = pickFrom(REPORT_OPENERS_HIGH);
+  else if (overallPct >= 40) opener = pickFrom(REPORT_OPENERS_MID);
+  else opener = pickFrom(REPORT_OPENERS_LOW);
+
+  return { opener, lines, roadmap: buildRoadmap(topicStats) };
+}

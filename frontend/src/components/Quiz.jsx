@@ -2,12 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { generateQuiz, submitQuizScore } from '../utils/api';
 import { translations as t } from '../translations';
 import { playPang, playCheer, playScream } from '../utils/sound';
-import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, ArrowRight } from 'lucide-react';
 import llamaSpit from '../assets/llama-spit.webp';
 import llamaCheer from '../assets/llama-cheer.webp';
-import { pickCorrectResponse, pickWrongResponse } from '../llamaResponses';
+import { pickCorrectResponse, pickWrongResponse, generateExamReport, topicLabel } from '../llamaResponses';
 
 const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame, pang_sniper: Zap, topic_master: Medal, xp_1000: Crown };
+const TIER_COLORS = {
+  weak: { bar: '#EF4444', shadow: '#B91C1C', label: 'Yếu', emoji: '🔴' },
+  mid: { bar: '#FFCF56', shadow: '#E0A82E', label: 'Cần ôn thêm', emoji: '🟡' },
+  strong: { bar: '#2563EB', shadow: '#17408F', label: 'Vững', emoji: '🟢' }
+};
 const CARD_SHADOW = '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)';
 
 export default function Quiz({ onQuizFinished }) {
@@ -105,6 +110,19 @@ export default function Quiz({ onQuizFinished }) {
   }
 
   function fmt(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+
+  function computeTopicStats(answers) {
+    const byTopic = {};
+    answers.forEach((a) => {
+      const key = a.question.topic || '';
+      if (!byTopic[key]) byTopic[key] = { correct: 0, total: 0 };
+      byTopic[key].total += 1;
+      if (a.isCorrect) byTopic[key].correct += 1;
+    });
+    return Object.entries(byTopic)
+      .map(([key, { correct, total }]) => ({ topic: topicLabel(key), correct, total, pct: Math.round((correct / total) * 100) }))
+      .sort((a, b) => a.pct - b.pct);
+  }
 
   const isCorrect = answered && selected === q?.correct_index;
 
@@ -214,24 +232,74 @@ export default function Quiz({ onQuizFinished }) {
           </div>
         )}
 
-        {mode === 'exam' && examAnswers.length > 0 && (
-          <div className="text-left mb-10">
-            <p className="text-xl font-extrabold uppercase tracking-widest text-[#101A24] mb-4">Xem lại bài thi</p>
-            <div className="flex flex-col gap-4">
-              {examAnswers.map((a, i) => (
-                <div key={i} className={`p-6 rounded-2xl border border-[#101A24]/10 shadow-sm ${a.isCorrect ? 'bg-[#2563EB]' : 'bg-[#EF4444]'}`}>
-                  <div className="flex items-start gap-4 text-white">
-                    {a.isCorrect ? <CheckCircle2 size={28} strokeWidth={3} className="shrink-0 mt-0.5" /> : <XCircle size={28} strokeWidth={3} className="shrink-0 mt-0.5" />}
-                    <div>
-                      <p className="font-bold text-lg leading-snug mb-3">{a.question.question}</p>
-                      {!a.isCorrect && <p className="text-white text-sm font-extrabold uppercase tracking-widest bg-[#101A24] inline-block px-3 py-1.5 rounded shadow-sm">✓ {a.question.options[a.question.correct_index]}</p>}
-                    </div>
-                  </div>
+        {mode === 'exam' && examAnswers.length > 0 && (() => {
+          const topicStats = computeTopicStats(examAnswers);
+          const report = generateExamReport(topicStats, pct);
+          const wrongCount = examAnswers.length - fs;
+
+          return (
+            <div className="text-left mb-10">
+              <p className="text-xl font-extrabold uppercase tracking-widest text-[#101A24] mb-5">📊 Báo cáo học tập</p>
+
+              {/* Correct/wrong ratio */}
+              <div className="mb-7">
+                <div className="flex items-center justify-between mb-2 text-sm font-extrabold text-[#101A24]">
+                  <span>✅ Đúng: {fs} câu</span>
+                  <span>❌ Sai: {wrongCount} câu</span>
                 </div>
-              ))}
+                <div className="h-6 rounded-full overflow-hidden flex bg-[#F0EFE9]" style={{ boxShadow: 'inset 0 2px 4px rgba(16,26,36,0.1)' }}>
+                  {fs > 0 && <div style={{ width: `${(fs / examAnswers.length) * 100}%`, background: '#2563EB' }} />}
+                  {wrongCount > 0 && <div style={{ width: `${(wrongCount / examAnswers.length) * 100}%`, background: '#EF4444', marginLeft: fs > 0 ? '2px' : 0 }} />}
+                </div>
+              </div>
+
+              {/* Per-topic strength/weakness chart */}
+              <p className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] mb-3">Lĩnh vực mạnh / yếu</p>
+              <div className="flex flex-col gap-3 mb-4">
+                {topicStats.map((ts) => {
+                  const tier = ts.pct < 40 ? 'weak' : ts.pct < 70 ? 'mid' : 'strong';
+                  const c = TIER_COLORS[tier];
+                  return (
+                    <div key={ts.topic}>
+                      <div className="flex items-center justify-between text-xs font-bold text-[#101A24] mb-1 gap-2">
+                        <span className="truncate">{ts.topic}</span>
+                        <span className="shrink-0 font-comic font-extrabold">{ts.correct}/{ts.total} ({ts.pct}%)</span>
+                      </div>
+                      <div className="h-5 rounded-full overflow-hidden bg-[#F0EFE9]" style={{ boxShadow: 'inset 0 1px 3px rgba(16,26,36,0.1)' }}>
+                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${ts.pct}%`, background: c.bar, boxShadow: `0 2px 0 ${c.shadow}` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-4 flex-wrap mb-7 text-xs font-bold text-[#5C5C5C]">
+                {Object.values(TIER_COLORS).map((c) => (
+                  <span key={c.label} className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full inline-block" style={{ background: c.bar }} />
+                    {c.label}
+                  </span>
+                ))}
+              </div>
+
+              {/* Llama's assessment + roadmap */}
+              <div className="bg-[#101A24] rounded-2xl p-6 text-white">
+                <p className="font-comic font-extrabold text-base mb-4 leading-relaxed">{report.opener}</p>
+                <div className="flex flex-col gap-2 mb-5">
+                  {report.lines.map((line) => (
+                    <p key={line.topic} className="text-sm font-bold leading-relaxed">
+                      {TIER_COLORS[line.tier].emoji} <strong>{line.topic}</strong> ({line.correct}/{line.total} - {line.pct}%): {line.remark}
+                    </p>
+                  ))}
+                </div>
+                <div className="bg-white/10 rounded-xl p-4">
+                  <p className="text-xs font-extrabold uppercase tracking-widest text-[#9FE870] mb-1">🗺️ Lộ trình đề xuất</p>
+                  <p className="text-sm font-bold leading-relaxed">{report.roadmap}</p>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <button onClick={() => onQuizFinished()} className="btn-pro-primary w-full text-xl bg-[#2563EB] text-white py-4">
           {t.backToDashboard}
