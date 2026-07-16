@@ -22,16 +22,27 @@ app.use(express.json());
 await initDb();
 
 // --- AUTH MIDDLEWARE ---
+// Verifies the token's signature is valid AND that the account it points to still
+// exists — a token can outlive its user (e.g. account removed after issuing), and
+// without this check downstream inserts using req.user.id as a foreign key
+// (e.g. knowledge_documents.uploaded_by) fail with a raw SQLITE_CONSTRAINT error.
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) return res.status(401).json({ error: 'Access token required' });
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, async (err, user) => {
     if (err) return res.status(403).json({ error: 'Invalid or expired token' });
-    req.user = user;
-    next();
+    try {
+      const db = await getDb();
+      const exists = await db.get('SELECT id FROM users WHERE id = ?', [user.id]);
+      if (!exists) return res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại' });
+      req.user = user;
+      next();
+    } catch (dbErr) {
+      res.status(500).json({ error: dbErr.message });
+    }
   });
 }
 
