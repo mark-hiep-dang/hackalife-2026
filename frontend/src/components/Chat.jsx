@@ -122,7 +122,7 @@ export default function Chat() {
           <p className="text-sm font-bold text-[#888] mb-6">{t.knowledgeSubtitle}</p>
 
           {docsError && (
-            <div className="bg-[#EF4444] border border-[#101A24]/10 text-white text-sm font-bold px-4 py-3 rounded-lg mb-4 shadow-sm">
+            <div className="bg-[#F7D2CC] border border-[#101A24]/10 text-[#B4443B] text-sm font-bold px-4 py-3 rounded-lg mb-4 shadow-sm">
               {docsError}
             </div>
           )}
@@ -130,13 +130,13 @@ export default function Chat() {
           {/* Upload */}
           <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <input ref={fileInputRef} type="file" accept=".pdf,.txt" onChange={handleFilePicked} className="hidden" id="knowledge-file-input" />
-            <label htmlFor="knowledge-file-input" className="btn-pro-primary bg-[#00B4D8] py-3 flex-1 cursor-pointer">
+            <label htmlFor="knowledge-file-input" className="btn-pro bg-[#B9E7EF] text-[#20606E] hover:bg-[#A8DEE8] py-3 flex-1 cursor-pointer">
               <Upload size={18} strokeWidth={3} /> {t.knowledgeUploadFile}
             </label>
           </div>
 
           {/* Paste text */}
-          <div className="bg-[#F9FAFB] border border-[#101A24]/10 rounded-2xl p-5 mb-6">
+          <div className="bg-[#FDF4E7] border border-[#101A24]/10 rounded-2xl p-5 mb-6">
             <p className="text-xs font-extrabold text-[#888] uppercase tracking-widest mb-3">{t.knowledgePasteText}</p>
             <input
               type="text" value={pasteTitle} onChange={e => setPasteTitle(e.target.value)}
@@ -149,7 +149,7 @@ export default function Chat() {
               rows={4}
               className="input-pro mb-3 resize-none"
             />
-            <button onClick={handlePasteSave} disabled={saving || !pasteText.trim()} className="btn-pro-primary bg-[#9FE870] w-full py-3">
+            <button onClick={handlePasteSave} disabled={saving || !pasteText.trim()} className="btn-pro-primary w-full py-3">
               {saving ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} strokeWidth={3} />} {t.knowledgeSaveBtn}
             </button>
           </div>
@@ -167,7 +167,7 @@ export default function Chat() {
                     <p className="text-sm font-extrabold text-[#101A24] truncate">{doc.title}</p>
                     <p className="text-xs font-bold text-[#888] uppercase tracking-widest">{doc.source_type} • {doc.chunk_count} đoạn</p>
                   </div>
-                  <button onClick={() => handleDelete(doc.id)} className="text-[#EF4444] hover:text-[#991B1B] shrink-0" title={t.knowledgeDeleteBtn}>
+                  <button onClick={() => handleDelete(doc.id)} className="text-[#D9695F] hover:text-[#B4443B] shrink-0" title={t.knowledgeDeleteBtn}>
                     <Trash2 size={18} strokeWidth={2.5} />
                   </button>
                 </div>
@@ -189,7 +189,7 @@ export default function Chat() {
                   <button
                     key={q}
                     onClick={() => sendMessage(q)}
-                    className="text-xs font-bold text-[#101A24] bg-[#F9FAFB] border border-[#101A24]/10 rounded-full px-3.5 py-2 shadow-sm hover:bg-[#9FE870] transition-colors"
+                    className="text-xs font-bold text-[#101A24] bg-[#FDF4E7] border border-[#101A24]/10 rounded-full px-3.5 py-2 shadow-sm hover:bg-[#C7EFC4] transition-colors"
                   >
                     {q}
                   </button>
@@ -202,7 +202,7 @@ export default function Chat() {
               {m.role === 'assistant' && <span className="text-2xl mr-2 shrink-0">🦙</span>}
               <div
                 className={`max-w-[80%] rounded-2xl px-5 py-3 text-sm font-bold leading-relaxed whitespace-pre-wrap shadow-sm border border-[#101A24]/10 ${
-                  m.role === 'user' ? 'bg-[#101A24] text-white' : 'bg-[#F9FAFB] text-[#101A24]'
+                  m.role === 'user' ? 'bg-[#101A24] text-white' : 'bg-[#FDF4E7] text-[#101A24]'
                 }`}
               >
                 {m.content}
@@ -212,7 +212,7 @@ export default function Chat() {
           {loading && (
             <div className="flex justify-start">
               <span className="text-2xl mr-2 shrink-0">🦙</span>
-              <div className="bg-[#F9FAFB] border border-[#101A24]/10 rounded-2xl px-5 py-3 text-sm font-extrabold text-[#888] uppercase tracking-widest shadow-sm flex items-center gap-2">
+              <div className="bg-[#FDF4E7] border border-[#101A24]/10 rounded-2xl px-5 py-3 text-sm font-extrabold text-[#888] uppercase tracking-widest shadow-sm flex items-center gap-2">
                 <Loader2 size={16} className="animate-spin" /> {t.chatThinking}
               </div>
             </div>
@@ -220,7 +220,7 @@ export default function Chat() {
         </div>
 
         {error && (
-          <div className="mx-6 mb-3 bg-[#EF4444] border border-[#101A24]/10 text-white text-sm font-bold px-4 py-3 rounded-lg shadow-sm">
+          <div className="mx-6 mb-3 bg-[#F7D2CC] border border-[#101A24]/10 text-[#B4443B] text-sm font-bold px-4 py-3 rounded-lg shadow-sm">
             {error}
           </div>
         )}
@@ -232,7 +232,7 @@ export default function Chat() {
             disabled={loading}
             className="input-pro flex-1 py-3"
           />
-          <button type="submit" disabled={loading || !input.trim()} className="btn-pro-primary bg-[#2563EB] text-white py-3 px-5 shrink-0">
+          <button type="submit" disabled={loading || !input.trim()} className="btn-pro bg-[#4C6FC4] text-white hover:bg-[#3D5DAE] py-3 px-5 shrink-0">
             <Send size={20} strokeWidth={3} />
           </button>
         </form>

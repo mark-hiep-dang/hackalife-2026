@@ -47,8 +47,8 @@ export default function Leaderboard({ profile }) {
       <div
         className="relative rounded-[2rem] overflow-hidden"
         style={{
-          background: 'linear-gradient(180deg, #DCF0FF 0%, #EEF7E8 100%)',
-          boxShadow: '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)'
+          background: 'linear-gradient(180deg, #EAF7FA 0%, #FDF4E7 100%)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
         }}
       >
         {/* Tab bar */}
@@ -62,9 +62,9 @@ export default function Leaderboard({ profile }) {
                 className="flex-1 border-none cursor-pointer py-2.5 px-3.5 font-comic font-bold text-[13px]"
                 style={{
                   borderRadius: '16px 16px 4px 4px',
-                  background: active ? '#101A24' : '#fff',
+                  background: active ? '#8A6FC9' : '#fff',
                   color: active ? '#fff' : '#101A24',
-                  boxShadow: active ? '0 3px 0 rgba(0,0,0,0.2)' : '0 3px 0 rgba(16,26,36,0.1)'
+                  boxShadow: active ? '0 4px 14px rgba(138,111,201,0.3)' : '0 4px 14px rgba(0,0,0,0.06)'
                 }}
               >
                 {tb.label}
@@ -77,7 +77,7 @@ export default function Leaderboard({ profile }) {
           <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang tải BXH...</div>
         )}
         {error && (
-          <div className="mx-5 my-6 py-6 text-center text-white bg-[#EF4444] rounded-2xl font-bold uppercase tracking-widest">{error}</div>
+          <div className="mx-5 my-6 py-6 text-center text-[#B4443B] bg-[#F7D2CC] rounded-2xl font-bold uppercase tracking-widest">{error}</div>
         )}
 
         {!loading && !error && (
@@ -92,7 +92,7 @@ export default function Leaderboard({ profile }) {
                     <div className="font-comic font-extrabold text-[13px] text-[#101A24] text-center truncate" style={{ maxWidth: '90px' }}>
                       {p.username}
                     </div>
-                    <div className="text-[11px] font-extrabold text-[#0E7C99]">{p.xp.toLocaleString()} XP</div>
+                    <div className="text-[11px] font-extrabold text-[#3B93A8]">{p.xp.toLocaleString()} XP</div>
                     <div
                       className="flex items-start justify-center pt-2"
                       style={{ width: `${stand.width}px`, height: `${stand.height}px`, background: stand.color, borderRadius: '12px 12px 0 0', boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.08)' }}
@@ -105,14 +105,14 @@ export default function Leaderboard({ profile }) {
             </div>
 
             {/* Rest of the list */}
-            <div className="bg-white mx-4 mb-5 rounded-[1.25rem] overflow-hidden" style={{ boxShadow: '0 2px 10px rgba(16,26,36,0.06)' }}>
+            <div className="bg-white mx-4 mb-5 rounded-[1.25rem] overflow-hidden" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
               {restRows.map((row) => (
                 <div
                   key={row.rank}
                   className="flex items-center gap-3.5 px-4 py-3 border-b-2 border-[#F3F3F3] last:border-b-0"
-                  style={{ background: row.isMe ? '#EFFBEA' : 'transparent' }}
+                  style={{ background: row.isMe ? '#EEF9EE' : 'transparent' }}
                 >
-                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[#F9FAFB] flex items-center justify-center font-comic font-extrabold text-sm text-[#101A24] shrink-0">
+                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[#FDF4E7] flex items-center justify-center font-comic font-extrabold text-sm text-[#101A24] shrink-0">
                     {row.rank}
                   </div>
                   <span className="text-2xl shrink-0">🦙</span>
@@ -120,7 +120,7 @@ export default function Leaderboard({ profile }) {
                     <div className="flex items-center gap-2">
                       <span className="font-comic font-bold text-sm text-[#101A24] truncate">{row.username}</span>
                       {row.isMe && (
-                        <span className="text-[9px] font-extrabold bg-[#101A24] text-white px-2 py-0.5 rounded-lg uppercase tracking-wide shrink-0">Bạn</span>
+                        <span className="text-[9px] font-extrabold bg-[#8A6FC9] text-white px-2 py-0.5 rounded-lg uppercase tracking-wide shrink-0">Bạn</span>
                       )}
                     </div>
                     <div className="text-[11px] font-bold text-[#8A8A8A] mt-0.5">🔥 {row.streak} ngày · Lv {row.level}</div>

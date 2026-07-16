@@ -21,7 +21,7 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
 
   const Section = ({ title, children }) => (
     <div className="mb-10">
-      <p className="text-xs font-extrabold text-[#101A24] bg-[#00B4D8] border border-[#101A24]/10 inline-block px-4 py-1.5 rounded-lg shadow-sm uppercase tracking-widest mb-6 rotate-1">{title}</p>
+      <p className="text-xs font-extrabold text-[#101A24] bg-[#B9E7EF] border border-[#101A24]/10 inline-block px-4 py-1.5 rounded-lg shadow-sm uppercase tracking-widest mb-6 rotate-1">{title}</p>
       <div className="card-pro p-8 md:p-10 bg-white">{children}</div>
     </div>
   );
@@ -29,14 +29,14 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
   return (
     <div className="flex flex-col pop-in max-w-2xl mx-auto w-full">
       <div className="flex items-center gap-6 mb-12">
-        <div className="w-16 h-16 bg-[#2563EB] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-3">
+        <div className="w-16 h-16 bg-[#C7D7F7] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-3">
           <SettingsIcon size={36} strokeWidth={3} className="text-[#101A24]" />
         </div>
         <h2 className="text-5xl font-extrabold text-[#101A24] uppercase tracking-tighter">{t.settingsTitle}</h2>
       </div>
 
       {saved && (
-        <div className="bg-[#2563EB] border border-[#101A24]/10 text-white text-base font-extrabold uppercase tracking-widest px-5 py-4 rounded-2xl mb-8 shadow-sm">
+        <div className="bg-[#C7EFC4] border border-[#101A24]/10 text-[#2F5C37] text-base font-extrabold uppercase tracking-widest px-5 py-4 rounded-2xl mb-8 shadow-sm">
           ✓ Đã lưu cài đặt!
         </div>
       )}
@@ -53,7 +53,7 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
           </div>
           
           <button onClick={toggleMute}
-            className={`relative w-20 h-10 rounded-full border transition-all shadow-sm ${muted ? 'bg-gray-300 border-[#101A24]/10' : 'bg-[#2563EB] border-[#101A24]/10'}`}
+            className={`relative w-20 h-10 rounded-full border transition-all shadow-sm ${muted ? 'bg-gray-300 border-[#101A24]/10' : 'bg-[#7C9AE0] border-[#101A24]/10'}`}
           >
             <span className={`absolute top-0.5 w-7 h-7 rounded-full border border-[#101A24]/10 bg-white transition-all ${muted ? 'left-1' : 'left-10'}`} />
           </button>
@@ -68,13 +68,13 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
           </div>
           <input type="text" value={ollamaUrl} onChange={e => setOllamaUrl(e.target.value)}
             className="input-pro mb-6 text-lg py-4" placeholder="http://localhost:11434" />
-          <button type="submit" className="btn-pro-primary w-full bg-[#00B4D8] text-xl py-4">{t.saveConfig}</button>
+          <button type="submit" className="btn-pro bg-[#B9E7EF] text-[#20606E] hover:bg-[#A8DEE8] w-full text-xl py-4">{t.saveConfig}</button>
         </form>
       </Section>
 
       {/* Logout */}
       <button onClick={handleLogout}
-        className="btn-pro-primary w-full bg-white text-[#EF4444] mt-4 py-5 text-xl"
+        className="btn-pro bg-white text-[#D9695F] border border-[#101A24]/10 w-full mt-4 py-5 text-xl"
       >
         <LogOut size={24} strokeWidth={3} /> {t.logout}
       </button>

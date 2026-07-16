@@ -28,8 +28,8 @@ export default function Auth({ setSession }) {
         
         <div className="card-pro p-8 md:p-10 text-center">
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-[#9FE870] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-3">
-              <Target size={32} strokeWidth={3} className="text-[#101A24]" />
+            <div className="w-16 h-16 bg-[#C7EFC4] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-3">
+              <Target size={32} strokeWidth={3} className="text-[#2F5C37]" />
             </div>
           </div>
           
@@ -39,7 +39,7 @@ export default function Auth({ setSession }) {
           <p className="text-sm text-[#101A24] font-bold mb-8">{t.tagline}</p>
 
           {error && (
-            <div className="bg-[#EF4444] border border-[#101A24]/10 text-white text-sm font-bold px-4 py-3 rounded-lg mb-6 shadow-sm uppercase tracking-wider">
+            <div className="bg-[#F7D2CC] border border-[#101A24]/10 text-[#B4443B] text-sm font-bold px-4 py-3 rounded-lg mb-6 shadow-sm uppercase tracking-wider">
               {error}
             </div>
           )}
@@ -74,7 +74,7 @@ export default function Auth({ setSession }) {
           <p className="text-center mt-8">
             <button
               onClick={() => { setIsRegister(r => !r); setError(''); }}
-              className="text-sm font-extrabold text-[#101A24] border-b-3 border-[#101A24]/10 hover:text-[#9FE870] hover:border-[#9FE870] transition-colors pb-0.5"
+              className="text-sm font-extrabold text-[#101A24] border-b-3 border-[#101A24]/10 hover:text-[#4F9A5A] hover:border-[#C7EFC4] transition-colors pb-0.5"
             >
               {isRegister ? t.registerToggle : t.loginToggle}
             </button>

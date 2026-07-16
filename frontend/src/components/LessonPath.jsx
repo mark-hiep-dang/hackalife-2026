@@ -61,8 +61,8 @@ export default function LessonPath({ lessons, onSelectLesson }) {
     <div
       className="relative overflow-hidden rounded-[2rem] p-8"
       style={{
-        background: 'linear-gradient(180deg, #DCF0FF 0%, #EEF7E8 55%, #F3ECD8 100%)',
-        boxShadow: '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)'
+        background: 'linear-gradient(180deg, #EAF7FA 0%, #F2F9EE 55%, #FDF4E7 100%)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
       }}
     >
       {/* Floating clouds */}
@@ -100,15 +100,15 @@ export default function LessonPath({ lessons, onSelectLesson }) {
           const isCurrent = origIdx === firstAvailableIdx;
           const icon = isSummit ? '⛰️' : (TOPIC_ICON[lesson.topic] || '🏕️');
 
-          let bg = '#F9FAFB', shadowColor = 'rgba(16,26,36,0.15)', opacity = 1;
-          if (isCompleted) { bg = '#2563EB'; shadowColor = '#17408F'; }
-          else if (isCurrent) { bg = '#9FE870'; shadowColor = '#6BAE2E'; }
+          let bg = '#FDF4E7', shadowColor = 'rgba(0,0,0,0.08)', opacity = 1;
+          if (isCompleted) { bg = '#C7D7F7'; shadowColor = 'rgba(76,111,196,0.3)'; }
+          else if (isCurrent) { bg = '#C7EFC4'; shadowColor = 'rgba(79,154,90,0.3)'; }
           else if (isLocked) { opacity = 0.55; }
 
           return (
             <div key={lesson.id} className="absolute text-center" style={{ left: `${x}px`, top: `${y}px`, transform: 'translate(-50%, -50%)' }}>
               {isCurrent && (
-                <div className="absolute left-1/2 whitespace-nowrap bg-[#101A24] text-white font-comic text-xs font-bold px-3.5 py-1.5 rounded-full pointer-events-none" style={{ bottom: `${NODE_SIZE / 2 + 22}px`, transform: 'translateX(-50%)', boxShadow: '0 3px 0 rgba(0,0,0,0.2)' }}>
+                <div className="absolute left-1/2 whitespace-nowrap bg-[#8A6FC9] text-white font-comic text-xs font-bold px-3.5 py-1.5 rounded-full pointer-events-none" style={{ bottom: `${NODE_SIZE / 2 + 22}px`, transform: 'translateX(-50%)', boxShadow: '0 4px 14px rgba(138,111,201,0.3)' }}>
                   Bắt đầu ở đây 👇
                 </div>
               )}
@@ -119,7 +119,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
                 style={{
                   width: `${NODE_SIZE}px`, height: `${NODE_SIZE}px`,
                   background: bg, opacity,
-                  boxShadow: `0 6px 0 ${shadowColor}`,
+                  boxShadow: `0 6px 16px ${shadowColor}`,
                   animation: isCurrent ? 'pulseGlow 1.8s ease-in-out infinite' : 'none'
                 }}
                 title={label}
@@ -152,11 +152,11 @@ export default function LessonPath({ lessons, onSelectLesson }) {
             </p>
 
             {preview.isLocked ? (
-              <p className="text-sm font-bold text-[#3A3A3A] bg-[#F9FAFB] rounded-2xl p-4 mb-5 leading-relaxed">
+              <p className="text-sm font-bold text-[#3A3A3A] bg-[#FDF4E7] rounded-2xl p-4 mb-5 leading-relaxed">
                 🔒 Trại này đang khóa. Hoàn thành trại trước đó để mở đường lên đây nhé!
               </p>
             ) : (
-              <div className="text-left bg-[#F9FAFB] rounded-2xl p-4 mb-5">
+              <div className="text-left bg-[#FDF4E7] rounded-2xl p-4 mb-5">
                 <p className="text-xs font-extrabold text-[#8A8A8A] uppercase tracking-wide mb-3">
                   Trong trại này ({preview.lesson.cards.length} thẻ):
                 </p>
@@ -172,16 +172,14 @@ export default function LessonPath({ lessons, onSelectLesson }) {
 
             <div className="flex gap-3">
               <button
-                className="flex-1 border-none cursor-pointer bg-[#F9FAFB] rounded-2xl py-3.5 font-comic font-bold text-[#101A24]"
-                style={{ boxShadow: '0 4px 0 rgba(16,26,36,0.1)' }}
+                className="flex-1 border-none cursor-pointer bg-[#FDF4E7] rounded-2xl py-3.5 font-comic font-bold text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
                 onClick={() => setPreview(null)}
               >
                 Đóng
               </button>
               {!preview.isLocked && (
                 <button
-                  className="flex-[2] border-none cursor-pointer bg-[#9FE870] rounded-2xl py-3.5 font-comic font-bold text-[#101A24]"
-                  style={{ boxShadow: '0 4px 0 #6BAE2E' }}
+                  className="flex-[2] border-none cursor-pointer bg-[#C7EFC4] rounded-2xl py-3.5 font-comic font-bold text-[#2F5C37] shadow-[0_4px_14px_rgba(79,154,90,0.25)]"
                   onClick={() => { onSelectLesson(preview.lesson); setPreview(null); }}
                 >
                   Bắt đầu 🎯

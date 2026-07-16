@@ -10,7 +10,7 @@ import ExamReport from './ExamReport';
 import QuizHistory from './QuizHistory';
 
 const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame, pang_sniper: Zap, topic_master: Medal, xp_1000: Crown };
-const CARD_SHADOW = '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)';
+const CARD_SHADOW = '0 4px 20px rgba(0,0,0,0.06)';
 
 export default function Quiz({ onQuizFinished, onStudyTopic }) {
   const [topic, setTopic] = useState('all');
@@ -126,8 +126,8 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
   if (!started && !finished) return (
     <div className="bg-white pop-in text-center max-w-xl mx-auto" style={{ borderRadius: '2rem', boxShadow: CARD_SHADOW, padding: '44px 40px' }}>
       <div
-        className="w-24 h-24 rounded-full bg-[#9FE870] flex items-center justify-center text-5xl mx-auto mb-5 wiggle"
-        style={{ boxShadow: '0 5px 0 #6BAE2E', transform: 'rotate(-6deg)' }}
+        className="w-24 h-24 rounded-full bg-[#C7EFC4] flex items-center justify-center text-5xl mx-auto mb-5 wiggle shadow-[0_6px_18px_rgba(79,154,90,0.25)]"
+        style={{ transform: 'rotate(-6deg)' }}
       >
         🎯
       </div>
@@ -140,8 +140,8 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: mode === 'practice' ? '#9FE870' : '#F9FAFB',
-            boxShadow: mode === 'practice' ? '0 4px 0 #6BAE2E' : '0 3px 0 rgba(16,26,36,0.1)'
+            background: mode === 'practice' ? '#C7EFC4' : '#FDF4E7',
+            boxShadow: mode === 'practice' ? '0 4px 14px rgba(79,154,90,0.25)' : '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
           <span className="text-4xl">🔫</span>
@@ -153,13 +153,13 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: mode === 'exam' ? '#101A24' : '#F9FAFB',
-            boxShadow: mode === 'exam' ? '0 4px 0 rgba(0,0,0,0.3)' : '0 3px 0 rgba(16,26,36,0.1)'
+            background: mode === 'exam' ? 'linear-gradient(135deg, #E3D9F5 0%, #FCE7A8 100%)' : '#FDF4E7',
+            boxShadow: mode === 'exam' ? '0 4px 14px rgba(138,111,201,0.3)' : '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
           <span className="text-4xl">⏱️</span>
-          <span className="font-comic font-extrabold text-base" style={{ color: mode === 'exam' ? '#fff' : '#101A24' }}>{t.examMode}</span>
-          <span className="text-xs font-bold" style={{ color: mode === 'exam' ? '#DFF3E4' : '#5C5C5C' }}>Mô phỏng thi thật, tính giờ nghiêm túc</span>
+          <span className="font-comic font-extrabold text-base text-[#101A24]">{t.examMode}</span>
+          <span className="text-xs font-bold" style={{ color: mode === 'exam' ? '#6B4FA8' : '#5C5C5C' }}>Mô phỏng thi thật, tính giờ nghiêm túc</span>
         </button>
       </div>
 
@@ -170,22 +170,20 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
       )}
 
       {error && (
-        <div className="text-white text-sm font-bold rounded-2xl bg-[#EF4444] px-4 py-3 mb-4">{error}</div>
+        <div className="text-[#B4443B] text-sm font-bold rounded-2xl bg-[#F7D2CC] px-4 py-3 mb-4">{error}</div>
       )}
 
       <button
         onClick={startQuiz}
         disabled={loading}
-        className="w-full border-none cursor-pointer bg-[#00B4D8] rounded-2xl py-4 font-comic font-extrabold text-lg text-[#101A24]"
-        style={{ boxShadow: '0 5px 0 #0E7C99' }}
+        className="w-full border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-lg text-[#20606E] shadow-[0_6px_18px_rgba(59,147,168,0.2)]"
       >
         {loading ? 'Đang chuẩn bị đạn...' : 'Vào trận thôi! 🚀'}
       </button>
 
       <button
         onClick={() => setShowHistory(true)}
-        className="w-full border-none cursor-pointer bg-white rounded-2xl py-3 mt-3 font-comic font-extrabold text-sm text-[#101A24]"
-        style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}
+        className="w-full border-none cursor-pointer bg-white rounded-2xl py-3 mt-3 font-comic font-extrabold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
       >
         📜 Lịch sử thi thử
       </button>
@@ -202,13 +200,13 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
         <h2 className="text-5xl md:text-6xl font-extrabold text-[#101A24] uppercase tracking-tighter mb-4">{t.quizCompleted}</h2>
         <p className="text-lg font-extrabold uppercase tracking-widest text-[#888] mb-8">{mode === 'exam' ? t.examMode : t.practiceMode}</p>
 
-        <div className="inline-flex flex-col items-center justify-center w-40 h-40 rounded-full border border-[#101A24]/10 bg-[#9FE870] shadow-sm mb-6 -rotate-2">
+        <div className="inline-flex flex-col items-center justify-center w-40 h-40 rounded-full border border-[#101A24]/10 bg-[#C7EFC4] shadow-sm mb-6 -rotate-2">
           <span className="text-5xl font-extrabold text-[#101A24]">{pct}%</span>
           <span className="text-sm font-extrabold text-[#101A24] uppercase tracking-widest bg-white border border-[#101A24]/10 px-2 py-0.5 rounded shadow-sm mt-2 -rotate-3">{fs}/{questions.length}</span>
         </div>
 
         {mode === 'exam' && (
-          <div className={`inline-block mb-10 px-6 py-3 rounded-2xl border border-[#101A24]/10 shadow-sm font-extrabold uppercase tracking-widest text-white ${pct >= 70 ? 'bg-[#2563EB]' : 'bg-[#EF4444]'}`}>
+          <div className={`inline-block mb-10 px-6 py-3 rounded-2xl border border-[#101A24]/10 shadow-sm font-extrabold uppercase tracking-widest text-white ${pct >= 70 ? 'bg-[#6B8AD6]' : 'bg-[#D9695F]'}`}>
             {pct >= 70 ? 'ĐẠT RỒI! 🎉 Xạ thủ đúng chuẩn đại lý tương lai đây!' : 'Chưa đủ 70% đâu nha, đừng buồn! Xạ thủ giỏi cỡ nào cũng từng bắn trượt trước khi trăm phát trăm trúng 💪'}
           </div>
         )}
@@ -216,21 +214,21 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
         <div className="grid grid-cols-2 gap-6 mb-10">
           <div className="bg-white border border-[#101A24]/10 rounded-2xl p-5 shadow-sm">
             <p className="text-xs font-extrabold uppercase tracking-widest text-[#101A24] mb-1">{t.xpEarned}</p>
-            <p className="text-4xl font-extrabold text-[#9FE870]">+{xpEarned}</p>
+            <p className="text-4xl font-extrabold text-[#4F9A5A]">+{xpEarned}</p>
           </div>
           <div className="bg-white border border-[#101A24]/10 rounded-2xl p-5 shadow-sm">
             <p className="text-xs font-extrabold uppercase tracking-widest text-[#101A24] mb-1">{t.comboBonus}</p>
-            <p className="text-4xl font-extrabold text-[#00B4D8]">{maxCombo > 1 ? `${(1 + Math.min((maxCombo-1)*0.05,0.25)).toFixed(2)}x` : '1.0x'}</p>
+            <p className="text-4xl font-extrabold text-[#3B93A8]">{maxCombo > 1 ? `${(1 + Math.min((maxCombo-1)*0.05,0.25)).toFixed(2)}x` : '1.0x'}</p>
           </div>
         </div>
 
         {newBadges.length > 0 && (
-          <div className="bg-[#00B4D8] border border-[#101A24]/10 rounded-2xl p-6 shadow-sm text-left mb-10">
+          <div className="bg-[#B9E7EF] border border-[#101A24]/10 rounded-2xl p-6 shadow-sm text-left mb-10">
             <p className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] mb-4">🏅 Huy hiệu mới</p>
             <div className="flex flex-col gap-3">
               {newBadges.map(bid => {
                 const Icon = BADGE_ICONS[bid] || Zap;
-                return <div key={bid} className="flex items-center gap-3 text-sm font-extrabold text-[#101A24] uppercase bg-white border border-[#101A24]/10 px-3 py-2 rounded shadow-sm"><Icon size={20} strokeWidth={3} className="text-[#9FE870]" /> {t[`badge_${bid}`] || bid}</div>;
+                return <div key={bid} className="flex items-center gap-3 text-sm font-extrabold text-[#101A24] uppercase bg-white border border-[#101A24]/10 px-3 py-2 rounded shadow-sm"><Icon size={20} strokeWidth={3} className="text-[#4F9A5A]" /> {t[`badge_${bid}`] || bid}</div>;
               })}
             </div>
           </div>
@@ -242,7 +240,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           </div>
         )}
 
-        <button onClick={() => onQuizFinished()} className="btn-pro-primary w-full text-xl bg-[#2563EB] text-white py-4">
+        <button onClick={() => onQuizFinished()} className="btn-pro w-full text-xl bg-[#4C6FC4] hover:bg-[#3D5DAE] text-white py-4">
           {t.backToDashboard}
         </button>
       </div>
@@ -259,30 +257,30 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {mode === 'exam' ? (
-            <span className={`flex items-center gap-2 font-comic font-extrabold text-sm px-4 py-2 rounded-2xl ${timeLeft < 300 ? 'bg-[#EF4444] text-white animate-pulse' : 'bg-white text-[#101A24]'}`} style={{ boxShadow: timeLeft < 300 ? 'none' : '0 3px 0 rgba(16,26,36,0.1)' }}>
+            <span className={`flex items-center gap-2 font-comic font-extrabold text-sm px-4 py-2 rounded-2xl ${timeLeft < 300 ? 'bg-[#E4897E] text-white animate-pulse' : 'bg-white text-[#101A24]'}`} style={{ boxShadow: timeLeft < 300 ? 'none' : '0 4px 14px rgba(0,0,0,0.06)' }}>
               <Clock size={20} strokeWidth={3} /> {fmt(timeLeft)}
             </span>
           ) : combo > 1 ? (
-            <span className="flex items-center gap-1.5 font-comic font-extrabold text-sm px-4 py-2 rounded-2xl" style={{ background: '#FFCF56', color: '#101A24', boxShadow: '0 3px 0 #E0A82E', transform: 'rotate(-2deg)' }}>
+            <span className="flex items-center gap-1.5 font-comic font-extrabold text-sm px-4 py-2 rounded-2xl" style={{ background: '#F7DA8A', color: '#101A24', boxShadow: '0 4px 14px rgba(184,145,46,0.25)', transform: 'rotate(-2deg)' }}>
               🔥 Combo {combo}x
             </span>
           ) : null}
         </div>
-        <span className="font-comic font-extrabold text-sm text-[#101A24] bg-white px-4 py-2 rounded-2xl" style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}>
+        <span className="font-comic font-extrabold text-sm text-[#101A24] bg-white px-4 py-2 rounded-2xl shadow-[0_4px_14px_rgba(0,0,0,0.06)]">
           {t.questionIndicator.replace('{current}', cidx + 1).replace('{total}', questions.length)}
         </span>
       </div>
 
       {/* Progress */}
-      <div className="h-4 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'inset 0 2px 4px rgba(16,26,36,0.1)' }}>
-        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${((cidx + 1) / questions.length) * 100}%`, background: 'linear-gradient(90deg, #9FE870, #6BAE2E)' }} />
+      <div className="h-4 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}>
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${((cidx + 1) / questions.length) * 100}%`, background: 'linear-gradient(90deg, #C7EFC4, #9BDDA0)' }} />
       </div>
 
       {/* Question */}
       <div className="relative bg-white mt-2" style={{ borderRadius: '2rem', boxShadow: CARD_SHADOW, padding: '36px 32px' }}>
         <span
-          className="absolute font-comic font-bold text-xs text-white bg-[#101A24] px-4 py-2 rounded-full"
-          style={{ top: '-18px', left: '28px', boxShadow: '0 3px 0 rgba(0,0,0,0.2)', transform: 'rotate(-3deg)' }}
+          className="absolute font-comic font-bold text-xs text-white bg-[#8A6FC9] px-4 py-2 rounded-full"
+          style={{ top: '-18px', left: '28px', boxShadow: '0 4px 14px rgba(138,111,201,0.3)', transform: 'rotate(-3deg)' }}
         >
           🎯 Sẵn sàng bắn chưa?
         </span>
@@ -296,14 +294,14 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
             const isCorr = i === q.correct_index;
             const isSel = selected === i;
 
-            let bg = '#F9FAFB', color = '#101A24', shadow = '0 3px 0 rgba(16,26,36,0.08)', letterBg = '#9FE870', letterColor = '#101A24', mark = '';
+            let bg = '#FDF4E7', color = '#101A24', shadow = '0 4px 14px rgba(0,0,0,0.06)', letterBg = '#C7EFC4', letterColor = '#101A24', mark = '';
             if (answered && mode === 'practice') {
-              if (isCorr) { bg = '#2563EB'; color = '#fff'; shadow = '0 3px 0 #17408F'; letterBg = '#fff'; letterColor = '#101A24'; mark = '✓'; }
-              else if (isSel) { bg = '#EF4444'; color = '#fff'; shadow = 'none'; letterBg = '#101A24'; letterColor = '#fff'; mark = '✕'; }
-              else { bg = '#F0EFE9'; color = '#A69B87'; shadow = 'none'; letterBg = '#E5E0D3'; letterColor = '#A69B87'; }
+              if (isCorr) { bg = '#6B8AD6'; color = '#fff'; shadow = '0 4px 14px rgba(76,111,196,0.3)'; letterBg = '#fff'; letterColor = '#101A24'; mark = '✓'; }
+              else if (isSel) { bg = '#D9695F'; color = '#fff'; shadow = 'none'; letterBg = '#101A24'; letterColor = '#fff'; mark = '✕'; }
+              else { bg = '#F3ECDD'; color = '#A69B87'; shadow = 'none'; letterBg = '#E5E0D3'; letterColor = '#A69B87'; }
             } else if (answered && mode === 'exam' && isSel) {
               // Real-exam behavior: just mark what you picked, no correctness reveal until results.
-              bg = '#101A24'; color = '#fff'; shadow = '0 3px 0 rgba(0,0,0,0.3)'; letterBg = '#fff'; letterColor = '#101A24';
+              bg = '#8A6FC9'; color = '#fff'; shadow = '0 4px 14px rgba(138,111,201,0.3)'; letterBg = '#fff'; letterColor = '#101A24';
             }
 
             return (
@@ -332,14 +330,14 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
       {answered && mode === 'practice' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101A24]/55 p-5">
           <div className="bounce-in bg-white w-full max-w-md overflow-hidden text-center" style={{ borderRadius: '2rem', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.3)' }}>
-            <div className="flex justify-center py-8" style={{ background: isCorrect ? '#DFF3E4' : '#FFE8E4' }}>
+            <div className="flex justify-center py-8" style={{ background: isCorrect ? '#E7F5E5' : '#FBEAE6' }}>
               <div
                 className="relative w-[140px] h-[140px]"
                 style={{ animation: 'bob 2.2s ease-in-out infinite' }}
               >
                 <div
                   className="w-full h-full rounded-full overflow-hidden"
-                  style={{ boxShadow: `0 6px 0 ${isCorrect ? '#6BAE2E' : '#F2A48F'}` }}
+                  style={{ boxShadow: `0 6px 16px ${isCorrect ? 'rgba(79,154,90,0.3)' : 'rgba(217,105,95,0.3)'}` }}
                 >
                   <img
                     src={isCorrect ? llamaCheer : llamaSpit}
@@ -348,8 +346,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
                   />
                 </div>
                 <span
-                  className="absolute -bottom-1.5 -right-1.5 text-2xl bg-white rounded-full w-[52px] h-[52px] flex items-center justify-center"
-                  style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.15)' }}
+                  className="absolute -bottom-1.5 -right-1.5 text-2xl bg-white rounded-full w-[52px] h-[52px] flex items-center justify-center shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
                 >
                   {isCorrect ? '🎉' : '💦'}
                 </span>
@@ -366,7 +363,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
                 </p>
               )}
 
-              <div className="text-left bg-[#F9FAFB] rounded-2xl p-5 mb-6">
+              <div className="text-left bg-[#FDF4E7] rounded-2xl p-5 mb-6">
                 <strong className="block text-[#101A24] text-xs font-extrabold uppercase tracking-widest mb-2">{t.explanationTitle}</strong>
                 <p className="text-sm font-bold text-[#3A3A3A] leading-relaxed">{q.explanation}</p>
                 {q.source && <p className="mt-3 text-xs font-medium text-[#8A8A8A] italic">Nguồn: {q.source}</p>}
@@ -374,8 +371,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
 
               <button
                 onClick={advance}
-                className="w-full border-none cursor-pointer bg-[#00B4D8] rounded-2xl py-4 font-comic font-extrabold text-base text-[#101A24] flex items-center justify-center gap-2"
-                style={{ boxShadow: '0 4px 0 #0E7C99' }}
+                className="w-full border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-base text-[#20606E] flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(59,147,168,0.2)]"
               >
                 {t.nextQuestionBtn} <ArrowRight size={20} strokeWidth={3} />
               </button>

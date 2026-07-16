@@ -77,7 +77,7 @@ export default function App() {
   /* ── Auth ─────────────────────────────────────────────── */
   if (!session) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
+      <div className="min-h-screen bg-[#FFF9F0] flex flex-col">
         <header className="bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
             <span className="font-comic font-extrabold text-2xl tracking-tight flex items-center gap-3 text-[#101A24]">
@@ -95,7 +95,7 @@ export default function App() {
 
   /* ── Main App (Sidebar / Bottom Tab layout) ───────────────── */
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#FFF9F0] flex flex-col md:flex-row">
       
       {/* ── Sidebar (Desktop) ─────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
@@ -113,7 +113,7 @@ export default function App() {
               <button key={id} onClick={() => { setActiveLesson(null); setActiveTab(id); }}
                 className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-base font-extrabold uppercase tracking-widest transition-all border ${
                   active
-                    ? 'bg-[#101A24] border-[#101A24]/10 text-white shadow-sm -translate-y-1 -translate-x-1'
+                    ? 'bg-[#E3D9F5] border-[#101A24]/10 text-[#101A24] shadow-sm -translate-y-1 -translate-x-1'
                     : 'bg-white border-transparent text-[#101A24] hover:border-[#101A24]/10 hover:shadow-sm'
                 }`}
               >
@@ -124,19 +124,19 @@ export default function App() {
         </nav>
 
         {profile && (
-          <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#F9FAFB] flex flex-col gap-4">
+          <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#FDF4E7] flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{profile.username}</span>
                 <span className="text-sm font-extrabold uppercase tracking-widest text-[#101A24]">LV. {profile.level}</span>
               </div>
-              <span className="text-sm font-extrabold uppercase tracking-widest bg-[#00B4D8] text-[#101A24] px-3 py-1.5 rounded-lg border border-[#101A24]/10 shadow-sm -rotate-3">
+              <span className="text-sm font-extrabold uppercase tracking-widest bg-[#B9E7EF] text-[#101A24] px-3 py-1.5 rounded-lg border border-[#101A24]/10 shadow-sm -rotate-3">
                 {profile.xp.toLocaleString()} XP
               </span>
             </div>
-            
+
             <button onClick={() => { const n = !muted; setMuted(n); setMuteState(n); }}
-              className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center text-[#101A24] hover:bg-[#9FE870] transition-colors font-extrabold text-xs uppercase tracking-widest gap-2"
+              className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center text-[#101A24] hover:bg-[#C7EFC4] transition-colors font-extrabold text-xs uppercase tracking-widest gap-2"
             >
               {muted ? <VolumeX size={16} strokeWidth={3} /> : <Volume2 size={16} strokeWidth={3} />}
               {muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
@@ -155,7 +155,7 @@ export default function App() {
           
           {profile && (
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest bg-[#00B4D8] text-[#101A24] px-2 py-1 rounded border border-[#101A24]/10 shadow-sm">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest bg-[#B9E7EF] text-[#101A24] px-2 py-1 rounded border border-[#101A24]/10 shadow-sm">
                 {profile.xp} XP
               </span>
               <button onClick={() => { const n = !muted; setMuted(n); setMuteState(n); }} className="w-8 h-8 rounded border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center text-[#101A24] active:translate-y-1 active:translate-x-1 active:shadow-none">
@@ -195,7 +195,7 @@ export default function App() {
               <button key={id} onClick={() => { setActiveLesson(null); setActiveTab(id); }}
                 className={`flex flex-col items-center gap-1 w-16 transition-colors ${active ? 'text-[#101A24]' : 'text-[#888]'}`}
               >
-                <div className={`flex items-center justify-center w-12 h-10 rounded-2xl border ${active ? 'bg-[#9FE870] border-[#101A24]/10 shadow-sm -translate-y-1' : 'bg-transparent border-transparent'}`}>
+                <div className={`flex items-center justify-center w-12 h-10 rounded-2xl border ${active ? 'bg-[#C7EFC4] border-[#101A24]/10 shadow-sm -translate-y-1' : 'bg-transparent border-transparent'}`}>
                   <Icon size={20} strokeWidth={active ? 3 : 2} />
                 </div>
                 <span className={`text-[9px] font-extrabold uppercase tracking-wider ${active ? 'opacity-100' : 'opacity-0'} transition-opacity`}>{label}</span>
