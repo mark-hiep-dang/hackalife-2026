@@ -10,8 +10,8 @@ export const translations = {
   // Auth
   authTitle: 'LLAMA 🦙',
   authSubtitle: 'Đăng nhập để chiến nghiệm',
-  loginTitle: 'LLAMA 🦙',
-  registerTitle: 'LLAMA 🦙',
+  loginTitle: 'LLAMA',
+  registerTitle: 'LLAMA',
   tagline: 'Learning Like A Master Agent',
   usernameLabel: 'Tên đăng nhập',
   passwordLabel: 'Mật khẩu',
