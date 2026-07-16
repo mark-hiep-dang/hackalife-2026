@@ -136,7 +136,7 @@ export default function Chat() {
           </div>
 
           {/* Paste text */}
-          <div className="bg-[#FDF4E7] border border-[#101A24]/10 rounded-2xl p-5 mb-6">
+          <div className="bg-[#EEF0F3] border border-[#101A24]/10 rounded-2xl p-5 mb-6">
             <p className="text-xs font-extrabold text-[#888] uppercase tracking-widest mb-3">{t.knowledgePasteText}</p>
             <input
               type="text" value={pasteTitle} onChange={e => setPasteTitle(e.target.value)}
@@ -189,7 +189,7 @@ export default function Chat() {
                   <button
                     key={q}
                     onClick={() => sendMessage(q)}
-                    className="text-xs font-bold text-[#101A24] bg-[#FDF4E7] border border-[#101A24]/10 rounded-full px-3.5 py-2 shadow-sm hover:bg-[#C7EFC4] transition-colors"
+                    className="text-xs font-bold text-[#101A24] bg-[#EEF0F3] border border-[#101A24]/10 rounded-full px-3.5 py-2 shadow-sm hover:bg-[#C7EFC4] transition-colors"
                   >
                     {q}
                   </button>
@@ -202,7 +202,7 @@ export default function Chat() {
               {m.role === 'assistant' && <span className="text-2xl mr-2 shrink-0">🦙</span>}
               <div
                 className={`max-w-[80%] rounded-2xl px-5 py-3 text-sm font-bold leading-relaxed whitespace-pre-wrap shadow-sm border border-[#101A24]/10 ${
-                  m.role === 'user' ? 'bg-[#101A24] text-white' : 'bg-[#FDF4E7] text-[#101A24]'
+                  m.role === 'user' ? 'bg-[#101A24] text-white' : 'bg-[#EEF0F3] text-[#101A24]'
                 }`}
               >
                 {m.content}
@@ -212,7 +212,7 @@ export default function Chat() {
           {loading && (
             <div className="flex justify-start">
               <span className="text-2xl mr-2 shrink-0">🦙</span>
-              <div className="bg-[#FDF4E7] border border-[#101A24]/10 rounded-2xl px-5 py-3 text-sm font-extrabold text-[#888] uppercase tracking-widest shadow-sm flex items-center gap-2">
+              <div className="bg-[#EEF0F3] border border-[#101A24]/10 rounded-2xl px-5 py-3 text-sm font-extrabold text-[#888] uppercase tracking-widest shadow-sm flex items-center gap-2">
                 <Loader2 size={16} className="animate-spin" /> {t.chatThinking}
               </div>
             </div>

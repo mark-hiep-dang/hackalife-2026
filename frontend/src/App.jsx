@@ -12,6 +12,7 @@ import Leaderboard from './components/Leaderboard';
 import Chat from './components/Chat';
 import Settings from './components/Settings';
 import { Home, Target, Layers, Trophy, Settings as SettingsIcon, Volume2, VolumeX, BookOpen, MessageCircle } from 'lucide-react';
+import llamaLogo from './assets/llama-logo.png';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -77,11 +78,11 @@ export default function App() {
   /* ── Auth ─────────────────────────────────────────────── */
   if (!session) {
     return (
-      <div className="min-h-screen bg-[#FFF9F0] flex flex-col">
+      <div className="min-h-screen bg-[#F5F6F8] flex flex-col">
         <header className="bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
-            <span className="font-comic font-extrabold text-2xl tracking-tight flex items-center gap-3 text-[#101A24]">
-              <span className="text-2xl wiggle inline-block">🦙</span>
+            <span className="font-comic font-extrabold text-2xl tracking-tight flex items-center gap-2 text-[#101A24]">
+              <img src={llamaLogo} alt="" className="w-9 h-9 object-contain wiggle" />
               LLAMA
             </span>
           </div>
@@ -95,13 +96,13 @@ export default function App() {
 
   /* ── Main App (Sidebar / Bottom Tab layout) ───────────────── */
   return (
-    <div className="min-h-screen bg-[#FFF9F0] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F5F6F8] flex flex-col md:flex-row">
       
       {/* ── Sidebar (Desktop) ─────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
         <div className="p-6 border-b-3 border-[#101A24]/10">
-          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-3 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
-            <span className="text-2xl wiggle inline-block">🦙</span>
+          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
+            <img src={llamaLogo} alt="" className="w-9 h-9 object-contain wiggle" />
             <span>LLAMA</span>
           </button>
         </div>
@@ -124,7 +125,7 @@ export default function App() {
         </nav>
 
         {profile && (
-          <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#FDF4E7] flex flex-col gap-4">
+          <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#EEF0F3] flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{profile.username}</span>
@@ -149,7 +150,7 @@ export default function App() {
       <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50 shadow-[0_4px_0_rgba(0,0,0,0.05)]">
         <div className="px-4 h-16 flex items-center justify-between">
           <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-xl tracking-tight text-[#101A24]">
-            <span className="text-xl wiggle inline-block">🦙</span>
+            <img src={llamaLogo} alt="" className="w-7 h-7 object-contain wiggle" />
             LLAMA
           </button>
           

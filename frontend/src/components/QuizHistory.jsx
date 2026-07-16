@@ -79,7 +79,7 @@ export default function QuizHistory({ onBack, onStudyTopic }) {
             <button
               key={q.id}
               onClick={() => openAttempt(q.id)}
-              className="w-full flex items-center justify-between gap-3 text-left border-none cursor-pointer bg-[#FDF4E7] rounded-2xl py-4 px-5 transition-transform hover:-translate-y-0.5 shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
+              className="w-full flex items-center justify-between gap-3 text-left border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-4 px-5 transition-transform hover:-translate-y-0.5 shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
             >
               <div className="min-w-0">
                 <p className="font-comic font-extrabold text-sm text-[#101A24]">{formatDate(q.created_at)}</p>

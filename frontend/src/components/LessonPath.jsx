@@ -61,7 +61,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
     <div
       className="relative overflow-hidden rounded-[2rem] p-8"
       style={{
-        background: 'linear-gradient(180deg, #EAF7FA 0%, #F2F9EE 55%, #FDF4E7 100%)',
+        background: 'linear-gradient(180deg, #EAF7FA 0%, #F2F9EE 55%, #EEF0F3 100%)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
       }}
     >
@@ -100,7 +100,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
           const isCurrent = origIdx === firstAvailableIdx;
           const icon = isSummit ? '⛰️' : (TOPIC_ICON[lesson.topic] || '🏕️');
 
-          let bg = '#FDF4E7', shadowColor = 'rgba(0,0,0,0.08)', opacity = 1;
+          let bg = '#EEF0F3', shadowColor = 'rgba(0,0,0,0.08)', opacity = 1;
           if (isCompleted) { bg = '#C7D7F7'; shadowColor = 'rgba(76,111,196,0.3)'; }
           else if (isCurrent) { bg = '#C7EFC4'; shadowColor = 'rgba(79,154,90,0.3)'; }
           else if (isLocked) { opacity = 0.55; }
@@ -152,11 +152,11 @@ export default function LessonPath({ lessons, onSelectLesson }) {
             </p>
 
             {preview.isLocked ? (
-              <p className="text-sm font-bold text-[#3A3A3A] bg-[#FDF4E7] rounded-2xl p-4 mb-5 leading-relaxed">
+              <p className="text-sm font-bold text-[#3A3A3A] bg-[#EEF0F3] rounded-2xl p-4 mb-5 leading-relaxed">
                 🔒 Trại này đang khóa. Hoàn thành trại trước đó để mở đường lên đây nhé!
               </p>
             ) : (
-              <div className="text-left bg-[#FDF4E7] rounded-2xl p-4 mb-5">
+              <div className="text-left bg-[#EEF0F3] rounded-2xl p-4 mb-5">
                 <p className="text-xs font-extrabold text-[#8A8A8A] uppercase tracking-wide mb-3">
                   Trong trại này ({preview.lesson.cards.length} thẻ):
                 </p>
@@ -172,7 +172,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
 
             <div className="flex gap-3">
               <button
-                className="flex-1 border-none cursor-pointer bg-[#FDF4E7] rounded-2xl py-3.5 font-comic font-bold text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
+                className="flex-1 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-3.5 font-comic font-bold text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
                 onClick={() => setPreview(null)}
               >
                 Đóng
