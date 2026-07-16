@@ -1,6 +1,9 @@
 // Frontend API Client
 
-const API_BASE = 'http://localhost:5005/api';
+// In dev, Vite proxies '/api' to the local backend. In production (Hostinger
+// static build), the backend runs on a separate host (Render), so the build
+// needs VITE_API_URL set to that backend's public URL — see deploy docs.
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 function getHeaders() {
   const token = localStorage.getItem('pang_chiu_token');
