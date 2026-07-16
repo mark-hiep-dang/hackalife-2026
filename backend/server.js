@@ -701,12 +701,15 @@ ${contextBlock}` : ''}`;
   } catch (err) {
     console.warn('Ollama proxy failed, running bilingual dictionary agent fallback. Reason:', err.message);
 
-    // If we found relevant uploaded material, surface it directly instead of the canned replies below —
-    // raw retrieved passages are far more useful than a generic fallback when Ollama isn't reachable.
+    // If we found relevant uploaded material, surface the single best-matching chunk's
+    // answer directly instead of dumping every retrieved passage — one clean answer,
+    // not a wall of "Đoạn 1, Đoạn 2..." text.
     if (retrieved.length > 0) {
-      const passages = retrieved.map((r, i) => `Đoạn ${i + 1}: ${r.content}`).join('\n\n');
+      const best = retrieved[0].content;
+      const answerMatch = best.match(/Trả lời:\s*(.+)$/s);
+      const answerText = answerMatch ? answerMatch[1].trim() : best;
       return res.json({
-        response: `😏 Mình chưa nối được AI để tổng hợp câu trả lời mượt, nhưng đây là những đoạn tài liệu bạn đã tải lên có vẻ liên quan nhất:\n\n${passages}\n\nKết nối Ollama trong Cài đặt để Llama tổng hợp câu trả lời mượt hơn nhé!`
+        response: `😏 ${answerText}`
       });
     }
 
