@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "LLAMA (Learning Like A Master Agent): Gamified MOF Insurance Exam Preparation App",
   "main": "backend/server.js",
+  "type": "module",
   "workspaces": ["backend", "frontend"],
   "scripts": {
     "install:backend": "cd backend && npm install",
