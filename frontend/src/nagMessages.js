@@ -1,19 +1,23 @@
 // Escalating, cheeky "Llama is nagging you" copy — Duolingo-owl-style guilt trips,
 // gets more dramatic the longer the user has skipped studying.
 
+// Each welcome message carries a "mood" emoji — paired with 🦙 in the UI to
+// give the llama a matching expression (chewing grass when chill, glasses
+// when it's being a smartass, side-eye when suspicious, etc).
 const welcomeMessages = [
-  'Hôm nay học gì đây? Lên đồ thôi! 🎒',
-  'Ôi hello người đẹp, hôm nay học gì nàooo? 💅',
-  'Chào chiến binh! Bữa nay múa quiz kiểu gì đây ta? 🥷',
-  'Ê, dậy sớm thế để bắn đề hay đi ngắm bình minh đấy? 🌅',
-  'Llama đã mài súng xong xuôi, còn bạn thì sao nào? 🔫✨',
-  'Nay đẹp trời, học tí cho đời thêm vui nè bạn ơiii! 🌤️',
-  'Tới giờ cày MOF rồi đó, đừng để Llama đợi lâu nha cưng! 🦙💕',
-  'Bạn đến rồi à? Llama tưởng bị bạn cho leo cây tiếp cơ 👀'
+  { text: 'Hôm nay học gì đây? Lên đồ thôi! 🎒', mood: '💪' },
+  { text: 'Ôi hello người đẹp, hôm nay học gì nàooo? 💅', mood: '😉' },
+  { text: 'Chào chiến binh! Bữa nay múa quiz kiểu gì đây ta? 🥷', mood: '😎' },
+  { text: 'Ê, dậy sớm thế để bắn đề hay đi ngắm bình minh đấy? 🌅', mood: '🧐' },
+  { text: 'Llama đã mài súng xong xuôi, còn bạn thì sao nào? 🔫✨', mood: '😤' },
+  { text: 'Nay đẹp trời, học tí cho đời thêm vui nè bạn ơiii! 🌤️', mood: '🌿' },
+  { text: 'Tới giờ cày MOF rồi đó, đừng để Llama đợi lâu nha cưng! 🦙💕', mood: '😏' },
+  { text: 'Bạn đến rồi à? Llama tưởng bị bạn cho leo cây tiếp cơ 👀', mood: '👀' }
 ];
 
 export function getRandomWelcomeMessage() {
-  return welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+  const { text, mood } = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+  return { message: text, icon: mood };
 }
 
 const nagTiers = [
