@@ -4,11 +4,16 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { PDFParse } from 'pdf-parse';
 import { initDb, getDb } from './db.js';
 import { generateDynamicQuestion, generateLlamaQuestion, questionBank } from './questions.js';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5005;
@@ -807,6 +812,16 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Serve the built frontend (frontend/dist) so a single Node process can host
+// both the app and the API — needed for hosts like Hostinger's Node.js App
+// feature, which only runs one process per app. Falls back to index.html for
+// any non-API route so client-side (React) routes resolve on direct loads.
+const frontendDist = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendDist));
+app.get(/^(?!\/api\/).*/, (req, res) => {
+  res.sendFile(path.join(frontendDist, 'index.html'));
 });
 
 app.listen(PORT, () => {
