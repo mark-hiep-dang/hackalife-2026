@@ -5,6 +5,9 @@ import { playPang, playCheer, playScream } from '../utils/sound';
 import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, ArrowRight } from 'lucide-react';
 import llamaSpit from '../assets/llama-spit.webp';
 import llamaCheer from '../assets/llama-cheer.webp';
+import quizModeSelect from '../assets/quiz-mode-select.webp';
+import quizPracticeMode from '../assets/quiz-practice-mode.webp';
+import quizExamMode from '../assets/quiz-exam-mode.webp';
 import { pickCorrectResponse, pickWrongResponse } from '../llamaResponses';
 import ExamReport from './ExamReport';
 import QuizHistory from './QuizHistory';
@@ -125,12 +128,12 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
   /* ── Setup: "Chọn chế độ chiến!" ─── */
   if (!started && !finished) return (
     <div className="bg-white pop-in text-center max-w-xl mx-auto" style={{ borderRadius: '2rem', boxShadow: CARD_SHADOW, padding: '44px 40px' }}>
-      <div
-        className="w-24 h-24 rounded-full bg-[#C7EFC4] flex items-center justify-center text-5xl mx-auto mb-5 wiggle shadow-[0_6px_18px_rgba(79,154,90,0.25)]"
+      <img
+        src={quizModeSelect}
+        alt=""
+        className="w-24 h-24 object-contain mx-auto mb-5 wiggle"
         style={{ transform: 'rotate(-6deg)' }}
-      >
-        🎯
-      </div>
+      />
       <h2 className="font-comic font-extrabold text-3xl text-[#101A24] uppercase mb-2">Chọn chế độ chiến!</h2>
       <p className="text-sm font-bold text-[#8A8A8A] mb-7">Luyện súng nhẹ nhàng hay thử lửa thi thật?</p>
 
@@ -144,7 +147,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
             boxShadow: mode === 'practice' ? '0 4px 14px rgba(79,154,90,0.25)' : '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
-          <span className="text-4xl">🔫</span>
+          <img src={quizPracticeMode} alt="" className="w-14 h-14 object-contain" />
           <span className="font-comic font-extrabold text-base text-[#101A24]">{t.practiceMode}</span>
           <span className="text-xs font-bold text-[#5C5C5C]">5 câu, thoải mái xem giải thích</span>
         </button>
@@ -157,7 +160,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
             boxShadow: mode === 'exam' ? '0 4px 14px rgba(138,111,201,0.3)' : '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
-          <span className="text-4xl">⏱️</span>
+          <img src={quizExamMode} alt="" className="w-14 h-14 object-contain" />
           <span className="font-comic font-extrabold text-base text-[#101A24]">{t.examMode}</span>
           <span className="text-xs font-bold" style={{ color: mode === 'exam' ? '#6B4FA8' : '#5C5C5C' }}>Mô phỏng thi thật, tính giờ nghiêm túc</span>
         </button>

@@ -10,18 +10,20 @@ import llamaMoodFire from '../assets/llama-mood-fire.webp';
 import llamaMoodIdle from '../assets/llama-mood-idle.webp';
 import llamaMoodSleepy from '../assets/llama-mood-sleepy.webp';
 import llamaMoodZombie from '../assets/llama-mood-zombie.webp';
-import llamaSpit from '../assets/llama-spit.webp';
+import llamaMoodReturn from '../assets/llama-mood-return.webp';
+import llamaMoodAngry from '../assets/llama-mood-angry.webp';
 
-// Maps each getLlamaAnimation() state to the matching mascot art — absence states
-// reuse the closest existing mood since there's no dedicated art for them yet.
+// Maps each getLlamaAnimation() state to the matching mascot art — llama-chill,
+// llama-fire and llama-zombie still reuse the older mood renders since there's
+// no dedicated professor-style art for those yet.
 const LLAMA_MOOD_IMAGES = {
   'llama-chill': llamaMoodChill,
   'llama-cozy': llamaMoodCozy,
   'llama-fire': llamaMoodFire,
   'llama-sleepy': llamaMoodSleepy,
   'llama-zombie': llamaMoodZombie,
-  'llama-return': llamaMoodIdle,
-  'llama-angry-return': llamaSpit,
+  'llama-return': llamaMoodReturn,
+  'llama-angry-return': llamaMoodAngry,
 };
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
