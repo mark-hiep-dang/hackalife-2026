@@ -4,8 +4,9 @@ node_modules/
 package-lock.json
 
 # Builds & Outputs
-dist/
-**/dist/
+# frontend/dist is intentionally committed — Hostinger's Node.js hosting
+# only runs `npm install` (no build-command step) before starting the
+# backend, so the built frontend must already be present in the repo.
 build/
 .cache/
 .eslintcache
