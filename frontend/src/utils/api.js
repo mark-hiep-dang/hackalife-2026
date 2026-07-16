@@ -106,14 +106,32 @@ export async function generateQuiz(topic, difficulty, type) {
   return data;
 }
 
-export async function submitQuizScore({ score, totalQuestions, topic, type, maxCombo }) {
+export async function submitQuizScore({ score, totalQuestions, topic, type, maxCombo, answers }) {
   const res = await fetch(`${API_BASE}/quiz/submit`, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ score, totalQuestions, topic, type, maxCombo })
+    body: JSON.stringify({ score, totalQuestions, topic, type, maxCombo, answers })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to submit quiz score');
+  return data;
+}
+
+export async function getQuizHistory() {
+  const res = await fetch(`${API_BASE}/quiz/history`, {
+    headers: getHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch quiz history');
+  return data;
+}
+
+export async function getQuizHistoryDetail(id) {
+  const res = await fetch(`${API_BASE}/quiz/history/${id}`, {
+    headers: getHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch quiz history detail');
   return data;
 }
 
