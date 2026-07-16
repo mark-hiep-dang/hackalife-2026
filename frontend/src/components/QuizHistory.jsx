@@ -49,7 +49,7 @@ export default function QuizHistory({ onBack, onStudyTopic }) {
           <ArrowLeft size={18} strokeWidth={3} /> Quay lại lịch sử
         </button>
         {detailLoading && <div className="text-center py-16 text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang tải...</div>}
-        {detailError && <div className="text-white bg-[#EF4444] rounded-2xl px-4 py-3 font-bold">{detailError}</div>}
+        {detailError && <div className="text-[#B4443B] bg-[#F7D2CC] rounded-2xl px-4 py-3 font-bold">{detailError}</div>}
         {detail && <ExamReport examAnswers={detail} onStudyTopic={onStudyTopic} />}
       </div>
     );
@@ -66,7 +66,7 @@ export default function QuizHistory({ onBack, onStudyTopic }) {
       </div>
 
       {loading && <div className="text-center py-16 text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang tải...</div>}
-      {error && <div className="text-white bg-[#EF4444] rounded-2xl px-4 py-3 font-bold">{error}</div>}
+      {error && <div className="text-[#B4443B] bg-[#F7D2CC] rounded-2xl px-4 py-3 font-bold">{error}</div>}
       {!loading && !error && list.length === 0 && (
         <div className="text-center py-16 text-[#8A8A8A] font-bold">Chưa có lượt thi thử nào. Vào trận đầu tiên thôi! 🚀</div>
       )}
@@ -79,14 +79,13 @@ export default function QuizHistory({ onBack, onStudyTopic }) {
             <button
               key={q.id}
               onClick={() => openAttempt(q.id)}
-              className="w-full flex items-center justify-between gap-3 text-left border-none cursor-pointer bg-[#F9FAFB] rounded-2xl py-4 px-5 transition-transform hover:-translate-y-0.5"
-              style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}
+              className="w-full flex items-center justify-between gap-3 text-left border-none cursor-pointer bg-[#FDF4E7] rounded-2xl py-4 px-5 transition-transform hover:-translate-y-0.5 shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
             >
               <div className="min-w-0">
                 <p className="font-comic font-extrabold text-sm text-[#101A24]">{formatDate(q.created_at)}</p>
                 <p className="text-xs font-bold text-[#8A8A8A] mt-0.5">{q.score}/{q.total_questions} câu · +{q.xp_earned} XP</p>
               </div>
-              <span className={`shrink-0 font-comic font-extrabold text-xs uppercase px-3 py-1.5 rounded-full ${passed ? 'bg-[#2563EB] text-white' : 'bg-[#EF4444] text-white'}`}>
+              <span className={`shrink-0 font-comic font-extrabold text-xs uppercase px-3 py-1.5 rounded-full ${passed ? 'bg-[#6B8AD6] text-white' : 'bg-[#D9695F] text-white'}`}>
                 {pct}% {passed ? 'ĐẠT' : 'CHƯA ĐẠT'}
               </span>
             </button>

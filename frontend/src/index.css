@@ -1,27 +1,42 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@500;700;800;900&display=swap');
 
-/* 
-  WISE + GUMROAD HYBRID PRO AESTHETIC
+/*
+  WARM PASTEL LEARNING APP AESTHETIC
   -----------------------------------
-  Primary Dark: #101A24 (Deep Navy)
-  Primary Accent: #9FE870 (Wise Bright Green)
-  Secondary Accent: #00B4D8 (Vibrant Cyan)
-  Success: #2563EB (Pro Blue)
-  Background: #F9FAFB (Off-White)
+  Text/Ink:        #101A24 (Deep Navy — unchanged, for contrast)
+  Background:      #FFF9F0 (Warm Cream)
+  Cards:           #FFFFFF, soft shadow only (no hard offsets, no neon)
+  Pastel Green:    #C7EFC4 fill / #4F9A5A ink
+  Pastel Cyan:     #B9E7EF fill / #3B93A8 ink
+  Pastel Blue:     #C7D7F7 fill / #4C6FC4 ink
+  Pastel Coral:    #F7D2CC fill / #D9695F ink
+  Pastel Gold:     #FCE7A8 fill / #B8912E ink (llama professor glasses)
+  Pastel Lavender: #E3D9F5 fill / #8A6FC9 ink (llama professor beret)
 */
 
 @theme {
   --color-brand-dark: #101A24;
-  --color-brand-green: #9FE870;
-  --color-brand-cyan: #00B4D8;
-  --color-brand-blue: #2563EB;
-  --color-brand-bg: #F9FAFB;
+  --color-brand-bg: #FFF9F0;
+  --color-brand-green: #C7EFC4;
+  --color-brand-green-ink: #4F9A5A;
+  --color-brand-cyan: #B9E7EF;
+  --color-brand-cyan-ink: #3B93A8;
+  --color-brand-blue: #C7D7F7;
+  --color-brand-blue-ink: #4C6FC4;
+  --color-brand-coral: #F7D2CC;
+  --color-brand-coral-ink: #D9695F;
+  --color-brand-gold: #FCE7A8;
+  --color-brand-gold-ink: #B8912E;
+  --color-brand-lavender: #E3D9F5;
+  --color-brand-lavender-ink: #8A6FC9;
+  --shadow-soft: 0 4px 20px rgba(0,0,0,0.06);
+  --shadow-soft-hover: 0 8px 28px rgba(0,0,0,0.09);
 }
 
 @layer base {
   body {
-    @apply bg-[#F9FAFB] text-[#101A24] antialiased selection:bg-[#9FE870] selection:text-[#101A24];
+    @apply bg-[#FFF9F0] text-[#101A24] antialiased selection:bg-[#C7EFC4] selection:text-[#101A24];
     font-family: 'Nunito', ui-sans-serif, sans-serif;
   }
 }
@@ -34,31 +49,31 @@
 
 @layer utilities {
   .card-pro {
-    @apply bg-white border border-[#101A24]/10 rounded-2xl shadow-[0_4px_20px_-4px_rgba(16,26,36,0.08)] transition-all duration-300;
+    @apply bg-white border border-[#101A24]/[0.06] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300;
   }
-  
+
   .card-pro-interactive {
-    @apply bg-white border border-[#101A24]/10 rounded-2xl shadow-[0_4px_20px_-4px_rgba(16,26,36,0.08)] transition-all duration-300 hover:shadow-[0_8px_30px_-4px_rgba(16,26,36,0.12)] hover:-translate-y-1 cursor-pointer;
+    @apply bg-white border border-[#101A24]/[0.06] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.09)] hover:-translate-y-1 cursor-pointer;
   }
 
   .btn-pro {
     @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden border border-transparent;
   }
-  
+
   .btn-pro-primary {
-    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden border border-transparent bg-[#9FE870] text-[#101A24] hover:bg-[#8CD95C];
+    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-[0_4px_14px_rgba(79,154,90,0.25)] active:scale-95 overflow-hidden border border-transparent bg-[#C7EFC4] text-[#2F5C37] hover:bg-[#B7E7B2];
   }
 
   .btn-pro-secondary {
-    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden bg-white text-[#101A24] border border-[#101A24]/20 hover:border-[#101A24]/40 hover:bg-gray-50;
+    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden bg-white text-[#101A24] border border-[#101A24]/10 hover:border-[#101A24]/20 hover:bg-[#FFF9F0];
   }
-  
+
   .btn-pro-dark {
     @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden border border-transparent bg-[#101A24] text-white hover:bg-[#1A2938];
   }
 
   .input-pro {
-    @apply w-full px-5 py-4 bg-white border border-[#101A24]/20 rounded-xl text-[#101A24] placeholder-gray-400 focus:outline-none focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 transition-all font-medium;
+    @apply w-full px-5 py-4 bg-white border border-[#101A24]/15 rounded-xl text-[#101A24] placeholder-gray-400 focus:outline-none focus:border-[#4C6FC4] focus:ring-4 focus:ring-[#C7D7F7]/40 transition-all font-medium;
   }
 }
 
@@ -120,8 +135,8 @@
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 6px 0 #6BAE2E, 0 0 0 0 rgba(159,232,112,0.6); }
-  50% { box-shadow: 0 6px 0 #6BAE2E, 0 0 0 16px rgba(159,232,112,0); }
+  0%, 100% { box-shadow: 0 4px 16px rgba(79,154,90,0.18), 0 0 0 0 rgba(199,239,196,0.5); }
+  50% { box-shadow: 0 4px 16px rgba(79,154,90,0.18), 0 0 0 10px rgba(199,239,196,0); }
 }
 
 /* Dashboard llama mascot moods — CSS fallback tier from llama-animations.json

@@ -3,17 +3,17 @@ import { getFlashcards, getFlashcardTopics } from '../utils/api';
 import { playPang, playChiu } from '../utils/sound';
 import { pickFlashcardTip } from '../llamaResponses';
 
-const CARD_SHADOW = '0 8px 0 rgba(16,26,36,0.08), 0 14px 30px -10px rgba(16,26,36,0.12)';
+const CARD_SHADOW = '0 4px 20px rgba(0,0,0,0.06)';
 
 const TOPIC_STYLES = [
-  { bg: '#EFF6FF', shadow: '#BFDBFE', color: '#1D4ED8', subColor: '#60A5FA' },
-  { bg: '#FFF7ED', shadow: '#FED7AA', color: '#C2410C', subColor: '#FB923C' },
-  { bg: '#F0FDF4', shadow: '#BBF7D0', color: '#15803D', subColor: '#4ADE80' },
-  { bg: '#FDF2F8', shadow: '#FBCFE8', color: '#BE185D', subColor: '#F472B6' },
-  { bg: '#ECFEFF', shadow: '#A5F3FC', color: '#0E7490', subColor: '#22D3EE' },
-  { bg: '#FEFCE8', shadow: '#FEF08A', color: '#A16207', subColor: '#FACC15' },
-  { bg: '#F3E8FF', shadow: '#E9D5FF', color: '#7E22CE', subColor: '#C084FC' },
-  { bg: '#FFF1EC', shadow: '#FFD3C7', color: '#C2410C', subColor: '#FDA98A' }
+  { bg: '#EFF6FF', color: '#4C6FC4', subColor: '#7C9AE0' },
+  { bg: '#FFF3E9', color: '#C2703F', subColor: '#E0A374' },
+  { bg: '#EEF9EE', color: '#4F9A5A', subColor: '#82C489' },
+  { bg: '#FCEEF5', color: '#B5548A', subColor: '#DD8FB8' },
+  { bg: '#EAF7FA', color: '#3B93A8', subColor: '#72BDCE' },
+  { bg: '#FCF6E3', color: '#B8912E', subColor: '#DBC073' },
+  { bg: '#F4EDFA', color: '#8A6FC9', subColor: '#B7A2E0' },
+  { bg: '#FBEAE6', color: '#C46A4F', subColor: '#E0977E' }
 ];
 
 export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
@@ -90,20 +90,20 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
           <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang tải bộ thẻ...</div>
         )}
         {topicsError && (
-          <div className="py-6 text-center text-white bg-[#EF4444] rounded-2xl font-bold uppercase tracking-widest">{topicsError}</div>
+          <div className="py-6 text-center text-[#B4443B] bg-[#F7D2CC] rounded-2xl font-bold uppercase tracking-widest">{topicsError}</div>
         )}
 
         {!topicsLoading && !topicsError && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={() => openDeck('__random')}
-              className="border-none cursor-pointer text-left bg-[#101A24] rounded-[1.75rem] py-6 px-6 flex items-center gap-4 transition-transform hover:-translate-y-1"
-              style={{ boxShadow: '0 6px 0 rgba(0,0,0,0.35)' }}
+              className="border-none cursor-pointer text-left rounded-[1.75rem] py-6 px-6 flex items-center gap-4 transition-transform hover:-translate-y-1 shadow-[0_6px_20px_rgba(138,111,201,0.22)]"
+              style={{ background: 'linear-gradient(135deg, #E3D9F5 0%, #FCE7A8 100%)' }}
             >
               <span className="text-4xl shrink-0">🔀</span>
               <div className="min-w-0">
-                <div className="font-comic font-extrabold text-[17px] text-white">Ngẫu nhiên tổng hợp</div>
-                <div className="text-xs font-bold text-[#9FE870] mt-0.5">20 thẻ trộn từ mọi chủ đề</div>
+                <div className="font-comic font-extrabold text-[17px] text-[#101A24]">Ngẫu nhiên tổng hợp</div>
+                <div className="text-xs font-bold text-[#8A6D1F] mt-0.5">20 thẻ trộn từ mọi chủ đề</div>
               </div>
             </button>
 
@@ -113,8 +113,8 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
                 <button
                   key={topicRow.topic}
                   onClick={() => openDeck(topicRow.topic)}
-                  className="border-none cursor-pointer text-left rounded-[1.75rem] py-6 px-6 flex items-center gap-4 transition-transform hover:-translate-y-1"
-                  style={{ background: st.bg, boxShadow: `0 6px 0 ${st.shadow}` }}
+                  className="border-none cursor-pointer text-left rounded-[1.75rem] py-6 px-6 flex items-center gap-4 transition-transform hover:-translate-y-1 shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
+                  style={{ background: st.bg }}
                 >
                   <span className="text-4xl shrink-0">📖</span>
                   <div className="min-w-0">
@@ -134,15 +134,14 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
   return (
     <div className="flex flex-col gap-2 pop-in max-w-2xl mx-auto w-full">
       {loading && <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang rút bài...</div>}
-      {error && <div className="py-6 text-center text-white bg-[#EF4444] rounded-2xl font-bold uppercase tracking-widest">{error}</div>}
+      {error && <div className="py-6 text-center text-[#B4443B] bg-[#F7D2CC] rounded-2xl font-bold uppercase tracking-widest">{error}</div>}
 
       {!loading && !error && !done && card && (
         <>
           <div className="flex items-center gap-3 mb-1">
             <button
               onClick={backToTopics}
-              className="border-none cursor-pointer bg-white rounded-2xl py-2 px-3.5 font-comic font-bold text-[13px] text-[#101A24]"
-              style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}
+              className="border-none cursor-pointer bg-white rounded-2xl py-2 px-3.5 font-comic font-bold text-[13px] text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
             >
               ← Chủ đề
             </button>
@@ -154,10 +153,10 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
 
           {/* Progress */}
           <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="flex-1 h-3.5 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'inset 0 2px 4px rgba(16,26,36,0.1)' }}>
-              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${((idx + 1) / cards.length) * 100}%`, background: 'linear-gradient(90deg,#9FE870,#6BAE2E)' }} />
+            <div className="flex-1 h-3.5 bg-white rounded-full overflow-hidden" style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}>
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${((idx + 1) / cards.length) * 100}%`, background: 'linear-gradient(90deg,#C7EFC4,#9BDDA0)' }} />
             </div>
-            <span className="font-comic font-extrabold text-[13px] text-[#101A24] bg-white px-3.5 py-1.5 rounded-2xl shrink-0" style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}>
+            <span className="font-comic font-extrabold text-[13px] text-[#101A24] bg-white px-3.5 py-1.5 rounded-2xl shrink-0 shadow-[0_4px_14px_rgba(0,0,0,0.06)]">
               {idx + 1}/{cards.length}
             </span>
           </div>
@@ -176,8 +175,8 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
                 className="absolute inset-0 rounded-[2rem] flex flex-col items-center justify-center p-8 text-center"
                 style={{
                   backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
-                  background: 'linear-gradient(135deg,#2563EB 0%,#4C7EF3 100%)',
-                  boxShadow: '0 8px 0 #17408F, 0 14px 30px -10px rgba(16,26,36,0.25)'
+                  background: 'linear-gradient(135deg,#8CA6E8 0%,#A9C0F0 100%)',
+                  boxShadow: '0 10px 28px rgba(76,111,196,0.25)'
                 }}
               >
                 {card.topic && (
@@ -209,7 +208,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
           </div>
 
           {flipped && tip && (
-            <div className="flex items-start gap-2.5 bg-[#FFF9E8] rounded-2xl px-4 py-3 mt-4 text-left bounce-in">
+            <div className="flex items-start gap-2.5 bg-[#FCEFD0] rounded-2xl px-4 py-3 mt-4 text-left bounce-in">
               <span className="text-lg shrink-0">🦙</span>
               <p className="text-xs font-bold text-[#8A6D1F] leading-relaxed">{tip}</p>
             </div>
@@ -219,15 +218,14 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
             <div className="flex gap-3.5 mt-7">
               <button
                 onClick={() => mark(false)}
-                className="flex-1 border-none cursor-pointer bg-white rounded-[1.25rem] py-4 font-comic font-extrabold text-[15px] text-[#D9603F] transition-transform hover:-translate-y-0.5"
-                style={{ border: '2px solid #FFD3C7', boxShadow: '0 4px 0 #FFD3C7' }}
+                className="flex-1 border-none cursor-pointer bg-white rounded-[1.25rem] py-4 font-comic font-extrabold text-[15px] text-[#C46A4F] transition-transform hover:-translate-y-0.5 shadow-[0_4px_16px_rgba(0,0,0,0.06)]"
+                style={{ border: '2px solid #F7D2CC' }}
               >
                 😓 Chưa nhớ
               </button>
               <button
                 onClick={() => mark(true)}
-                className="flex-1 border-none cursor-pointer bg-[#9FE870] rounded-[1.25rem] py-4 font-comic font-extrabold text-[15px] text-[#101A24] transition-transform hover:-translate-y-0.5"
-                style={{ boxShadow: '0 4px 0 #6BAE2E' }}
+                className="flex-1 border-none cursor-pointer bg-[#C7EFC4] rounded-[1.25rem] py-4 font-comic font-extrabold text-[15px] text-[#2F5C37] transition-transform hover:-translate-y-0.5 shadow-[0_4px_16px_rgba(79,154,90,0.2)]"
               >
                 ✅ Đã nhớ
               </button>
@@ -245,35 +243,33 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
       {done && (
         <div className="relative bg-white rounded-[2rem] py-12 px-10 text-center max-w-md mx-auto mt-5 bounce-in" style={{ boxShadow: CARD_SHADOW }}>
           <div
-            className="w-[100px] h-[100px] rounded-full bg-[#9FE870] flex items-center justify-center text-5xl mx-auto mb-5"
-            style={{ boxShadow: '0 5px 0 #6BAE2E', animation: 'bob 2.4s ease-in-out infinite' }}
+            className="w-[100px] h-[100px] rounded-full bg-[#C7EFC4] flex items-center justify-center text-5xl mx-auto mb-5 shadow-[0_6px_18px_rgba(79,154,90,0.2)]"
+            style={{ animation: 'bob 2.4s ease-in-out infinite' }}
           >
             🦙
           </div>
           <div className="font-comic font-extrabold text-2xl text-[#101A24] uppercase mb-2">Xong bộ thẻ rồi! 🎉</div>
           <div className="text-sm font-bold text-[#8A8A8A] mb-6">Llama tự hào về bạn lắm đó!</div>
           <div className="flex gap-3.5 mb-7">
-            <div className="flex-1 bg-[#EFFBEA] rounded-2xl py-4">
-              <div className="font-comic font-extrabold text-2xl text-[#4B9A1E]">{known}</div>
-              <div className="text-[11px] font-extrabold text-[#6BAE2E] uppercase">Đã nhớ</div>
+            <div className="flex-1 bg-[#EEF9EE] rounded-2xl py-4">
+              <div className="font-comic font-extrabold text-2xl text-[#4F9A5A]">{known}</div>
+              <div className="text-[11px] font-extrabold text-[#4F9A5A] uppercase">Đã nhớ</div>
             </div>
-            <div className="flex-1 bg-[#FFF1EC] rounded-2xl py-4">
-              <div className="font-comic font-extrabold text-2xl text-[#D9603F]">{unknown}</div>
-              <div className="text-[11px] font-extrabold text-[#D9603F] uppercase">Chưa nhớ</div>
+            <div className="flex-1 bg-[#FBEAE6] rounded-2xl py-4">
+              <div className="font-comic font-extrabold text-2xl text-[#C46A4F]">{unknown}</div>
+              <div className="text-[11px] font-extrabold text-[#C46A4F] uppercase">Chưa nhớ</div>
             </div>
           </div>
           <div className="flex gap-3">
             <button
               onClick={backToTopics}
-              className="flex-1 border-none cursor-pointer bg-[#F9FAFB] rounded-2xl py-4 font-comic font-bold text-sm text-[#101A24]"
-              style={{ boxShadow: '0 4px 0 rgba(16,26,36,0.1)' }}
+              className="flex-1 border-none cursor-pointer bg-[#FDF4E7] rounded-2xl py-4 font-comic font-bold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
             >
               Chủ đề khác
             </button>
             <button
               onClick={restartDeck}
-              className="flex-[2] border-none cursor-pointer bg-[#00B4D8] rounded-2xl py-4 font-comic font-extrabold text-[15px] text-[#101A24]"
-              style={{ boxShadow: '0 4px 0 #0E7C99' }}
+              className="flex-[2] border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-[15px] text-[#20606E] shadow-[0_4px_14px_rgba(59,147,168,0.2)]"
             >
               Ôn lại lần nữa 🔁
             </button>

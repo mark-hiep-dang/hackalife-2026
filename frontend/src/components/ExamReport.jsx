@@ -3,9 +3,9 @@ import { ArrowRight } from 'lucide-react';
 import { generateExamReport, topicLabel, pickFlashcardTip } from '../llamaResponses';
 
 const TIER_COLORS = {
-  weak: { bar: '#EF4444', shadow: '#B91C1C', label: 'Yếu', emoji: '🔴' },
-  mid: { bar: '#FFCF56', shadow: '#E0A82E', label: 'Cần ôn thêm', emoji: '🟡' },
-  strong: { bar: '#2563EB', shadow: '#17408F', label: 'Vững', emoji: '🟢' }
+  weak: { bar: '#E4897E', label: 'Yếu', emoji: '🔴' },
+  mid: { bar: '#F0C468', label: 'Cần ôn thêm', emoji: '🟡' },
+  strong: { bar: '#7C9AE0', label: 'Vững', emoji: '🟢' }
 };
 
 function computeTopicStats(answers) {
@@ -45,9 +45,9 @@ export default function ExamReport({ examAnswers, onStudyTopic }) {
           <span>✅ Đúng: {fs} câu</span>
           <span>❌ Sai: {wrongCount} câu</span>
         </div>
-        <div className="h-6 rounded-full overflow-hidden flex bg-[#F0EFE9]" style={{ boxShadow: 'inset 0 2px 4px rgba(16,26,36,0.1)' }}>
-          {fs > 0 && <div style={{ width: `${(fs / examAnswers.length) * 100}%`, background: '#2563EB' }} />}
-          {wrongCount > 0 && <div style={{ width: `${(wrongCount / examAnswers.length) * 100}%`, background: '#EF4444', marginLeft: fs > 0 ? '2px' : 0 }} />}
+        <div className="h-6 rounded-full overflow-hidden flex bg-[#F3ECDD]" style={{ boxShadow: 'inset 0 2px 4px rgba(16,26,36,0.06)' }}>
+          {fs > 0 && <div style={{ width: `${(fs / examAnswers.length) * 100}%`, background: '#7C9AE0' }} />}
+          {wrongCount > 0 && <div style={{ width: `${(wrongCount / examAnswers.length) * 100}%`, background: '#E4897E', marginLeft: fs > 0 ? '2px' : 0 }} />}
         </div>
       </div>
 
@@ -63,8 +63,8 @@ export default function ExamReport({ examAnswers, onStudyTopic }) {
                 <span className="truncate">{ts.topic}</span>
                 <span className="shrink-0 font-comic font-extrabold">{ts.correct}/{ts.total} ({ts.pct}%)</span>
               </div>
-              <div className="h-5 rounded-full overflow-hidden bg-[#F0EFE9]" style={{ boxShadow: 'inset 0 1px 3px rgba(16,26,36,0.1)' }}>
-                <div className="h-full rounded-full transition-all duration-300" style={{ width: `${ts.pct}%`, background: c.bar, boxShadow: `0 2px 0 ${c.shadow}` }} />
+              <div className="h-5 rounded-full overflow-hidden bg-[#F3ECDD]" style={{ boxShadow: 'inset 0 1px 3px rgba(16,26,36,0.06)' }}>
+                <div className="h-full rounded-full transition-all duration-300" style={{ width: `${ts.pct}%`, background: c.bar }} />
               </div>
             </div>
           );
@@ -81,7 +81,7 @@ export default function ExamReport({ examAnswers, onStudyTopic }) {
       </div>
 
       {/* Llama's assessment */}
-      <div className="bg-[#101A24] rounded-2xl p-6 text-white mb-7">
+      <div className="bg-[#E3D9F5] rounded-2xl p-6 text-[#101A24] mb-7 shadow-[0_4px_20px_rgba(0,0,0,0.06)]">
         <p className="font-comic font-extrabold text-base mb-4 leading-relaxed">{report.opener}</p>
         <div className="flex flex-col gap-2">
           {report.lines.map((line) => (
@@ -107,8 +107,7 @@ export default function ExamReport({ examAnswers, onStudyTopic }) {
                   <li key={item.topicKey}>
                     <button
                       onClick={() => onStudyTopic?.(item.topicKey)}
-                      className="w-full flex items-center gap-3.5 text-left border-none cursor-pointer bg-white rounded-2xl py-3.5 px-4 transition-transform hover:-translate-y-0.5"
-                      style={{ boxShadow: `0 3px 0 ${c.shadow}` }}
+                      className="w-full flex items-center gap-3.5 text-left border-none cursor-pointer bg-white rounded-2xl py-3.5 px-4 transition-transform hover:-translate-y-0.5 shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
                     >
                       <span
                         className="w-7 h-7 rounded-full flex items-center justify-center font-comic font-extrabold text-xs text-white shrink-0"
@@ -133,8 +132,7 @@ export default function ExamReport({ examAnswers, onStudyTopic }) {
       {/* Detailed per-question report */}
       <button
         onClick={() => setShowDetailedReport((v) => !v)}
-        className="w-full border-none cursor-pointer bg-white rounded-2xl py-3.5 font-comic font-extrabold text-sm text-[#101A24] mb-4"
-        style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}
+        className="w-full border-none cursor-pointer bg-white rounded-2xl py-3.5 font-comic font-extrabold text-sm text-[#101A24] mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
       >
         {showDetailedReport ? '▲ Ẩn báo cáo chi tiết' : '📋 Xem báo cáo chi tiết từng câu'}
       </button>
@@ -144,22 +142,22 @@ export default function ExamReport({ examAnswers, onStudyTopic }) {
           {examAnswers.map((a, i) => {
             const tip = pickFlashcardTip({ term: a.question.options[a.question.correct_index] });
             return (
-              <div key={i} className={`p-6 rounded-2xl border border-[#101A24]/10 shadow-sm ${a.isCorrect ? 'bg-[#EFFBEA]' : 'bg-[#FFF1EC]'}`}>
+              <div key={i} className={`p-6 rounded-2xl border border-[#101A24]/10 shadow-[0_4px_20px_rgba(0,0,0,0.06)] ${a.isCorrect ? 'bg-[#E7F5E5]' : 'bg-[#FBEAE6]'}`}>
                 <p className="font-comic font-extrabold text-sm text-[#101A24] mb-1">Câu {i + 1}</p>
                 <p className="font-bold text-base text-[#101A24] leading-snug mb-3">{a.question.question}</p>
                 {a.isCorrect ? (
-                  <p className="text-sm font-extrabold text-[#4B9A1E] mb-3">✓ Bạn đã trả lời đúng: {a.question.options[a.question.correct_index]}</p>
+                  <p className="text-sm font-extrabold text-[#4F9A5A] mb-3">✓ Bạn đã trả lời đúng: {a.question.options[a.question.correct_index]}</p>
                 ) : (
                   <>
-                    <p className="text-sm font-extrabold text-[#D9603F] mb-1">✕ Bạn chọn: {a.question.options[a.selected]}</p>
-                    <p className="text-sm font-extrabold text-[#4B9A1E] mb-3">✓ Đáp án đúng: {a.question.options[a.question.correct_index]}</p>
+                    <p className="text-sm font-extrabold text-[#C46A4F] mb-1">✕ Bạn chọn: {a.question.options[a.selected]}</p>
+                    <p className="text-sm font-extrabold text-[#4F9A5A] mb-3">✓ Đáp án đúng: {a.question.options[a.question.correct_index]}</p>
                   </>
                 )}
                 <div className="bg-white rounded-xl p-4 mb-3">
                   <p className="text-xs font-extrabold uppercase tracking-widest text-[#101A24] mb-1">Giải thích</p>
                   <p className="text-sm font-bold text-[#3A3A3A] leading-relaxed">{a.question.explanation}</p>
                 </div>
-                <div className="flex items-start gap-2 bg-[#FFF9E8] rounded-xl px-4 py-3">
+                <div className="flex items-start gap-2 bg-[#FCEFD0] rounded-xl px-4 py-3">
                   <span className="text-lg shrink-0">🦙</span>
                   <p className="text-xs font-bold text-[#8A6D1F] leading-relaxed">{tip}</p>
                 </div>
