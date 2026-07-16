@@ -263,7 +263,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
           <div className="flex gap-3">
             <button
               onClick={backToTopics}
-              className="flex-1 border-none cursor-pointer bg-[#FDF4E7] rounded-2xl py-4 font-comic font-bold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
+              className="flex-1 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-4 font-comic font-bold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
             >
               Chủ đề khác
             </button>

@@ -140,7 +140,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: mode === 'practice' ? '#C7EFC4' : '#FDF4E7',
+            background: mode === 'practice' ? '#C7EFC4' : '#EEF0F3',
             boxShadow: mode === 'practice' ? '0 4px 14px rgba(79,154,90,0.25)' : '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
@@ -153,7 +153,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: mode === 'exam' ? 'linear-gradient(135deg, #E3D9F5 0%, #FCE7A8 100%)' : '#FDF4E7',
+            background: mode === 'exam' ? 'linear-gradient(135deg, #E3D9F5 0%, #FCE7A8 100%)' : '#EEF0F3',
             boxShadow: mode === 'exam' ? '0 4px 14px rgba(138,111,201,0.3)' : '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
@@ -294,7 +294,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
             const isCorr = i === q.correct_index;
             const isSel = selected === i;
 
-            let bg = '#FDF4E7', color = '#101A24', shadow = '0 4px 14px rgba(0,0,0,0.06)', letterBg = '#C7EFC4', letterColor = '#101A24', mark = '';
+            let bg = '#EEF0F3', color = '#101A24', shadow = '0 4px 14px rgba(0,0,0,0.06)', letterBg = '#C7EFC4', letterColor = '#101A24', mark = '';
             if (answered && mode === 'practice') {
               if (isCorr) { bg = '#6B8AD6'; color = '#fff'; shadow = '0 4px 14px rgba(76,111,196,0.3)'; letterBg = '#fff'; letterColor = '#101A24'; mark = '✓'; }
               else if (isSel) { bg = '#D9695F'; color = '#fff'; shadow = 'none'; letterBg = '#101A24'; letterColor = '#fff'; mark = '✕'; }
@@ -363,7 +363,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
                 </p>
               )}
 
-              <div className="text-left bg-[#FDF4E7] rounded-2xl p-5 mb-6">
+              <div className="text-left bg-[#EEF0F3] rounded-2xl p-5 mb-6">
                 <strong className="block text-[#101A24] text-xs font-extrabold uppercase tracking-widest mb-2">{t.explanationTitle}</strong>
                 <p className="text-sm font-bold text-[#3A3A3A] leading-relaxed">{q.explanation}</p>
                 {q.source && <p className="mt-3 text-xs font-medium text-[#8A8A8A] italic">Nguồn: {q.source}</p>}

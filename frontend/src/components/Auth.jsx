@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { login, register } from '../utils/api';
 import { translations as t } from '../translations';
 import { playPang } from '../utils/sound';
-import { Target } from 'lucide-react';
+import llamaLogo from '../assets/llama-logo.png';
 
 export default function Auth({ setSession }) {
   const [isRegister, setIsRegister] = useState(false);
@@ -28,9 +28,7 @@ export default function Auth({ setSession }) {
         
         <div className="card-pro p-8 md:p-10 text-center">
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-[#C7EFC4] border border-[#101A24]/10 rounded-2xl flex items-center justify-center shadow-sm -rotate-3">
-              <Target size={32} strokeWidth={3} className="text-[#2F5C37]" />
-            </div>
+            <img src={llamaLogo} alt="LLAMA" className="w-24 h-24 object-contain -rotate-3" />
           </div>
           
           <h1 className="text-3xl font-extrabold text-[#101A24] tracking-tight mb-2 uppercase">

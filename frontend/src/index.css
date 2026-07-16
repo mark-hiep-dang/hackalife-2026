@@ -5,7 +5,7 @@
   WARM PASTEL LEARNING APP AESTHETIC
   -----------------------------------
   Text/Ink:        #101A24 (Deep Navy — unchanged, for contrast)
-  Background:      #FFF9F0 (Warm Cream)
+  Background:      #F5F6F8 (Pale Neutral Gray — distinct from white cards)
   Cards:           #FFFFFF, soft shadow only (no hard offsets, no neon)
   Pastel Green:    #C7EFC4 fill / #4F9A5A ink
   Pastel Cyan:     #B9E7EF fill / #3B93A8 ink
@@ -17,7 +17,7 @@
 
 @theme {
   --color-brand-dark: #101A24;
-  --color-brand-bg: #FFF9F0;
+  --color-brand-bg: #F5F6F8;
   --color-brand-green: #C7EFC4;
   --color-brand-green-ink: #4F9A5A;
   --color-brand-cyan: #B9E7EF;
@@ -36,7 +36,7 @@
 
 @layer base {
   body {
-    @apply bg-[#FFF9F0] text-[#101A24] antialiased selection:bg-[#C7EFC4] selection:text-[#101A24];
+    @apply bg-[#F5F6F8] text-[#101A24] antialiased selection:bg-[#C7EFC4] selection:text-[#101A24];
     font-family: 'Nunito', ui-sans-serif, sans-serif;
   }
 }
@@ -65,7 +65,7 @@
   }
 
   .btn-pro-secondary {
-    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden bg-white text-[#101A24] border border-[#101A24]/10 hover:border-[#101A24]/20 hover:bg-[#FFF9F0];
+    @apply relative inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 shadow-sm active:scale-95 active:shadow-none overflow-hidden bg-white text-[#101A24] border border-[#101A24]/10 hover:border-[#101A24]/20 hover:bg-[#F5F6F8];
   }
 
   .btn-pro-dark {

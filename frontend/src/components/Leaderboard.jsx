@@ -47,7 +47,7 @@ export default function Leaderboard({ profile }) {
       <div
         className="relative rounded-[2rem] overflow-hidden"
         style={{
-          background: 'linear-gradient(180deg, #EAF7FA 0%, #FDF4E7 100%)',
+          background: 'linear-gradient(180deg, #EAF7FA 0%, #EEF0F3 100%)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
         }}
       >
@@ -112,7 +112,7 @@ export default function Leaderboard({ profile }) {
                   className="flex items-center gap-3.5 px-4 py-3 border-b-2 border-[#F3F3F3] last:border-b-0"
                   style={{ background: row.isMe ? '#EEF9EE' : 'transparent' }}
                 >
-                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[#FDF4E7] flex items-center justify-center font-comic font-extrabold text-sm text-[#101A24] shrink-0">
+                  <div className="w-[34px] h-[34px] rounded-[10px] bg-[#EEF0F3] flex items-center justify-center font-comic font-extrabold text-sm text-[#101A24] shrink-0">
                     {row.rank}
                   </div>
                   <span className="text-2xl shrink-0">🦙</span>
