@@ -53,8 +53,12 @@ export default function Chat() {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setInput(''); setLoading(true); setError('');
 
+    // Real answers come back near-instantly (no actual LLM latency), which reads as
+    // fake — hold the "thinking" bubble up for a beat so it feels like Llama is working.
+    const minThinkTime = new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 600));
+
     try {
-      const reply = await sendChatMessage(text, history);
+      const [reply] = await Promise.all([sendChatMessage(text, history), minThinkTime]);
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (e) {
       setError(e.message || 'Llama không trả lời được, thử lại nhé');
