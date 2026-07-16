@@ -223,22 +223,10 @@ function remarkFor(tier) {
   return pickFrom(STRONG_TOPIC_REMARKS);
 }
 
-function buildRoadmap(topicStats) {
-  const weak = topicStats.filter((t) => t.tier === 'weak').map((t) => t.topic);
-  const mid = topicStats.filter((t) => t.tier === 'mid').map((t) => t.topic);
-  if (weak.length === 0 && mid.length === 0) {
-    return 'Không có lĩnh vực nào đáng lo cả! Ôn lại tổng quan một lượt trước khi thi thật là đủ rồi, xạ thủ ạ! 🎯';
-  }
-  const parts = [];
-  if (weak.length > 0) parts.push(`Ưu tiên học lại NGAY: ${weak.join(', ')}`);
-  if (mid.length > 0) parts.push(`Nên ôn thêm cho chắc: ${mid.join(', ')}`);
-  return parts.join('. ') + '.';
-}
-
 /**
  * Builds a study report from per-topic exam stats: an opening remark scaled to
- * overall score, a tiered (weak/mid/strong) remark per topic, and a suggested
- * review roadmap — all in Llama's teasing persona.
+ * overall score, a tiered (weak/mid/strong) remark per topic, and an ordered
+ * roadmap of chapters to review (weakest first) — all in Llama's teasing persona.
  */
 export function generateExamReport(topicStatsInput, overallPct) {
   const topicStats = topicStatsInput.map((t) => ({ ...t, tier: tierFor(t.pct) }));
@@ -249,5 +237,8 @@ export function generateExamReport(topicStatsInput, overallPct) {
   else if (overallPct >= 40) opener = pickFrom(REPORT_OPENERS_MID);
   else opener = pickFrom(REPORT_OPENERS_LOW);
 
-  return { opener, lines, roadmap: buildRoadmap(topicStats) };
+  // Roadmap: weak topics first, then mid-tier — both already sorted weakest-first upstream.
+  const roadmap = topicStats.filter((t) => t.tier === 'weak' || t.tier === 'mid');
+
+  return { opener, lines, roadmap };
 }
