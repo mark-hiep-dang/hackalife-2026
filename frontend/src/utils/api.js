@@ -97,6 +97,17 @@ export async function getFlashcards(topic) {
   return data;
 }
 
+export async function markFlashcardProgress(id, known) {
+  const res = await fetch(`${API_BASE}/flashcards/${id}/progress`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ known })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to save flashcard progress');
+  return data;
+}
+
 export async function generateQuiz(topic, difficulty, type) {
   const ollamaUrl = localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434';
   const query = new URLSearchParams({ topic, difficulty, type, ollamaUrl }).toString();

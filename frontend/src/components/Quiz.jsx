@@ -51,10 +51,10 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
 
   const q = questions[cidx];
 
-  async function startQuiz() {
+  async function startQuiz(selectedMode = mode) {
     setLoading(true); setError('');
     try {
-      const qs = await generateQuiz(topic, difficulty, mode);
+      const qs = await generateQuiz(topic, difficulty, selectedMode);
       if (qs.length === 0) throw new Error("Không có câu hỏi nào cho chủ đề này.");
       setQuestions(qs); setCidx(0); setScore(0); setCombo(0); setMaxCombo(0);
       setSelected(null); setAnswered(false); setTimeLeft(3600);
@@ -139,12 +139,12 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
 
       <div className="flex gap-4 mb-3">
         <button
-          onClick={() => setMode('practice')}
+          onClick={() => { setMode('practice'); startQuiz('practice'); }}
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: mode === 'practice' ? '#C7EFC4' : '#EEF0F3',
-            boxShadow: mode === 'practice' ? '0 4px 14px rgba(79,154,90,0.25)' : '0 4px 14px rgba(0,0,0,0.06)'
+            background: '#EEF0F3',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
           <img src={quizPracticeMode} alt="" className="w-14 h-14 object-contain" />
@@ -152,37 +152,27 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           <span className="text-xs font-bold text-[#5C5C5C]">5 câu, thoải mái xem giải thích</span>
         </button>
         <button
-          onClick={() => setMode('exam')}
+          onClick={() => { setMode('exam'); startQuiz('exam'); }}
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: mode === 'exam' ? 'linear-gradient(135deg, #E3D9F5 0%, #FCE7A8 100%)' : '#EEF0F3',
-            boxShadow: mode === 'exam' ? '0 4px 14px rgba(138,111,201,0.3)' : '0 4px 14px rgba(0,0,0,0.06)'
+            background: '#EEF0F3',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
           }}
         >
           <img src={quizExamMode} alt="" className="w-14 h-14 object-contain" />
           <span className="font-comic font-extrabold text-base text-[#101A24]">{t.examMode}</span>
-          <span className="text-xs font-bold" style={{ color: mode === 'exam' ? '#6B4FA8' : '#5C5C5C' }}>Mô phỏng thi thật, tính giờ nghiêm túc</span>
+          <span className="text-xs font-bold text-[#5C5C5C]">40 câu • 60 phút • tính giờ nghiêm túc</span>
         </button>
       </div>
 
-      {mode === 'exam' && (
-        <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#8A8A8A] mb-6">
-          40 câu hỏi • 60 phút • cần đạt 70% mới đỗ (đúng chuẩn thi thật)
-        </p>
+      {loading && (
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#8A8A8A] mb-4">Đang chuẩn bị đạn...</p>
       )}
 
       {error && (
         <div className="text-[#B4443B] text-sm font-bold rounded-2xl bg-[#F7D2CC] px-4 py-3 mb-4">{error}</div>
       )}
-
-      <button
-        onClick={startQuiz}
-        disabled={loading}
-        className="w-full border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-lg text-[#20606E] shadow-[0_6px_18px_rgba(59,147,168,0.2)]"
-      >
-        {loading ? 'Đang chuẩn bị đạn...' : 'Vào trận thôi! 🚀'}
-      </button>
 
       <button
         onClick={() => setShowHistory(true)}

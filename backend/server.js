@@ -374,12 +374,36 @@ app.get('/api/quiz/generate', authenticateToken, async (req, res) => {
   }
 });
 
-// Get flashcard topic sets with counts
+// Get flashcard topic sets with counts, plus how many the current user has marked known
 app.get('/api/flashcards/topics', authenticateToken, async (req, res) => {
   const db = await getDb();
   try {
-    const topics = await db.all('SELECT topic, COUNT(*) as count FROM flashcards GROUP BY topic ORDER BY topic ASC');
+    const topics = await db.all(
+      `SELECT f.topic, COUNT(*) as count,
+              COALESCE(SUM(CASE WHEN ufp.known = 1 THEN 1 ELSE 0 END), 0) as known_count
+       FROM flashcards f
+       LEFT JOIN user_flashcard_progress ufp ON ufp.flashcard_id = f.id AND ufp.user_id = ?
+       GROUP BY f.topic ORDER BY f.topic ASC`,
+      [req.user.id]
+    );
     res.json(topics);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mark a flashcard as known/unknown for the current user (upsert)
+app.post('/api/flashcards/:id/progress', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const { known } = req.body;
+    await db.run(
+      `INSERT INTO user_flashcard_progress (user_id, flashcard_id, known, updated_at)
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(user_id, flashcard_id) DO UPDATE SET known = excluded.known, updated_at = CURRENT_TIMESTAMP`,
+      [req.user.id, req.params.id, known ? 1 : 0]
+    );
+    res.json({ message: 'ok' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

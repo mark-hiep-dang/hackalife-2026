@@ -44,11 +44,21 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
 
   return (
     <div className="flex flex-col gap-8 pop-in w-full max-w-5xl mx-auto">
-      {/* Top row: greeting + quick stat pills */}
+      {/* Top row: llama greeting bubble + quick stat pills */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="font-comic font-extrabold text-2xl md:text-[28px] text-[#101A24]">
-          Xin chào, {profile.username}! 👋
-        </div>
+        <button
+          onClick={handleStudyNow}
+          className="border-none cursor-pointer bg-transparent flex items-end gap-3 flex-1 min-w-0 text-left"
+        >
+          <img
+            src={LLAMA_MOOD_IMAGES[llamaAnim] || llamaMoodIdle}
+            alt="Llama"
+            className={`w-14 h-14 rounded-full object-cover border-[3px] border-[#FCE7A8] shadow-sm shrink-0 ${llamaAnim}`}
+          />
+          <div className="inline-block bg-white rounded-[20px] rounded-bl-md px-4 py-2.5 font-comic font-extrabold text-base text-[#101A24] shadow-sm max-w-full">
+            {heroMessage}
+          </div>
+        </button>
         <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-1.5 bg-white border-2 border-[#FCE7A8] rounded-full px-3.5 py-2 font-comic font-bold text-sm text-[#B8912E] shadow-[0_4px_14px_rgba(0,0,0,0.06)]">
             <span className="text-lg">🔥</span>{profile.streak}
@@ -66,27 +76,6 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
           )}
         </div>
       </div>
-
-      {/* Hero card — Llama's message of the day + streak/level */}
-      <button
-        onClick={handleStudyNow}
-        className="relative text-left rounded-[2rem] px-6 py-6 md:px-8 overflow-hidden pop-in flex items-center justify-between gap-5 flex-wrap sm:flex-nowrap"
-        style={{
-          background: 'linear-gradient(120deg, #C7EFC4 0%, #E3F7DE 100%)',
-          boxShadow: '0 10px 30px rgba(79,154,90,0.18)'
-        }}
-      >
-        <div className="relative z-10 flex items-end gap-3 flex-1 min-w-0">
-          <img
-            src={LLAMA_MOOD_IMAGES[llamaAnim] || llamaMoodIdle}
-            alt="Llama"
-            className={`w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-[3px] border-[#FCE7A8] shadow-sm shrink-0 ${llamaAnim}`}
-          />
-          <div className="inline-block bg-white rounded-[20px] rounded-bl-md px-4 md:px-5 py-3 font-comic font-extrabold text-base md:text-lg text-[#101A24] shadow-sm max-w-full">
-            {heroMessage}
-          </div>
-        </div>
-      </button>
 
       {/* Quick actions */}
       <div className="grid grid-cols-3 gap-4">
@@ -106,7 +95,7 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
         </button>
         <button
           onClick={() => onNavigate('leaderboard')}
-          className="border-2 border-[#101A24]/10 cursor-pointer bg-white rounded-3xl py-5 px-3 flex flex-col items-center gap-2 transition-transform duration-150 hover:-translate-y-1 hover:-rotate-1 active:translate-y-0.5 shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
+          className="border-none cursor-pointer bg-[#C7EFC4] rounded-3xl py-5 px-3 flex flex-col items-center gap-2 transition-transform duration-150 hover:-translate-y-1 hover:-rotate-1 active:translate-y-0.5 shadow-[0_6px_18px_rgba(79,154,90,0.2)]"
         >
           <span className="text-3xl">🏆</span>
           <span className="font-comic font-bold text-sm text-[#101A24]">{t.navLeaderboard}</span>
