@@ -167,7 +167,7 @@ app.post('/api/auth/register', async (req, res) => {
     );
 
     const token = jwt.sign({ id: result.lastID, username }, JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ token, user: { id: result.lastID, username, xp: 0, level: 1, streak: 1 } });
+    res.status(201).json({ token, user: { id: result.lastID, username, xp: 0, level: 1, streak: 1, selected_path: null } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -207,7 +207,8 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username,
         xp: user.xp,
         level: currentLevel,
-        streak: currentStreak
+        streak: currentStreak,
+        selected_path: user.selected_path
       }
     });
   } catch (err) {
@@ -219,7 +220,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/profile', authenticateToken, async (req, res) => {
   const db = await getDb();
   try {
-    const user = await db.get('SELECT id, username, xp, level, streak, last_login_date FROM users WHERE id = ?', [req.user.id]);
+    const user = await db.get('SELECT id, username, xp, level, streak, last_login_date, selected_path FROM users WHERE id = ?', [req.user.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
     
     // Fresh check for streak when retrieving profile
@@ -234,10 +235,27 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
       xp: user.xp,
       level: user.level,
       streak: currentStreak,
+      selected_path: user.selected_path,
       badges,
       completedLessons: lessons,
       quizHistory: quizzes
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update User Path
+app.put('/api/profile/path', authenticateToken, async (req, res) => {
+  const { path } = req.body;
+  if (!['MOF', 'UL', 'ILP'].includes(path)) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+  
+  const db = await getDb();
+  try {
+    await db.run('UPDATE users SET selected_path = ? WHERE id = ?', [path, req.user.id]);
+    res.json({ success: true, selected_path: path });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -829,6 +847,7 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
       xp: user.xp,
       level: user.level,
       streak: user.streak,
+      selected_path: user.selected_path,
       isCurrentUser: user.username === req.user.username
     }));
 

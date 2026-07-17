@@ -36,9 +36,17 @@ export async function initDb() {
       level INTEGER DEFAULT 1,
       streak INTEGER DEFAULT 0,
       last_login_date TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      selected_path TEXT
     )
   `);
+
+  // Migrate existing users table to add selected_path if it doesn't exist
+  try {
+    await db.exec('ALTER TABLE users ADD COLUMN selected_path TEXT');
+  } catch (err) {
+    // Column already exists, ignore
+  }
 
   // Create Lessons table
   await db.exec(`

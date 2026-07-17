@@ -59,6 +59,17 @@ export async function getProfile() {
   return data;
 }
 
+export async function updateUserPath(path) {
+  const res = await fetch(`${API_BASE}/profile/path`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ path })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update path');
+  return data;
+}
+
 export async function getLessons() {
   const res = await fetch(`${API_BASE}/lessons`, {
     headers: getHeaders()

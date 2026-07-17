@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { translations as t } from '../translations';
 import { getDaysSinceLastStudy } from '../utils/streak';
 import { getNagTier, getRandomWelcomeMessage, getLlamaAnimation } from '../nagMessages';
@@ -12,6 +12,7 @@ import llamaMoodZombie from '../assets/llama-mood-zombie.webp';
 import llamaMoodReturn from '../assets/llama-mood-return.webp';
 import llamaMoodAngry from '../assets/llama-mood-angry.webp';
 import llamaMoodFire from '../assets/quiz-mode-select.webp';
+import PathSelection from './PathSelection';
 
 // Maps each getLlamaAnimation() state to the matching mascot art — llama-chill
 // and llama-zombie still reuse the older mood renders since there's no
@@ -27,6 +28,7 @@ const LLAMA_MOOD_IMAGES = {
 };
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
+  const [showPathSelect, setShowPathSelect] = useState(false);
   const daysAbsent = getDaysSinceLastStudy();
   const nagTier = useMemo(() => getNagTier(daysAbsent), [daysAbsent]);
   const welcome = useMemo(() => getRandomWelcomeMessage(), []);
@@ -59,7 +61,13 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
             {heroMessage}
           </div>
         </button>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button 
+            onClick={() => setShowPathSelect(true)}
+            className="flex items-center gap-1.5 bg-white border-2 border-[#101A24]/10 rounded-full px-3.5 py-2 font-comic font-bold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-transform"
+          >
+            <span className="text-lg">🎯</span> {profile.selected_path || 'MOF'}
+          </button>
           <div className="flex items-center gap-1.5 bg-white border-2 border-[#FCE7A8] rounded-full px-3.5 py-2 font-comic font-bold text-sm text-[#B8912E] shadow-[0_4px_14px_rgba(0,0,0,0.06)]">
             <span className="text-lg">🔥</span>{profile.streak}
           </div>
@@ -111,6 +119,17 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
 
         <LessonPath lessons={lessons} onSelectLesson={onSelectLesson} />
       </div>
+
+      {showPathSelect && (
+        <PathSelection 
+          onSelect={(path) => { 
+            profile.selected_path = path; 
+            setShowPathSelect(false); 
+          }} 
+          isCancellable={true} 
+          onCancel={() => setShowPathSelect(false)} 
+        />
+      )}
     </div>
   );
 }

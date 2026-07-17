@@ -11,6 +11,7 @@ import Flashcards from './components/Flashcards';
 import Leaderboard from './components/Leaderboard';
 import Chat from './components/Chat';
 import Settings from './components/Settings';
+import PathSelection from './components/PathSelection';
 import { Home, Target, Layers, Trophy, Settings as SettingsIcon, Volume2, VolumeX, BookOpen, MessageCircle } from 'lucide-react';
 import llamaLogo from './assets/llama-logo.png';
 
@@ -92,6 +93,11 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  /* ── Path Interception ────────────────────────────────── */
+  if (profile && !profile.selected_path) {
+    return <PathSelection onSelect={(path) => setProfile(p => ({ ...p, selected_path: path }))} isCancellable={false} />;
   }
 
   /* ── Main App (Sidebar / Bottom Tab layout) ───────────────── */
