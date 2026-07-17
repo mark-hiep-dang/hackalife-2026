@@ -48,14 +48,14 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <button
           onClick={handleStudyNow}
-          className="border-none cursor-pointer bg-transparent flex items-end gap-3 flex-1 min-w-0 text-left"
+          className="border-none cursor-pointer bg-transparent flex items-center gap-3 flex-1 min-w-[240px] text-left"
         >
           <img
             src={LLAMA_MOOD_IMAGES[llamaAnim] || llamaMoodIdle}
             alt="Llama"
             className={`w-14 h-14 rounded-full object-cover border-[3px] border-[#FCE7A8] shadow-sm shrink-0 ${llamaAnim}`}
           />
-          <div className="inline-block bg-white rounded-[20px] rounded-bl-md px-4 py-2.5 font-comic font-extrabold text-base text-[#101A24] shadow-sm max-w-full">
+          <div className="flex-1 min-w-0 bg-white rounded-[20px] rounded-bl-md px-4 py-2.5 font-comic font-extrabold text-base text-[#101A24] shadow-sm">
             {heroMessage}
           </div>
         </button>
