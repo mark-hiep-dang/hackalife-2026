@@ -3,6 +3,7 @@ import { getFlashcards, getFlashcardTopics, markFlashcardProgress } from '../uti
 import { playPang, playChiu } from '../utils/sound';
 import { pickFlashcardTip } from '../llamaResponses';
 import llamaTipIcon from '../assets/llama-mood-cozy.webp';
+import { ArrowLeft } from 'lucide-react';
 
 const CARD_SHADOW = '0 4px 20px rgba(0,0,0,0.06)';
 
@@ -17,7 +18,7 @@ const TOPIC_STYLES = [
   { bg: '#FBEAE6', color: '#C46A4F', subColor: '#E0977E' }
 ];
 
-export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
+export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack }) {
   const [topics, setTopics] = useState([]);
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState('');
@@ -86,6 +87,14 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
     const totalKnown = topics.reduce((s, tr) => s + (tr.known_count || 0), 0);
     return (
       <div className="flex flex-col gap-2 pop-in max-w-3xl mx-auto w-full">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="self-start flex items-center gap-1.5 border-none cursor-pointer bg-white rounded-2xl py-2 px-3.5 mb-2 font-comic font-bold text-[13px] text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
+          >
+            <ArrowLeft size={16} strokeWidth={3} /> Trang chủ
+          </button>
+        )}
         <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide flex items-center gap-2">
           <span>🗂️</span> Thẻ ghi nhớ
         </h2>

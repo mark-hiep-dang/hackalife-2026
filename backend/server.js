@@ -708,7 +708,7 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
   const { message, history, ollamaUrl } = req.body;
   const db = await getDb();
 
-  const retrieved = await retrieveKnowledge(db, message, 5);
+  const retrieved = await retrieveKnowledge(db, message, 8);
   const contextBlock = retrieved.length > 0
     ? retrieved.map((r, i) => `[Đoạn ${i + 1}] ${r.content}`).join('\n\n')
     : '';
@@ -726,7 +726,7 @@ Knowledge Base Guidelines:
 3. If the user asks you to "quiz me", output a brief MCQ question.
 4. Keep the tone snappy, game-like, and use target/gunshot references occasionally (e.g. "Hãy nhắm thẳng mục tiêu!").${contextBlock ? `
 
-Bên dưới là các đoạn tài liệu do agent tự tải lên, hãy ƯU TIÊN dùng các đoạn này để trả lời nếu chúng liên quan đến câu hỏi. Trích dẫn ngắn gọn nếu phù hợp. Nếu tài liệu không đủ thông tin, hãy dùng kiến thức chung của bạn và nói rõ điều đó:
+Bên dưới là các đoạn tài liệu được tìm kiếm tự động (không phải do người chọn tay), mỗi đoạn có dạng "Câu hỏi: ... Trả lời: ...". Vì tìm kiếm dựa trên từ khóa, có thể lẫn cả đoạn CÙNG CHỦ ĐỀ nhưng KHÁC CÂU HỎI với câu người dùng đang hỏi (ví dụ: đoạn nói "tính từ ngày nào" khác với đoạn nói "là bao nhiêu ngày"). TUYỆT ĐỐI không lấy đại đoạn xếp đầu tiên — hãy đọc kỹ phần "Câu hỏi:" của TỪNG đoạn, so khớp ý nghĩa với câu hỏi thật của người dùng, rồi chỉ dùng (các) đoạn nào thực sự trả lời đúng câu hỏi đó. Nếu không đoạn nào khớp, dùng kiến thức chung của bạn và nói rõ điều đó:
 
 ${contextBlock}` : ''}`;
 
@@ -863,9 +863,9 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
     
     // Add mock competitive users to simulate a lively community
     const mockCompetitors = [
-      { id: 991, username: '🎯 Britto Laban', xp: 850, level: 3, streak: 9 },
-      { id: 992, username: '🥇 Khắc Báu', xp: 720, level: 2, streak: 12 },
-      { id: 993, username: '💡 Khánh Linh', xp: 580, level: 2, streak: 5 },
+      { id: 991, username: 'Chị Hảo BGK', xp: 850, level: 3, streak: 9 },
+      { id: 992, username: 'Ngọc Full Topping', xp: 720, level: 2, streak: 12 },
+      { id: 993, username: 'Harry Porter', xp: 580, level: 2, streak: 5 },
       { id: 994, username: '🛡️ Mai Anh', xp: 450, level: 2, streak: 4 }
     ];
 

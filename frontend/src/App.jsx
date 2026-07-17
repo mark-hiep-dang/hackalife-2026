@@ -62,7 +62,7 @@ export default function App() {
   }
   function handleLogout() { localStorage.removeItem('pang_chiu_token'); setSession(null); }
   function handleLessonFinished(xp) { setActiveLesson(null); if (xp !== null) { markStudiedToday(); fetchUserDossier(); } }
-  function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); setActiveTab('home'); }
+  function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); }
   function handleStudyTopic(topicKey) { setFlashcardTopic(topicKey); setActiveTab('flashcards'); }
 
   const t = translations; // Now just a single dict
@@ -183,8 +183,8 @@ export default function App() {
           ) : (
             <>
               {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} onLogout={handleLogout} />}
-              {activeTab === 'quiz' && <div className="max-w-4xl mx-auto"><Quiz onQuizFinished={handleQuizFinished} onStudyTopic={handleStudyTopic} /></div>}
-              {activeTab === 'flashcards' && <div className="max-w-4xl mx-auto"><Flashcards initialTopic={flashcardTopic} onConsumeInitialTopic={() => setFlashcardTopic(null)} /></div>}
+              {activeTab === 'quiz' && <div className="max-w-4xl mx-auto"><Quiz onQuizFinished={handleQuizFinished} onStudyTopic={handleStudyTopic} onBack={() => setActiveTab('home')} /></div>}
+              {activeTab === 'flashcards' && <div className="max-w-4xl mx-auto"><Flashcards initialTopic={flashcardTopic} onConsumeInitialTopic={() => setFlashcardTopic(null)} onBack={() => setActiveTab('home')} /></div>}
               {activeTab === 'chat' && <Chat />}
               {activeTab === 'leaderboard' && <div className="max-w-3xl mx-auto"><Leaderboard profile={profile} /></div>}
               {activeTab === 'settings' && <div className="max-w-2xl mx-auto"><Settings profile={profile} setSession={setSession} onMuteToggled={setMuted} /></div>}

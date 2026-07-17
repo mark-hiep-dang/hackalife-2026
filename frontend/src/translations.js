@@ -47,7 +47,7 @@ export const translations = {
   quizCompleted: 'Hoàn thành!',
   xpEarned: 'Kinh nghiệm nhận được',
   comboBonus: 'Thưởng Combo',
-  backToDashboard: 'Về trang chủ',
+  backToDashboard: 'Chọn chế độ khác',
   questionIndicator: 'Câu {current} / {total}',
   badge_streak_3: 'Hăng hái (3 ngày)',
   badge_streak_7: 'Chăm chỉ (7 ngày)',

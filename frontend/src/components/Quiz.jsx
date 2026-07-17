@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { generateQuiz, submitQuizScore } from '../utils/api';
 import { translations as t } from '../translations';
 import { playPang, playCheer, playScream } from '../utils/sound';
-import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, ArrowRight } from 'lucide-react';
+import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, ArrowRight, ArrowLeft } from 'lucide-react';
 import llamaSpit from '../assets/llama-spit.webp';
 import llamaCheer from '../assets/llama-cheer.webp';
 import quizModeSelect from '../assets/quiz-mode-select.webp';
@@ -15,7 +15,7 @@ import QuizHistory from './QuizHistory';
 const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame, pang_sniper: Zap, topic_master: Medal, xp_1000: Crown };
 const CARD_SHADOW = '0 4px 20px rgba(0,0,0,0.06)';
 
-export default function Quiz({ onQuizFinished, onStudyTopic }) {
+export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
   const [topic, setTopic] = useState('all');
   const [difficulty, setDifficulty] = useState('intermediate');
   const [mode, setMode] = useState('practice');
@@ -121,6 +121,14 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
 
   function fmt(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
+  function backToModeSelect() {
+    onQuizFinished();
+    setStarted(false); setFinished(false); setQuestions([]); setCidx(0);
+    setScore(0); setCombo(0); setMaxCombo(0); setWrongStreak(0);
+    setSelected(null); setAnswered(false); setExamAnswers([]);
+    setXpEarned(0); setNewBadges([]); setError('');
+  }
+
   const isCorrect = answered && selected === q?.correct_index;
 
   if (showHistory) return <QuizHistory onBack={() => setShowHistory(false)} onStudyTopic={onStudyTopic} />;
@@ -128,6 +136,14 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
   /* ── Setup: "Chọn chế độ chiến!" ─── */
   if (!started && !finished) return (
     <div className="bg-white pop-in text-center max-w-xl mx-auto" style={{ borderRadius: '2rem', boxShadow: CARD_SHADOW, padding: '44px 40px' }}>
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-2 px-3.5 mb-5 font-comic font-bold text-[13px] text-[#101A24]"
+        >
+          <ArrowLeft size={16} strokeWidth={3} /> Trang chủ
+        </button>
+      )}
       <img
         src={quizModeSelect}
         alt=""
@@ -233,7 +249,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           </div>
         )}
 
-        <button onClick={() => onQuizFinished()} className="btn-pro w-full text-xl bg-[#4C6FC4] hover:bg-[#3D5DAE] text-white py-4">
+        <button onClick={backToModeSelect} className="btn-pro w-full text-xl bg-[#4C6FC4] hover:bg-[#3D5DAE] text-white py-4">
           {t.backToDashboard}
         </button>
       </div>
@@ -245,7 +261,8 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
   const opts = q.options;
 
   return (
-    <div className="flex flex-col gap-5 pop-in max-w-3xl mx-auto w-full">
+    <div className="flex flex-col gap-5 max-w-3xl mx-auto w-full">
+    <div className="flex flex-col gap-5 pop-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -318,6 +335,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           })}
         </div>
       </div>
+    </div>
 
       {/* Feedback — centered popup with a Llama mascot bubble, impossible to miss */}
       {answered && mode === 'practice' && (

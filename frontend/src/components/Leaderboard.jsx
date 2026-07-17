@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getLeaderboard } from '../utils/api';
+import podiumGold from '../assets/podium-gold.webp';
+import podiumSilver from '../assets/podium-silver.webp';
+import podiumBronze from '../assets/podium-bronze.webp';
 
 const STAND_STYLE = {
-  1: { height: 64, width: 96, color: '#FFD34D', medal: '🥇', emojiSize: 56, bobSpeed: '2.4s' },
-  2: { height: 46, width: 88, color: '#D8DEE6', medal: '🥈', emojiSize: 42, bobSpeed: '3s' },
-  3: { height: 32, width: 88, color: '#E8B98A', medal: '🥉', emojiSize: 42, bobSpeed: '3s' }
+  1: { height: 64, width: 96, color: '#FFD34D', medal: '🥇', icon: podiumGold, iconSize: 72, bobSpeed: '2.4s' },
+  2: { height: 46, width: 88, color: '#D8DEE6', medal: '🥈', icon: podiumSilver, iconSize: 56, bobSpeed: '3s' },
+  3: { height: 32, width: 88, color: '#E8B98A', medal: '🥉', icon: podiumBronze, iconSize: 56, bobSpeed: '3s' }
 };
 const PODIUM_ORDER = [2, 1, 3]; // classic podium visual order: 2nd, 1st, 3rd
 
@@ -88,7 +91,12 @@ export default function Leaderboard({ profile }) {
                 const stand = STAND_STYLE[p.rank];
                 return (
                   <div key={p.rank} className="flex flex-col items-center gap-2">
-                    <span className="leading-none" style={{ fontSize: `${stand.emojiSize}px`, animation: `bob ${stand.bobSpeed} ease-in-out infinite` }}>🦙</span>
+                    <img
+                      src={stand.icon}
+                      alt=""
+                      className="rounded-full object-cover"
+                      style={{ width: `${stand.iconSize}px`, height: `${stand.iconSize}px`, animation: `bob ${stand.bobSpeed} ease-in-out infinite` }}
+                    />
                     <div className="font-comic font-extrabold text-[13px] text-[#101A24] text-center truncate" style={{ maxWidth: '90px' }}>
                       {p.username}
                     </div>
