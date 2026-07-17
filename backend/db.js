@@ -125,6 +125,20 @@ export async function initDb() {
     )
   `);
 
+  // Tracks which flashcards each user has marked "known", so the topic picker
+  // can show learned/total progress per deck.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS user_flashcard_progress (
+      user_id INTEGER NOT NULL,
+      flashcard_id INTEGER NOT NULL,
+      known INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, flashcard_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
+    )
+  `);
+
   // Create Test Questions table (imported from Excel)
   await db.exec(`
     CREATE TABLE IF NOT EXISTS test_questions (

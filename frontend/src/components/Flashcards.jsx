@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getFlashcards, getFlashcardTopics } from '../utils/api';
+import { getFlashcards, getFlashcardTopics, markFlashcardProgress } from '../utils/api';
 import { playPang, playChiu } from '../utils/sound';
 import { pickFlashcardTip } from '../llamaResponses';
+import llamaTipIcon from '../assets/llama-mood-cozy.webp';
 
 const CARD_SHADOW = '0 4px 20px rgba(0,0,0,0.06)';
 
@@ -31,13 +32,13 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
   const [unknown, setUnknown] = useState(0);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try { setTopics(await getFlashcardTopics()); }
-      catch (e) { setTopicsError(e.message || 'Lỗi tải danh sách bộ thẻ'); }
-      finally { setTopicsLoading(false); }
-    })();
-  }, []);
+  async function loadTopics() {
+    try { setTopics(await getFlashcardTopics()); }
+    catch (e) { setTopicsError(e.message || 'Lỗi tải danh sách bộ thẻ'); }
+    finally { setTopicsLoading(false); }
+  }
+
+  useEffect(() => { loadTopics(); }, []);
 
   // Deep-link: jump straight into a specific deck (e.g. from the exam report's roadmap)
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
 
   function backToTopics() {
     setSelectedTopic(null); setCards([]); setIdx(0); setFlipped(false); setError('');
+    loadTopics();
   }
 
   function restartDeck() {
@@ -70,6 +72,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
 
   function mark(isKnown) {
     isKnown ? setKnown(k => k + 1) : setUnknown(u => u + 1);
+    if (card) markFlashcardProgress(card.id, isKnown).catch(() => {});
     setFlipped(false);
     setTimeout(() => {
       if (idx + 1 >= cards.length) setDone(true);
@@ -79,6 +82,8 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
 
   /* ── Topic picker ─── */
   if (!selectedTopic) {
+    const totalCount = topics.reduce((s, tr) => s + tr.count, 0);
+    const totalKnown = topics.reduce((s, tr) => s + (tr.known_count || 0), 0);
     return (
       <div className="flex flex-col gap-2 pop-in max-w-3xl mx-auto w-full">
         <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide flex items-center gap-2">
@@ -101,14 +106,18 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
               style={{ background: 'linear-gradient(135deg, #E3D9F5 0%, #FCE7A8 100%)' }}
             >
               <span className="text-4xl shrink-0">🔀</span>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="font-comic font-extrabold text-[17px] text-[#101A24]">Ngẫu nhiên tổng hợp</div>
-                <div className="text-xs font-bold text-[#8A6D1F] mt-0.5">20 thẻ trộn từ mọi chủ đề</div>
+                <div className="text-xs font-bold text-[#8A6D1F] mt-0.5">{totalKnown}/{totalCount} thẻ đã học</div>
+                <div className="h-1.5 bg-white/50 rounded-full overflow-hidden mt-1.5">
+                  <div className="h-full rounded-full bg-[#8A6D1F]" style={{ width: `${totalCount ? (totalKnown / totalCount) * 100 : 0}%` }} />
+                </div>
               </div>
             </button>
 
             {topics.map((topicRow, i) => {
               const st = TOPIC_STYLES[i % TOPIC_STYLES.length];
+              const known = topicRow.known_count || 0;
               return (
                 <button
                   key={topicRow.topic}
@@ -117,9 +126,12 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
                   style={{ background: st.bg }}
                 >
                   <span className="text-4xl shrink-0">📖</span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="font-comic font-extrabold text-[17px] truncate" style={{ color: st.color }}>{topicRow.topic}</div>
-                    <div className="text-xs font-bold mt-0.5" style={{ color: st.subColor }}>{topicRow.count} thẻ</div>
+                    <div className="text-xs font-bold mt-0.5" style={{ color: st.subColor }}>{known}/{topicRow.count} thẻ đã học</div>
+                    <div className="h-1.5 bg-white/50 rounded-full overflow-hidden mt-1.5">
+                      <div className="h-full rounded-full" style={{ width: `${topicRow.count ? (known / topicRow.count) * 100 : 0}%`, background: st.color }} />
+                    </div>
                   </div>
                 </button>
               );
@@ -164,7 +176,6 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
           {/* Flip card */}
           <div className="relative cursor-pointer select-none" style={{ perspective: '1400px', height: '340px' }} onClick={flip}>
             <span className="absolute -top-4 left-1.5 text-2xl z-0 wiggle">✨</span>
-            <span className="absolute -bottom-6 right-0 text-5xl z-0" style={{ animation: 'bob 2.8s ease-in-out infinite' }}>🦙</span>
 
             <div
               className="relative w-full h-full transition-transform duration-500 ease-in-out"
@@ -209,7 +220,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic }) {
 
           {flipped && tip && (
             <div className="flex items-start gap-2.5 bg-[#FCEFD0] rounded-2xl px-4 py-3 mt-4 text-left bounce-in">
-              <span className="text-lg shrink-0">🦙</span>
+              <img src={llamaTipIcon} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
               <p className="text-xs font-bold text-[#8A6D1F] leading-relaxed">{tip}</p>
             </div>
           )}
