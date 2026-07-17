@@ -4,6 +4,7 @@ import { translations } from './translations';
 import { getMuteState, setMuteState } from './utils/sound';
 import { markStudiedToday, ensureStudyTrackingInitialized } from './utils/streak';
 import Auth from './components/Auth';
+import ProgramSelect from './components/ProgramSelect';
 import Dashboard from './components/Dashboard';
 import Learn from './components/Learn';
 import Quiz from './components/Quiz';
@@ -16,6 +17,7 @@ import llamaLogo from './assets/llama-logo.png';
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [showProgramSelect, setShowProgramSelect] = useState(false);
   const [profile, setProfile] = useState(null);
   const [lessons, setLessons] = useState([]);
   const [activeTab, setActiveTab] = useState('home');
@@ -60,6 +62,7 @@ export default function App() {
     catch { handleLogout(); }
   }
   function handleLogout() { localStorage.removeItem('pang_chiu_token'); setSession(null); }
+  function handleFreshLogin(user) { setSession(user); setShowProgramSelect(true); }
   function handleLessonFinished(xp) { setActiveLesson(null); if (xp !== null) { markStudiedToday(); fetchUserDossier(); } }
   function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); setActiveTab('home'); }
   function handleStudyTopic(topicKey) { setFlashcardTopic(topicKey); setActiveTab('flashcards'); }
@@ -88,8 +91,17 @@ export default function App() {
           </div>
         </header>
         <div className="flex-1 overflow-auto">
-          <Auth setSession={setSession} />
+          <Auth setSession={handleFreshLogin} />
         </div>
+      </div>
+    );
+  }
+
+  /* ── Program picker (shown once right after login/register) ── */
+  if (showProgramSelect) {
+    return (
+      <div className="min-h-screen bg-[#F5F6F8]">
+        <ProgramSelect onSelect={() => setShowProgramSelect(false)} />
       </div>
     );
   }
