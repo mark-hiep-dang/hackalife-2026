@@ -97,7 +97,7 @@ export default function Leaderboard({ profile }) {
                       className="rounded-full object-cover"
                       style={{ width: `${stand.iconSize}px`, height: `${stand.iconSize}px`, animation: `bob ${stand.bobSpeed} ease-in-out infinite` }}
                     />
-                    <div className="font-comic font-extrabold text-[13px] text-[#101A24] text-center truncate" style={{ maxWidth: '90px' }}>
+                    <div className="font-comic font-extrabold text-[13px] text-[#101A24] text-center leading-tight" style={{ maxWidth: '90px' }}>
                       {p.username}
                     </div>
                     <div className="text-[11px] font-extrabold text-[#3B93A8]">{p.xp.toLocaleString()} XP</div>
