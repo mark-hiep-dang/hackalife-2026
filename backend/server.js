@@ -714,6 +714,38 @@ ${contextBlock}` : ''}`;
 
   const cleanOllamaUrl = ollamaUrl || 'http://localhost:11434';
 
+  // Tier 1: Gemini (free-tier cloud LLM — no local setup needed, works once deployed)
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const contents = [
+        ...(history || []).map(h => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.content }] })),
+        { role: 'user', parts: [{ text: message }] }
+      ];
+
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: insuranceContext }] },
+            contents
+          })
+        }
+      );
+
+      if (geminiRes.ok) {
+        const data = await geminiRes.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return res.json({ response: text });
+      } else {
+        console.warn('Gemini API returned non-ok status:', geminiRes.status, await geminiRes.text());
+      }
+    } catch (err) {
+      console.warn('Gemini API call failed, falling back. Reason:', err.message);
+    }
+  }
+
   try {
     // Try local Ollama
     const messages = [
@@ -736,7 +768,7 @@ ${contextBlock}` : ''}`;
       const data = await response.json();
       return res.json({ response: data.message.content });
     }
-    
+
     throw new Error('Ollama endpoint returned non-ok status');
   } catch (err) {
     console.warn('Ollama proxy failed, running bilingual dictionary agent fallback. Reason:', err.message);
