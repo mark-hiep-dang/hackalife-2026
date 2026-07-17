@@ -24,6 +24,7 @@ export default function App() {
   const [muted, setMuted] = useState(getMuteState());
   const [effects, setEffects] = useState([]);
   const [flashcardTopic, setFlashcardTopic] = useState(null);
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem('pang_chiu_token')) setSession({ username: 'Agent' });
@@ -89,15 +90,21 @@ export default function App() {
           </div>
         </header>
         <div className="flex-1 overflow-auto">
-          <Auth setSession={setSession} />
+          <Auth setSession={(u) => { setSession(u); setJustLoggedIn(true); }} />
         </div>
       </div>
     );
   }
 
   /* ── Path Interception ────────────────────────────────── */
-  if (profile && !profile.selected_path) {
-    return <PathSelection onSelect={(path) => setProfile(p => ({ ...p, selected_path: path }))} isCancellable={false} />;
+  if (profile && (!profile.selected_path || justLoggedIn)) {
+    return (
+      <PathSelection
+        onSelect={(path) => { setProfile(p => ({ ...p, selected_path: path })); setJustLoggedIn(false); }}
+        isCancellable={!!profile.selected_path}
+        onCancel={() => setJustLoggedIn(false)}
+      />
+    );
   }
 
   /* ── Main App (Sidebar / Bottom Tab layout) ───────────────── */
