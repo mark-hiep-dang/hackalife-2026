@@ -143,26 +143,26 @@ export default function Quiz({ onQuizFinished, onStudyTopic }) {
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: '#EEF0F3',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
+            background: '#C7EFC4',
+            boxShadow: '0 4px 14px rgba(79,154,90,0.25)'
           }}
         >
           <img src={quizPracticeMode} alt="" className="w-14 h-14 object-contain" />
           <span className="font-comic font-extrabold text-base text-[#101A24]">{t.practiceMode}</span>
-          <span className="text-xs font-bold text-[#5C5C5C]">5 câu, thoải mái xem giải thích</span>
+          <span className="text-xs font-bold text-[#2F5C37]">5 câu, thoải mái xem giải thích</span>
         </button>
         <button
           onClick={() => { setMode('exam'); startQuiz('exam'); }}
           disabled={loading}
           className="flex-1 border-none cursor-pointer rounded-3xl py-6 px-4 flex flex-col items-center gap-2.5 transition-transform hover:-translate-y-1"
           style={{
-            background: '#EEF0F3',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
+            background: 'linear-gradient(135deg, #E3D9F5 0%, #FCE7A8 100%)',
+            boxShadow: '0 4px 14px rgba(138,111,201,0.3)'
           }}
         >
           <img src={quizExamMode} alt="" className="w-14 h-14 object-contain" />
           <span className="font-comic font-extrabold text-base text-[#101A24]">{t.examMode}</span>
-          <span className="text-xs font-bold text-[#5C5C5C]">40 câu • 60 phút • tính giờ nghiêm túc</span>
+          <span className="text-xs font-bold text-[#6B4FA8]">40 câu • 60 phút • tính giờ nghiêm túc</span>
         </button>
       </div>
 
