@@ -12,6 +12,7 @@ import { detectLearnerRisk } from './engines/learnerRisk.js';
 import { analyzeQuestionQuality } from './engines/questionQuality.js';
 import { clusterMisconceptions } from './engines/misconceptionCluster.js';
 import { calculateInterventionEffectiveness } from './engines/interventionEffectiveness.js';
+import { computeSummitReadiness } from '../engines/adaptiveLoop.js';
 
 // The JWT payload only carries {id, username} (see server.js authenticateToken),
 // so role must be re-checked against the DB per request rather than trusted
@@ -506,37 +507,72 @@ export function mountStudioRoutes(app, authenticateToken) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  // Real learners (spec follow-up): reuses the same deterministic engines as
+  // the cohort/mock-exam demo, but reads from the actual learner-app tables
+  // (user_quizzes/user_quiz_answers/topic_mastery) instead of the seeded
+  // studio_mock_exam_* demo data — this is the trainer's real student roster,
+  // not the hackathon-demo cohort.
+  async function computeRealLearnerSummary(db, learner) {
+    const quizzes = await db.all('SELECT score, total_questions, created_at FROM user_quizzes WHERE user_id = ? ORDER BY created_at', [learner.id]);
+    const scores = quizzes.map((q) => Math.round((q.score / q.total_questions) * 100));
+    const prefs = await db.get('SELECT target_score, exam_date FROM learner_preferences WHERE user_id = ?', [learner.id]);
+    const daysUntilExam = prefs?.exam_date ? Math.max(0, Math.round((new Date(prefs.exam_date) - new Date()) / 86400000)) : undefined;
+    const summitReadiness = await computeSummitReadiness(db, learner.id);
+    const answers = await db.all(
+      `SELECT ua.topic, ua.is_correct, ua.confidence, ua.mistake_type FROM user_quiz_answers ua JOIN user_quizzes q ON ua.quiz_id = q.id WHERE q.user_id = ?`,
+      [learner.id]
+    );
+    const wrongAnswers = answers.filter((a) => !a.is_correct);
+    const highConfidenceMistakeCount = wrongAnswers.filter((a) => a.confidence === 'certain').length;
+    const mistakeCounts = {};
+    for (const a of wrongAnswers) if (a.mistake_type) mistakeCounts[a.mistake_type] = (mistakeCounts[a.mistake_type] || 0) + 1;
+    const commonMistakeType = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const topicMastery = await db.all('SELECT topic, mastery_score FROM topic_mastery WHERE user_id = ? ORDER BY mastery_score ASC', [learner.id]);
+    const weakestTopic = topicMastery[0]?.topic?.replace(/^\d+\.\s*/, '') ?? null;
+    return { quizzes, scores, prefs, daysUntilExam, summitReadiness, answers, highConfidenceMistakeCount, commonMistakeType, weakestTopic };
+  }
+
+  app.get('/api/studio/learners', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const learners = await db.all("SELECT id, username FROM users WHERE role IS NULL OR role != 'trainer'");
+      const results = [];
+      for (const learner of learners) {
+        const summary = await computeRealLearnerSummary(db, learner);
+        if (summary.quizzes.length === 0) continue; // only students actually studying, not empty accounts
+        const risk = detectLearnerRisk({
+          recentScoresChronological: summary.scores, targetScore: summary.prefs?.target_score || 70,
+          summitReadiness: summary.summitReadiness, daysUntilExam: summary.daysUntilExam,
+          highConfidenceMistakeCount: summary.highConfidenceMistakeCount,
+          hasAttemptedAssigned: true, recentActivityCount: summary.quizzes.length
+        });
+        results.push({
+          id: learner.id, name: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
+          scoreTrend: classifyTrend(summary.scores), status: risk.status, reasons: risk.reasons,
+          recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType
+        });
+      }
+      res.json(results);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   app.get('/api/studio/learners/:id/profile', ...T, async (req, res) => {
     const db = req.db;
     try {
       const learner = await db.get('SELECT id, username FROM users WHERE id = ?', [req.params.id]);
       if (!learner) return res.status(404).json({ error: 'Không tìm thấy học viên' });
-      const attempts = await db.all(
-        `SELECT att.* FROM studio_mock_exam_attempts att JOIN studio_mock_exams m ON att.mock_exam_id = m.id WHERE att.learner_id = ? ORDER BY m.round_number`,
-        [learner.id]
-      );
-      const scores = attempts.map((a) => a.score);
-      const answers = await db.all(`SELECT * FROM studio_mock_exam_answers WHERE attempt_id IN (${attempts.map((a) => a.id).join(',') || '-1'})`);
-      const topicPerf = calculateTopicPerformance(answers.map((a) => ({ topic: a.topic, isCorrect: !!a.is_correct, mistakeType: a.mistake_type })), 70);
-      const mistakeCounts = {};
-      for (const a of answers) if (a.mistake_type) mistakeCounts[a.mistake_type] = (mistakeCounts[a.mistake_type] || 0) + 1;
-      const commonMistakeType = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-
-      const interventions = await db.all(
-        `SELECT i.*, ia.assigned_at, ia.completed_at FROM studio_interventions i
-         JOIN studio_intervention_assignments ia ON i.id = ia.intervention_id WHERE ia.learner_id = ?`,
-        [learner.id]
-      );
+      const summary = await computeRealLearnerSummary(db, learner);
+      const topicPerf = calculateTopicPerformance(summary.answers.map((a) => ({ topic: a.topic, isCorrect: !!a.is_correct, mistakeType: a.mistake_type })), 70);
 
       const insight = await summarizeLearnerInsight({
-        learnerName: learner.username, latestScore: scores[scores.length - 1] ?? null,
-        trend: classifyTrend(scores), weakestTopic: topicPerf[0]?.topic?.replace(/^\d+\.\s*/, ''), commonMistakeType
+        learnerName: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
+        trend: classifyTrend(summary.scores), weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType
       });
 
       res.json({
-        learner, mockExamHistory: scores, latestScore: scores[scores.length - 1] ?? null,
-        scoreTrend: classifyTrend(scores), topicPerformance: topicPerf, commonMistakeType,
-        interventions, insight: insight.summary
+        learner, mockExamHistory: summary.scores, latestScore: summary.scores[summary.scores.length - 1] ?? null,
+        scoreTrend: classifyTrend(summary.scores), topicPerformance: topicPerf, commonMistakeType: summary.commonMistakeType,
+        interventions: [], insight: insight.summary
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });

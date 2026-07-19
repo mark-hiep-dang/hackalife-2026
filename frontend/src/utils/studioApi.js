@@ -39,6 +39,7 @@ export const getCohort = (id) => req(`/cohorts/${id}`);
 export const getMockExamAnalytics = (cohortId) => req(`/cohorts/${cohortId}/mock-exam-analytics`);
 export const getQuestionAnalytics = (mockExamId) => req(`/mock-exams/${mockExamId}/questions`);
 export const getLearnersAtRisk = (cohortId) => req(`/cohorts/${cohortId}/learners-at-risk`);
+export const getLearners = () => req('/learners');
 export const getLearnerProfile = (learnerId) => req(`/learners/${learnerId}/profile`);
 
 export const getMisconceptionClusters = (cohortId) => req(`/cohorts/${cohortId}/misconception-clusters`);

@@ -3,10 +3,12 @@ import { getCourses, createCourse, getCourse, generateCourseCurriculum, runQuali
 import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import { Plus, ArrowLeft, Mountain, Sparkles } from 'lucide-react';
+import { useT } from '../../translations';
 
 const CAMP_COLORS = ['bg-[#C7EFC4]', 'bg-[#B9E7EF]', 'bg-[#E3D9F5]', 'bg-[#FBE3B0]', 'bg-[#F5C9DA]'];
 
 function CreateCourseForm({ onCreated, onCancel }) {
+  const t = useT();
   const [form, setForm] = useState({ title: '', description: '', targetGroup: '', durationWeeks: 4, examDate: '', learningGoal: '', targetScore: 70, preferredCamps: 4 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -30,34 +32,34 @@ function CreateCourseForm({ onCreated, onCancel }) {
 
   return (
     <Card>
-      <SectionTitle>Tạo khóa học mới</SectionTitle>
+      <SectionTitle>{t.studioCreateCourseTitle}</SectionTitle>
       <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {field('title', 'Tên khóa học')}
-        {field('targetGroup', 'Đối tượng học viên')}
-        {field('description', 'Mô tả')}
-        {field('learningGoal', 'Mục tiêu học tập')}
-        {field('durationWeeks', 'Số tuần', 'number')}
-        {field('targetScore', 'Điểm mục tiêu', 'number')}
-        {field('examDate', 'Ngày thi', 'date')}
-        {field('preferredCamps', 'Số camp mong muốn', 'number')}
+        {field('title', t.studioFieldCourseTitle)}
+        {field('targetGroup', t.studioFieldTargetGroup)}
+        {field('description', t.studioFieldDescription)}
+        {field('learningGoal', t.studioFieldLearningGoal)}
+        {field('durationWeeks', t.studioFieldDurationWeeks, 'number')}
+        {field('targetScore', t.studioFieldTargetScore, 'number')}
+        {field('examDate', t.studioFieldExamDate, 'date')}
+        {field('preferredCamps', t.studioFieldPreferredCamps, 'number')}
         {error && <p className="text-sm text-red-600 md:col-span-2">{error}</p>}
         <div className="md:col-span-2 flex gap-3 mt-2">
-          <Button type="submit" disabled={saving}>{saving ? 'Đang lưu…' : 'Tạo khóa học'}</Button>
-          <Button type="button" variant="secondary" onClick={onCancel}>Hủy</Button>
+          <Button type="submit" disabled={saving}>{saving ? t.studioSaving : t.studioCreateCourseBtn}</Button>
+          <Button type="button" variant="secondary" onClick={onCancel}>{t.studioCancel}</Button>
         </div>
       </form>
     </Card>
   );
 }
 
-function MountainVisual({ camps, lessons }) {
+function MountainVisual({ camps, lessons, t }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 text-[#101A24] font-extrabold"><Mountain size={20} /> Base Camp → Summit</div>
+      <div className="flex items-center gap-2 text-[#101A24] font-extrabold"><Mountain size={20} /> {t.studioMountainTitle}</div>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {camps.map((camp, i) => (
           <div key={camp.id} className={`min-w-[220px] rounded-2xl border border-[#101A24]/10 p-4 ${CAMP_COLORS[i % CAMP_COLORS.length]}`}>
-            <div className="text-xs font-extrabold uppercase tracking-widest text-[#101A24]/70 mb-2">Camp {i + 1}</div>
+            <div className="text-xs font-extrabold uppercase tracking-widest text-[#101A24]/70 mb-2">{t.studioCampLabel.replace('{n}', i + 1)}</div>
             <div className="font-extrabold text-[#101A24] mb-3">{camp.title}</div>
             <div className="flex flex-col gap-2">
               {lessons.filter((l) => l.campId === camp.id).map((l) => (
@@ -70,7 +72,7 @@ function MountainVisual({ camps, lessons }) {
           </div>
         ))}
         <div className="min-w-[140px] rounded-2xl border border-[#101A24]/10 p-4 bg-[#101A24] text-white flex items-center justify-center font-extrabold">
-          🏔️ Summit
+          🏔️ {t.studioSummitLabel}
         </div>
       </div>
     </div>
@@ -78,6 +80,7 @@ function MountainVisual({ camps, lessons }) {
 }
 
 function CourseDetail({ courseId, onBack }) {
+  const t = useT();
   const [bundle, setBundle] = useState(null);
   const [quality, setQuality] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -110,17 +113,17 @@ function CourseDetail({ courseId, onBack }) {
     } finally { setBusy(false); }
   }
 
-  if (!bundle) return <Spinner />;
+  if (!bundle) return <Spinner label={t.studioLoading} />;
   const { course, camps, lessons } = bundle;
 
   return (
     <div className="flex flex-col gap-6">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#101A24]"><ArrowLeft size={16} /> Danh sách khóa học</button>
+      <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#101A24]"><ArrowLeft size={16} /> {t.studioBackToCourses}</button>
       <Card>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-xl font-extrabold text-[#101A24]">{course.title}</h2>
-            <p className="text-sm text-[#666]">{course.target_group} · {course.duration_weeks} tuần · Mục tiêu {course.target_score} điểm</p>
+            <p className="text-sm text-[#666]">{course.target_group} · {t.studioWeeksShort.replace('{n}', course.duration_weeks)} · {t.studioFieldTargetScore} {course.target_score}</p>
           </div>
           <span className="text-xs font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#EEF0F3]">{course.status}</span>
         </div>
@@ -129,42 +132,42 @@ function CourseDetail({ courseId, onBack }) {
       {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} />}
 
       <div className="flex gap-2">
-        <Button variant={tab === 'architect' ? 'primary' : 'secondary'} onClick={() => setTab('architect')}>Course Architect</Button>
-        <Button variant={tab === 'quality' ? 'primary' : 'secondary'} onClick={() => setTab('quality')}>Course Quality</Button>
+        <Button variant={tab === 'architect' ? 'primary' : 'secondary'} onClick={() => setTab('architect')}>{t.studioCourseArchitectTab}</Button>
+        <Button variant={tab === 'quality' ? 'primary' : 'secondary'} onClick={() => setTab('quality')}>{t.studioCourseQualityTab}</Button>
       </div>
 
       {tab === 'architect' && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <SectionTitle subtitle="Llama đề xuất giáo trình dựa trên tài liệu đã duyệt. Mọi nội dung đều là bản nháp cho tới khi bạn duyệt.">Lộ trình khóa học</SectionTitle>
+            <SectionTitle subtitle={t.studioCurriculumSubtitle}>{t.studioCurriculumTitle}</SectionTitle>
             <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2">
-              <Sparkles size={16} /> {camps.length ? 'Tạo lại giáo trình' : 'Tạo giáo trình bằng AI'}
+              <Sparkles size={16} /> {camps.length ? t.studioRegenerateCurriculum : t.studioGenerateCurriculum}
             </Button>
           </div>
-          {camps.length === 0 ? <EmptyState>Chưa có lộ trình. Bấm "Tạo giáo trình bằng AI" để bắt đầu.</EmptyState> : <MountainVisual camps={camps} lessons={lessons} />}
+          {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual camps={camps} lessons={lessons} t={t} />}
         </Card>
       )}
 
       {tab === 'quality' && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <SectionTitle>Course Quality Check</SectionTitle>
-            <Button onClick={handleQualityCheck} disabled={busy}>{busy ? 'Đang kiểm tra…' : 'Chạy kiểm tra'}</Button>
+            <SectionTitle>{t.studioQualityCheckTitle}</SectionTitle>
+            <Button onClick={handleQualityCheck} disabled={busy}>{busy ? t.studioChecking : t.studioRunCheck}</Button>
           </div>
           {quality ? (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
-                <Stat label="Health Score" value={`${quality.healthScore}/100`} />
-                <Stat label="Có thể publish" value={quality.canPublish ? 'Có' : 'Chưa'} />
+                <Stat label={t.studioHealthScoreLabel} value={`${quality.healthScore}/100`} />
+                <Stat label={t.studioCanPublishLabel} value={quality.canPublish ? t.studioYes : t.studioNo} />
               </div>
               <div className="flex flex-col gap-2">
                 {quality.issues.map((issue) => (
                   <IssueRow key={issue.id} issue={issue} onChanged={handleQualityCheck} />
                 ))}
-                {quality.issues.length === 0 && <EmptyState>Không còn vấn đề nào — giáo án sạch!</EmptyState>}
+                {quality.issues.length === 0 && <EmptyState>{t.studioNoIssues}</EmptyState>}
               </div>
             </div>
-          ) : <EmptyState>Chưa chạy kiểm tra lần nào.</EmptyState>}
+          ) : <EmptyState>{t.studioNoQualityCheckYet}</EmptyState>}
         </Card>
       )}
     </div>
@@ -172,6 +175,7 @@ function CourseDetail({ courseId, onBack }) {
 }
 
 function IssueRow({ issue, onChanged }) {
+  const t = useT();
   const [fix, setFix] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -192,17 +196,18 @@ function IssueRow({ issue, onChanged }) {
           <span className="text-xs font-bold text-[#888] uppercase">{issue.category}</span>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={handleSuggest} disabled={loading}>Gợi ý sửa</Button>
-          <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={handleIgnore}>Bỏ qua</Button>
+          <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={handleSuggest} disabled={loading}>{t.studioSuggestFix}</Button>
+          <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={handleIgnore}>{t.studioIgnoreIssue}</Button>
         </div>
       </div>
       <p className="text-sm text-[#101A24]">{issue.message}</p>
-      {fix && <p className="text-sm bg-[#F5F6F8] rounded-lg p-2 text-[#101A24]"><strong>Gợi ý:</strong> {fix.suggestion}</p>}
+      {fix && <p className="text-sm bg-[#F5F6F8] rounded-lg p-2 text-[#101A24]"><strong>{t.studioSuggestionLabel}</strong> {fix.suggestion}</p>}
     </div>
   );
 }
 
 export default function Courses() {
+  const t = useT();
   const [courses, setCourses] = useState(null);
   const [view, setView] = useState('list');
   const [selected, setSelected] = useState(null);
@@ -213,16 +218,16 @@ export default function Courses() {
   if (view === 'create') return <CreateCourseForm onCreated={(id) => { setSelected(id); setView('detail'); refresh(); }} onCancel={() => setView('list')} />;
   if (view === 'detail' && selected) return <CourseDetail courseId={selected} onBack={() => { setView('list'); refresh(); }} />;
 
-  if (!courses) return <Spinner />;
+  if (!courses) return <Spinner label={t.studioLoading} />;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <SectionTitle subtitle="Quản lý giáo trình và kiểm tra chất lượng khóa học.">Khóa học</SectionTitle>
-        <Button onClick={() => setView('create')} className="flex items-center gap-2"><Plus size={16} /> Khóa học mới</Button>
+        <SectionTitle subtitle={t.studioCoursesSubtitle}>{t.studioCoursesTitle}</SectionTitle>
+        <Button onClick={() => setView('create')} className="flex items-center gap-2"><Plus size={16} /> {t.studioNewCourse}</Button>
       </div>
       {courses.length === 0 ? (
-        <EmptyState>Chưa có khóa học nào. Tạo khóa học đầu tiên để bắt đầu dựng đường.</EmptyState>
+        <EmptyState>{t.studioNoCoursesYet}</EmptyState>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {courses.map((c) => (
@@ -232,7 +237,7 @@ export default function Courses() {
                 <p className="text-sm text-[#666] mt-1">{c.target_group}</p>
                 <div className="flex items-center gap-3 mt-3 text-xs font-bold text-[#888]">
                   <span className="px-2 py-1 rounded bg-[#EEF0F3]">{c.status}</span>
-                  <span>Health {c.health_score ?? '—'}/100</span>
+                  <span>{t.studioHealthLabel.replace('{score}', c.health_score ?? '—')}</span>
                 </div>
               </button>
             </Card>

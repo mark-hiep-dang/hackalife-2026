@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LayoutDashboard, GraduationCap, Library, Users2, UserCircle2, ClipboardList, Lightbulb, UploadCloud, LogOut, ArrowLeftRight } from 'lucide-react';
 import llamaLogo from '../assets/llama-logo.png';
 import { switchRole } from '../utils/studioApi';
+import { useT, useLanguage } from '../translations';
 
 import Overview from './screens/Overview';
 import Courses from './screens/Courses';
@@ -13,18 +14,23 @@ import Insights from './screens/Insights';
 import PublishCenter from './screens/PublishCenter';
 import TrainerCopilot from './components/TrainerCopilot';
 
-const NAV = [
-  { id: 'overview', icon: LayoutDashboard, label: 'Tổng quan' },
-  { id: 'courses', icon: GraduationCap, label: 'Khóa học' },
-  { id: 'library', icon: Library, label: 'Thư viện nội dung' },
-  { id: 'cohorts', icon: Users2, label: 'Nhóm học' },
-  { id: 'learners', icon: UserCircle2, label: 'Học viên' },
-  { id: 'exams', icon: ClipboardList, label: 'Thi thử' },
-  { id: 'insights', icon: Lightbulb, label: 'Insights' },
-  { id: 'publish', icon: UploadCloud, label: 'Publish Center' }
-];
+function getNav(t) {
+  return [
+    { id: 'overview', icon: LayoutDashboard, label: t.studioNavOverview },
+    { id: 'courses', icon: GraduationCap, label: t.studioNavCourses },
+    { id: 'library', icon: Library, label: t.studioNavLibrary },
+    { id: 'cohorts', icon: Users2, label: t.studioNavCohorts },
+    { id: 'learners', icon: UserCircle2, label: t.studioNavLearners },
+    { id: 'exams', icon: ClipboardList, label: t.studioNavExams },
+    { id: 'insights', icon: Lightbulb, label: t.studioNavInsights },
+    { id: 'publish', icon: UploadCloud, label: t.studioNavPublish }
+  ];
+}
 
 export default function StudioApp({ profile, onExitStudio }) {
+  const t = useT();
+  const { lang, setLang } = useLanguage();
+  const NAV = getNav(t);
   const [tab, setTab] = useState('overview');
   const [switching, setSwitching] = useState(false);
 
@@ -44,9 +50,9 @@ export default function StudioApp({ profile, onExitStudio }) {
         <div className="p-6 border-b-3 border-[#101A24]/10">
           <button onClick={() => setTab('overview')} className="flex items-center gap-2 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
             <img src={llamaLogo} alt="" className="w-9 h-9 object-contain" />
-            <span>Llama Studio</span>
+            <span>Llama Trainer</span>
           </button>
-          <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-[#8B7BAE]">Bạn dựng đường. Học viên chinh phục đỉnh.</p>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-[#8B7BAE]">{t.studioTagline}</p>
         </div>
 
         <nav className="flex-1 px-4 py-6 flex flex-col gap-2 overflow-y-auto">
@@ -67,20 +73,26 @@ export default function StudioApp({ profile, onExitStudio }) {
         </nav>
 
         <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#EEF0F3] flex flex-col gap-3">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{profile?.username} · Trainer</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{profile?.username} · {t.studioTrainerBadge}</span>
+            <div className="flex gap-1">
+              <button onClick={() => setLang('vi')} className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${lang === 'vi' ? 'bg-white text-[#101A24]' : 'text-[#888]'}`}>VI</button>
+              <button onClick={() => setLang('en')} className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${lang === 'en' ? 'bg-white text-[#101A24]' : 'text-[#888]'}`}>EN</button>
+            </div>
+          </div>
           <button onClick={handleExit} disabled={switching}
             className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center gap-2 text-[#101A24] hover:bg-[#B9E7EF] transition-colors font-extrabold text-xs uppercase tracking-widest disabled:opacity-50"
           >
-            <ArrowLeftRight size={16} strokeWidth={3} /> Về app học viên
+            <ArrowLeftRight size={16} strokeWidth={3} /> {t.studioExitToLearner}
           </button>
         </div>
       </aside>
 
       <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
         <div className="px-4 h-16 flex items-center justify-between">
-          <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Studio</span>
+          <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Trainer</span>
           <button onClick={handleExit} className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-[#101A24]/10 bg-white flex items-center gap-1">
-            <LogOut size={14} /> Học viên
+            <LogOut size={14} /> {t.modeLearner}
           </button>
         </div>
         <div className="flex overflow-x-auto gap-2 px-3 pb-3">
