@@ -3,6 +3,8 @@ import { useT, useLanguage } from '../translations';
 import { getDaysSinceLastStudy } from '../utils/streak';
 import { getNagTier, getRandomWelcomeMessage, getLlamaAnimation } from '../nagMessages';
 import LessonPath from './LessonPath';
+import DailyExpedition from './DailyExpedition';
+import SummitReadiness from './SummitReadiness';
 import { LogOut } from 'lucide-react';
 import llamaMoodChill from '../assets/llama-mood-chill.webp';
 import llamaMoodCozy from '../assets/llama-mood-cozy.webp';
@@ -27,7 +29,7 @@ const LLAMA_MOOD_IMAGES = {
   'llama-angry-return': llamaMoodAngry,
 };
 
-export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
+export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout, onStartRescue }) {
   const t = useT();
   const { lang } = useLanguage();
   const [showPathSelect, setShowPathSelect] = useState(false);
@@ -110,6 +112,12 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
           <span className="text-3xl">🏆</span>
           <span className="font-comic font-bold text-sm text-[#101A24]">{t.navLeaderboard}</span>
         </button>
+      </div>
+
+      {/* Personalized Expedition — today's plan + overall readiness */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <DailyExpedition onNavigate={onNavigate} onStartRescue={onStartRescue} />
+        <SummitReadiness />
       </div>
 
       {/* Lessons — Llama's climb to the MOF summit */}

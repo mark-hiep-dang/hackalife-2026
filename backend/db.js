@@ -196,6 +196,101 @@ export async function initDb() {
     )
   `);
 
+  // ─── Personalized Expedition schema ──────────────────────────────────────
+
+  // Learner preferences captured in Settings (or a first-time modal) — every
+  // column has a safe default so existing users are never blocked.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS learner_preferences (
+      user_id INTEGER PRIMARY KEY,
+      exam_date TEXT,
+      daily_minutes INTEGER DEFAULT 15,
+      target_score INTEGER DEFAULT 70,
+      experience_level TEXT DEFAULT 'new',
+      preferred_format TEXT DEFAULT 'quiz',
+      goal TEXT DEFAULT 'pass',
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Current mastery state per (user, real exam topic) — one row per topic,
+  // overwritten on every update. History of how it got there lives in
+  // mastery_history below.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS topic_mastery (
+      user_id INTEGER NOT NULL,
+      topic TEXT NOT NULL,
+      mastery_score REAL NOT NULL DEFAULT 0,
+      evidence_count INTEGER NOT NULL DEFAULT 0,
+      last_reviewed_at TEXT,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, topic),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Append-only log of every mastery change — powers "42% → 68%" style copy
+  // and lets the formula be tested/explained after the fact.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS mastery_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      topic TEXT NOT NULL,
+      mastery_score REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Extend user_quiz_answers (previously exam-only) with the fields the
+  // adaptive engines need. Practice-mode answers now populate this table too.
+  for (const col of ['difficulty TEXT', 'confidence TEXT', 'response_time_ms INTEGER', 'mistake_type TEXT']) {
+    try { await db.exec(`ALTER TABLE user_quiz_answers ADD COLUMN ${col}`); } catch (err) { /* already exists */ }
+  }
+
+  // Append-only flashcard review log (user_flashcard_progress only keeps the
+  // latest known/unknown state — this keeps history for forgetting-risk math).
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS flashcard_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      flashcard_id INTEGER NOT NULL,
+      topic TEXT,
+      known INTEGER NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Caches each day's generated Daily Expedition so re-opening Home doesn't
+  // regenerate a different plan mid-day, and tracks per-activity completion.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS daily_expedition (
+      user_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      data TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, date),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Lightweight record of when a Rescue Trail was offered/finished. The trail's
+  // actual content is assembled on demand (engines/rescueTrail.js), not queued here.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS rescue_trail_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      topic TEXT NOT NULL,
+      mistake_type TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   // Lessons are static reference content controlled by the codebase, so we upsert them
   // on every boot (keeping user progress in user_lessons untouched) instead of seeding once.
   {

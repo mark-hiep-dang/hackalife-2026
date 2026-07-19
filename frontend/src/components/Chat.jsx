@@ -4,13 +4,20 @@ import { useT } from '../translations';
 import { Send, BookOpen, Upload, FileText, Trash2, X, Loader2 } from 'lucide-react';
 import llamaWalk from '../assets/llama-walk.webp';
 
-export default function Chat() {
+const QUICK_PROMPT_KEYS = [
+  'quickPromptWhyWrong', 'quickPromptCompare', 'quickPromptBeginner',
+  'quickPromptExample', 'quickPromptQuizBack', 'quickPromptSimilar'
+];
+
+export default function Chat({ initialContext, onConsumeInitialContext }) {
   const t = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [context, setContext] = useState(null);
   const scrollRef = useRef(null);
+  const consumedContextRef = useRef(null);
 
   const [showKnowledge, setShowKnowledge] = useState(false);
   const [docs, setDocs] = useState([]);
@@ -25,6 +32,18 @@ export default function Chat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
+  // Contextual Ask Llama (spec §16) — arriving from a quiz question/mistake
+  // pre-fills a relevant opening question, grounded in that context.
+  useEffect(() => {
+    if (initialContext && consumedContextRef.current !== initialContext) {
+      consumedContextRef.current = initialContext;
+      setContext(initialContext);
+      sendMessage(t.quickPromptWhyWrong, initialContext);
+      onConsumeInitialContext?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialContext]);
+
   async function loadDocs() {
     setDocsLoading(true); setDocsError('');
     try { setDocs(await getKnowledgeDocs()); }
@@ -38,8 +57,9 @@ export default function Chat() {
     if (next) loadDocs();
   }
 
-  async function sendMessage(text) {
+  async function sendMessage(text, messageContext) {
     if (!text || loading) return;
+    const activeContext = messageContext || context;
 
     const history = messages.map(m => ({ role: m.role, content: m.content }));
     setMessages(prev => [...prev, { role: 'user', content: text }]);
@@ -50,8 +70,8 @@ export default function Chat() {
     const minThinkTime = new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 600));
 
     try {
-      const [reply] = await Promise.all([sendChatMessage(text, history), minThinkTime]);
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      const [{ response, sources }] = await Promise.all([sendChatMessage(text, history, activeContext), minThinkTime]);
+      setMessages(prev => [...prev, { role: 'assistant', content: response, sources }]);
     } catch (e) {
       setError(e.message || t.chatReplyError);
     } finally {
@@ -192,12 +212,19 @@ export default function Chat() {
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {m.role === 'assistant' && <span className="text-2xl mr-2 shrink-0">🦙</span>}
-              <div
-                className={`max-w-[80%] rounded-2xl px-5 py-3 text-sm font-bold leading-relaxed whitespace-pre-wrap shadow-sm border border-[#101A24]/10 ${
-                  m.role === 'user' ? 'bg-[#101A24] text-white' : 'bg-[#EEF0F3] text-[#101A24]'
-                }`}
-              >
-                {m.content}
+              <div className="max-w-[80%]">
+                <div
+                  className={`rounded-2xl px-5 py-3 text-sm font-bold leading-relaxed whitespace-pre-wrap shadow-sm border border-[#101A24]/10 ${
+                    m.role === 'user' ? 'bg-[#101A24] text-white' : 'bg-[#EEF0F3] text-[#101A24]'
+                  }`}
+                >
+                  {m.content}
+                </div>
+                {m.sources?.length > 0 && (
+                  <p className="text-[10px] font-bold text-[#8A8A8A] mt-1.5 px-1">
+                    {m.sources.map((s) => t.chatSourceLabel.replace('{title}', s.title)).join(' · ')}
+                  </p>
+                )}
               </div>
             </div>
           ))}
@@ -214,6 +241,20 @@ export default function Chat() {
         {error && (
           <div className="mx-6 mb-3 bg-[#F7D2CC] border border-[#101A24]/10 text-[#B4443B] text-sm font-bold px-4 py-3 rounded-lg shadow-sm">
             {error}
+          </div>
+        )}
+
+        {context && messages.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+            {QUICK_PROMPT_KEYS.map((key) => (
+              <button
+                key={key}
+                onClick={() => sendMessage(t[key])}
+                className="text-[11px] font-bold text-[#6B4FA8] bg-[#F4EDFA] rounded-full px-3 py-1.5 hover:bg-[#E9DCF7] transition-colors"
+              >
+                {t[key]}
+              </button>
+            ))}
           </div>
         )}
 

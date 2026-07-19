@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useT, useLanguage } from '../translations';
-import { logout } from '../utils/api';
+import { logout, getPreferences, updatePreferences } from '../utils/api';
 import { getMuteState, setMuteState } from '../utils/sound';
-import { Settings as SettingsIcon, Volume2, VolumeX, LogOut, Database } from 'lucide-react';
+import { Settings as SettingsIcon, Volume2, VolumeX, LogOut, Database, Compass } from 'lucide-react';
+
+const DAILY_MINUTES_OPTIONS = [10, 15, 20, 30, 45, 60];
 
 export default function Settings({ profile, setSession, onMuteToggled }) {
   const t = useT();
@@ -10,6 +12,13 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
   const [ollamaUrl, setOllamaUrl] = useState(localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434');
   const [muted, setMuted] = useState(getMuteState());
   const [saved, setSaved] = useState(false);
+
+  const [prefs, setPrefs] = useState(null);
+  const [prefsSaved, setPrefsSaved] = useState(false);
+
+  useEffect(() => {
+    getPreferences().then(setPrefs).catch(() => {});
+  }, []);
 
   function handleSave(e) {
     e.preventDefault();
@@ -20,6 +29,23 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
     const n = !muted; setMuted(n); setMuteState(n); onMuteToggled(n);
   }
   function handleLogout() { logout(); setSession(null); }
+
+  async function handleSavePrefs(e) {
+    e.preventDefault();
+    try {
+      await updatePreferences({
+        examDate: prefs.exam_date,
+        dailyMinutes: prefs.daily_minutes,
+        targetScore: prefs.target_score,
+        experienceLevel: prefs.experience_level,
+        preferredFormat: prefs.preferred_format,
+        goal: prefs.goal
+      });
+      setPrefsSaved(true); setTimeout(() => setPrefsSaved(false), 3000);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   const Section = ({ title, children }) => (
     <div className="mb-10">
@@ -60,6 +86,98 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
           </button>
         </div>
       </Section>
+
+      {/* Personalized Expedition preferences */}
+      {prefs && (
+        <Section title={t.expeditionPrefsTitle}>
+          <form onSubmit={handleSavePrefs} className="flex flex-col gap-6">
+            <div className="flex items-center gap-3 text-base font-extrabold text-[#101A24] uppercase tracking-widest mb-1">
+              <Compass size={24} strokeWidth={3} />
+            </div>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-extrabold text-[#101A24] uppercase tracking-widest">{t.examDateLabel}</span>
+              <input
+                type="date"
+                value={prefs.exam_date || ''}
+                onChange={(e) => setPrefs((p) => ({ ...p, exam_date: e.target.value }))}
+                className="input-pro py-3"
+              />
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-extrabold text-[#101A24] uppercase tracking-widest">{t.dailyMinutesLabel}</span>
+              <div className="flex flex-wrap gap-2">
+                {DAILY_MINUTES_OPTIONS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setPrefs((p) => ({ ...p, daily_minutes: m }))}
+                    className={`px-4 py-2.5 rounded-xl font-comic font-extrabold text-sm transition-all ${prefs.daily_minutes === m ? 'bg-[#7C9AE0] text-white' : 'bg-[#EEF0F3] text-[#101A24]'}`}
+                  >
+                    {t.expeditionMinutesShort.replace('{n}', m)}
+                  </button>
+                ))}
+              </div>
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-extrabold text-[#101A24] uppercase tracking-widest">{t.targetScoreLabel}</span>
+              <input
+                type="number" min={0} max={100}
+                value={prefs.target_score ?? 70}
+                onChange={(e) => setPrefs((p) => ({ ...p, target_score: Number(e.target.value) }))}
+                className="input-pro py-3"
+              />
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-extrabold text-[#101A24] uppercase tracking-widest">{t.experienceLevelLabel}</span>
+              <select
+                value={prefs.experience_level || 'new'}
+                onChange={(e) => setPrefs((p) => ({ ...p, experience_level: e.target.value }))}
+                className="input-pro py-3"
+              >
+                <option value="new">{t.experience_new}</option>
+                <option value="under1">{t.experience_under1}</option>
+                <option value="1to3">{t.experience_1to3}</option>
+                <option value="over3">{t.experience_over3}</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-extrabold text-[#101A24] uppercase tracking-widest">{t.preferredFormatLabel}</span>
+              <select
+                value={prefs.preferred_format || 'quiz'}
+                onChange={(e) => setPrefs((p) => ({ ...p, preferred_format: e.target.value }))}
+                className="input-pro py-3"
+              >
+                <option value="quick">{t.format_quick}</option>
+                <option value="flashcard">{t.format_flashcard}</option>
+                <option value="quiz">{t.format_quiz}</option>
+                <option value="scenario">{t.format_scenario}</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-extrabold text-[#101A24] uppercase tracking-widest">{t.goalLabel}</span>
+              <select
+                value={prefs.goal || 'pass'}
+                onChange={(e) => setPrefs((p) => ({ ...p, goal: e.target.value }))}
+                className="input-pro py-3"
+              >
+                <option value="pass">{t.goal_pass}</option>
+                <option value="good">{t.goal_good}</option>
+                <option value="mastery">{t.goal_mastery}</option>
+              </select>
+            </label>
+
+            <button type="submit" className="btn-pro bg-[#C7D7F7] text-[#2E4A9E] hover:bg-[#B5C7F0] w-full text-xl py-4">
+              {prefsSaved ? `✓ ${t.settingsSaved}` : t.savePrefsBtn}
+            </button>
+          </form>
+        </Section>
+      )}
 
       {/* Sound */}
       <Section title={t.soundLabel}>

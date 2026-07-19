@@ -98,9 +98,16 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
             <ArrowLeft size={16} strokeWidth={3} /> {t.navHome}
           </button>
         )}
-        <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide flex items-center gap-2">
-          <span>🗂️</span> {t.fcDeckTitle}
-        </h2>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide flex items-center gap-2">
+            <span>🗂️</span> {t.fcDeckTitle}
+          </h2>
+          {!topicsLoading && totalCount > 0 && totalCount - totalKnown > 0 && (
+            <span className="text-xs font-extrabold text-[#8A6D1F] bg-[#FCF6E3] px-3 py-1.5 rounded-full">
+              {t.fcDueLabel.replace('{n}', totalCount - totalKnown)}
+            </span>
+          )}
+        </div>
         <p className="text-sm font-bold text-[#8A8A8A] mb-4">{t.fcChooseTopic}</p>
 
         {topicsLoading && (

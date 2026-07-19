@@ -9,6 +9,13 @@ import { fileURLToPath } from 'url';
 import { PDFParse } from 'pdf-parse';
 import { initDb, getDb } from './db.js';
 import { generateDynamicQuestion, generateLlamaQuestion, questionBank } from './questions.js';
+import { chunkText, buildFtsQuery, retrieveKnowledge, storeDocument, getChunkSource, pickBestMatchingChunk } from './knowledgeBase.js';
+import { processQuizAnswers, previewMistakeDNA, computeRankedTopics, computeSummitReadiness, getExamWeights } from './engines/adaptiveLoop.js';
+import { buildDailyExpedition } from './engines/dailyExpedition.js';
+import { buildPriorityExplanation } from './engines/reasonCopy.js';
+import { assembleRescueTrail } from './engines/rescueTrail.js';
+import { masteryStateLabel } from './engines/mastery.js';
+import { explainExpedition, explainMistake, generateRescueTrail } from './llamaAIService.js';
 
 dotenv.config();
 
@@ -421,6 +428,14 @@ app.post('/api/flashcards/:id/progress', authenticateToken, async (req, res) => 
        ON CONFLICT(user_id, flashcard_id) DO UPDATE SET known = excluded.known, updated_at = CURRENT_TIMESTAMP`,
       [req.user.id, req.params.id, known ? 1 : 0]
     );
+    // Append-only review log (spec §15) — powers "due for review" and
+    // forgetting-risk math, which user_flashcard_progress's latest-state-only
+    // row can't provide on its own.
+    const card = await db.get('SELECT topic FROM flashcards WHERE id = ?', [req.params.id]);
+    await db.run(
+      'INSERT INTO flashcard_reviews (user_id, flashcard_id, topic, known) VALUES (?, ?, ?, ?)',
+      [req.user.id, req.params.id, card?.topic || null, known ? 1 : 0]
+    );
     res.json({ message: 'ok' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -473,14 +488,20 @@ app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
       [req.user.id, score, totalQuestions, topic, type, xpEarned]
     );
 
-    // Exam mode: persist the full per-question breakdown so this attempt's
-    // study report (topic chart, roadmap, per-question review) can be reopened later.
-    if (type === 'exam' && Array.isArray(answers) && answers.length > 0) {
+    // Persist the full per-question breakdown for BOTH modes now (previously
+    // exam-only) — the adaptive engines need per-question evidence from
+    // practice mode too, not just mock exams.
+    if (Array.isArray(answers) && answers.length > 0) {
       for (const a of answers) {
         await db.run(
-          `INSERT INTO user_quiz_answers (quiz_id, question, topic, options, correct_index, selected_index, is_correct, explanation)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [quizResult.lastID, a.question, a.topic || '', JSON.stringify(a.options || []), a.correct_index, a.selected_index, a.isCorrect ? 1 : 0, a.explanation || '']
+          `INSERT INTO user_quiz_answers
+             (quiz_id, question, topic, options, correct_index, selected_index, is_correct, explanation, difficulty, confidence, response_time_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            quizResult.lastID, a.question, a.topic || topic || '', JSON.stringify(a.options || []),
+            a.correct_index, a.selected_index, a.isCorrect ? 1 : 0, a.explanation || '',
+            a.difficulty || null, a.confidence || null, a.responseTimeMs ?? null
+          ]
         );
       }
     }
@@ -489,18 +510,53 @@ app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
     const user = await db.get('SELECT xp FROM users WHERE id = ?', [req.user.id]);
     const newXp = (user.xp || 0) + xpEarned;
     const newLevel = calculateLevel(newXp);
-    
+
     await db.run('UPDATE users SET xp = ?, level = ? WHERE id = ?', [newXp, newLevel, req.user.id]);
 
     const newlyUnlockedBadges = await evaluateBadges(db, req.user.id);
     const updatedUser = await db.get('SELECT xp, level, streak FROM users WHERE id = ?', [req.user.id]);
+
+    // Personalized Expedition adaptive loop (spec §10): update mastery, run
+    // Mistake DNA, and flag whether a Rescue Trail / visible path change is
+    // warranted. Never lets an adaptive-loop error break the core quiz flow.
+    let masteryUpdates = [];
+    let rescueNeeded = null;
+    let pathChanged = false;
+    try {
+      if (Array.isArray(answers) && answers.length > 0) {
+        const prefs = await db.get('SELECT exam_date FROM learner_preferences WHERE user_id = ?', [req.user.id]);
+        const daysUntilExam = prefs?.exam_date
+          ? Math.max(1, Math.round((new Date(prefs.exam_date) - new Date()) / 86400000))
+          : undefined;
+        const result = await processQuizAnswers(
+          db,
+          req.user.id,
+          answers.map((a) => ({
+            question: a.question,
+            topic: a.topic || topic,
+            difficulty: a.difficulty,
+            isCorrect: a.isCorrect,
+            confidence: a.confidence,
+            responseTimeMs: a.responseTimeMs
+          }))
+        );
+        masteryUpdates = result.masteryUpdates;
+        rescueNeeded = result.rescueNeeded;
+        pathChanged = result.pathChanged;
+      }
+    } catch (adaptiveErr) {
+      console.warn('Adaptive loop failed (quiz score is still saved):', adaptiveErr.message);
+    }
 
     res.json({
       xp_earned: xpEarned,
       xp: updatedUser.xp,
       level: updatedUser.level,
       combo_applied: comboMultiplier,
-      newBadges: newlyUnlockedBadges
+      newBadges: newlyUnlockedBadges,
+      masteryUpdates,
+      rescueNeeded,
+      pathChanged
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -555,79 +611,236 @@ app.get('/api/quiz/history/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// --- PERSONALIZED EXPEDITION ---
+
+// Learner preferences (spec §5) — always returns a row with safe defaults,
+// never blocks an existing user from using the app if they haven't set any.
+app.get('/api/preferences', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const row = await db.get('SELECT * FROM learner_preferences WHERE user_id = ?', [req.user.id]);
+    res.json(
+      row || {
+        user_id: req.user.id,
+        exam_date: null,
+        daily_minutes: 15,
+        target_score: 70,
+        experience_level: 'new',
+        preferred_format: 'quiz',
+        goal: 'pass'
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/preferences', authenticateToken, async (req, res) => {
+  const { examDate, dailyMinutes, targetScore, experienceLevel, preferredFormat, goal } = req.body;
+  const db = await getDb();
+  try {
+    await db.run(
+      `INSERT INTO learner_preferences (user_id, exam_date, daily_minutes, target_score, experience_level, preferred_format, goal, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(user_id) DO UPDATE SET
+         exam_date = excluded.exam_date, daily_minutes = excluded.daily_minutes, target_score = excluded.target_score,
+         experience_level = excluded.experience_level, preferred_format = excluded.preferred_format, goal = excluded.goal,
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        req.user.id, examDate || null, dailyMinutes || 15, targetScore || 70,
+        experienceLevel || 'new', preferredFormat || 'quiz', goal || 'pass'
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Per-topic mastery state (spec §6) — the mountain journey and Daily
+// Expedition both read from this.
+app.get('/api/mastery', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const weights = await getExamWeights(db);
+    const rows = await db.all('SELECT * FROM topic_mastery WHERE user_id = ?', [req.user.id]);
+    const byTopic = new Map(rows.map((r) => [r.topic, r]));
+
+    const topics = Object.keys(weights).map((topic) => {
+      const row = byTopic.get(topic);
+      const score = row?.mastery_score ?? 0;
+      return {
+        topic,
+        mastery: score,
+        state: masteryStateLabel(score),
+        evidenceCount: row?.evidence_count ?? 0,
+        lastReviewedAt: row?.last_reviewed_at ?? null,
+        examWeight: weights[topic]
+      };
+    });
+    res.json(topics);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Summit Readiness (spec §12) — a study-support indicator, never framed as a
+// guaranteed exam outcome.
+app.get('/api/summit-readiness', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const readiness = await computeSummitReadiness(db, req.user.id);
+    const ranked = await computeRankedTopics(db, req.user.id);
+    res.json({
+      ...readiness,
+      strongestTopic: ranked[ranked.length - 1]?.topic ?? null,
+      highestRiskTopic: ranked[0]?.topic ?? null,
+      disclaimer: 'Summit Readiness là chỉ số hỗ trợ học tập, không phải cam kết kết quả kỳ thi.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Daily Expedition (spec §9) — cached per user per calendar day so reloading
+// Home mid-day doesn't regenerate a different plan.
+app.get('/api/expedition/daily', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const cached = await db.get('SELECT data FROM daily_expedition WHERE user_id = ? AND date = ?', [req.user.id, today]);
+    if (cached) return res.json(JSON.parse(cached.data));
+
+    const prefs = await db.get('SELECT * FROM learner_preferences WHERE user_id = ?', [req.user.id]);
+    const dailyMinutes = prefs?.daily_minutes ?? 15;
+    const preferredFormat = prefs?.preferred_format ?? 'quiz';
+    const daysUntilExam = prefs?.exam_date
+      ? Math.max(1, Math.round((new Date(prefs.exam_date) - new Date()) / 86400000))
+      : undefined;
+
+    const ranked = await computeRankedTopics(db, req.user.id, daysUntilExam);
+    const focusTopic = ranked[0]?.topic;
+
+    let dueFlashcardCount = 0;
+    if (focusTopic) {
+      const total = await db.get('SELECT COUNT(*) c FROM flashcards WHERE topic = ?', [focusTopic]);
+      const known = await db.get(
+        `SELECT COUNT(*) c FROM user_flashcard_progress ufp
+         JOIN flashcards f ON f.id = ufp.flashcard_id
+         WHERE ufp.user_id = ? AND f.topic = ? AND ufp.known = 1`,
+        [req.user.id, focusTopic]
+      );
+      dueFlashcardCount = Math.max((total?.c ?? 0) - (known?.c ?? 0), 0);
+    }
+
+    const topPriority = ranked[0];
+    const rescueNeeded =
+      topPriority && topPriority.reasons.includes('HIGH_CONFIDENCE_MISTAKE')
+        ? { topic: focusTopic, mistakeType: 'concept_confusion' }
+        : null;
+
+    const plan = buildDailyExpedition(
+      { dailyMinutes, rankedTopics: ranked, dueFlashcardCount, preferredFormat, rescueNeeded },
+      buildPriorityExplanation
+    );
+
+    // Let Llama re-word the deterministic explanation (fallback keeps it verbatim if AI is unavailable).
+    const { message: explanation } = await explainExpedition({
+      focusTopicLabel: plan.focusTopic || '',
+      deterministicExplanation: plan.explanation,
+      dailyMinutes
+    });
+
+    const result = { ...plan, explanation, date: today, completed: false };
+    await db.run(
+      `INSERT INTO daily_expedition (user_id, date, data, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(user_id, date) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP`,
+      [req.user.id, today, JSON.stringify(result)]
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Marks today's Daily Expedition as completed (drives the celebration reaction).
+app.post('/api/expedition/complete', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const cached = await db.get('SELECT data FROM daily_expedition WHERE user_id = ? AND date = ?', [req.user.id, today]);
+    if (cached) {
+      const data = { ...JSON.parse(cached.data), completed: true };
+      await db.run('UPDATE daily_expedition SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND date = ?', [
+        JSON.stringify(data), req.user.id, today
+      ]);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rescue Trail content (spec §11) — assembled deterministically from real
+// flashcards/questions, narrated by Llama (with a deterministic fallback).
+app.get('/api/rescue-trail', authenticateToken, async (req, res) => {
+  const { topic, mistakeType } = req.query;
+  if (!topic) return res.status(400).json({ error: 'topic is required' });
+  const db = await getDb();
+  try {
+    await db.run('INSERT INTO rescue_trail_log (user_id, topic, mistake_type) VALUES (?, ?, ?)', [
+      req.user.id, topic, mistakeType || null
+    ]);
+    const content = await assembleRescueTrail(db, { topic, mistakeType: mistakeType || 'knowledge_gap' });
+    const narration = await generateRescueTrail({ topic, mistakeType: mistakeType || 'knowledge_gap', conceptPair: content.conceptPair });
+    res.json({ ...content, ...narration });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/rescue-trail/complete', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    await db.run(
+      `UPDATE rescue_trail_log SET completed_at = CURRENT_TIMESTAMP
+       WHERE id = (SELECT id FROM rescue_trail_log WHERE user_id = ? ORDER BY id DESC LIMIT 1)`,
+      [req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Llama's playful explanation of a specific Mistake DNA reveal (fallback works with no API key).
+app.post('/api/llama/explain-mistake', authenticateToken, async (req, res) => {
+  const { mistakeLabel, explanation, question } = req.body;
+  try {
+    const result = await explainMistake({ mistakeLabel, explanation, question });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Read-only Mistake DNA preview for a single practice-mode answer, so the UI
+// can show inline feedback right away without waiting for the end-of-session
+// batch submit (which is the only thing that actually writes mastery state).
+app.post('/api/quiz/answer-preview', authenticateToken, async (req, res) => {
+  const { question, topic, difficulty, isCorrect, confidence, responseTimeMs } = req.body;
+  const db = await getDb();
+  try {
+    const mistakeDNA = await previewMistakeDNA(db, req.user.id, { question, topic, difficulty, isCorrect, confidence, responseTimeMs });
+    res.json({ mistakeDNA });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- KNOWLEDGE BASE (RAG documents for Llama chat) ---
 
 // Splits raw text into ~700-char chunks along paragraph boundaries.
-function chunkText(text, maxLen = 700) {
-  const paragraphs = text
-    .split(/\n\s*\n/)
-    .map((p) => p.replace(/\s+/g, ' ').trim())
-    .filter((p) => p.length > 30);
-
-  const chunks = [];
-  let current = '';
-  for (const p of paragraphs) {
-    if (current && (current.length + p.length + 1) > maxLen) {
-      chunks.push(current.trim());
-      current = p;
-    } else {
-      current = current ? `${current} ${p}` : p;
-    }
-  }
-  if (current) chunks.push(current.trim());
-  return chunks;
-}
-
-// Builds a permissive FTS5 MATCH query (prefix-match each word, OR'd together)
-// from free-text user input, since raw chat messages aren't valid FTS5 syntax.
-function buildFtsQuery(message) {
-  const words = message
-    .toLowerCase()
-    .replace(/["*:^]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length >= 2);
-  if (words.length === 0) return null;
-  return words.map((w) => `"${w}"*`).join(' OR ');
-}
-
-async function retrieveKnowledge(db, message, limit = 5) {
-  const ftsQuery = buildFtsQuery(message);
-  if (!ftsQuery) return [];
-  try {
-    return await db.all(
-      `SELECT chunk_id, document_id, content, bm25(knowledge_chunks_fts) as score
-       FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ? ORDER BY score LIMIT ?`,
-      [ftsQuery, limit]
-    );
-  } catch (err) {
-    console.warn('Knowledge retrieval failed:', err.message);
-    return [];
-  }
-}
-
-async function storeDocument(db, title, sourceType, text, userId) {
-  const chunks = chunkText(text);
-  if (chunks.length === 0) throw new Error('Không trích xuất được nội dung từ tài liệu.');
-
-  const doc = await db.run(
-    'INSERT INTO knowledge_documents (title, source_type, uploaded_by) VALUES (?, ?, ?)',
-    [title, sourceType, userId]
-  );
-  const documentId = doc.lastID;
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = await db.run(
-      'INSERT INTO knowledge_chunks (document_id, chunk_index, content) VALUES (?, ?, ?)',
-      [documentId, i, chunks[i]]
-    );
-    await db.run(
-      'INSERT INTO knowledge_chunks_fts (content, chunk_id, document_id) VALUES (?, ?, ?)',
-      [chunks[i], chunk.lastID, documentId]
-    );
-  }
-  return { documentId, chunkCount: chunks.length };
-}
-
 // List uploaded knowledge documents
 app.get('/api/knowledge', authenticateToken, async (req, res) => {
   const db = await getDb();
@@ -705,13 +918,28 @@ app.delete('/api/knowledge/:id', authenticateToken, async (req, res) => {
 
 // Chatbot: Proxy to Ollama/Llama, grounded with retrieved knowledge chunks, with a local fallback
 app.post('/api/chat', authenticateToken, async (req, res) => {
-  const { message, history, ollamaUrl } = req.body;
+  const { message, history, ollamaUrl, context } = req.body;
   const db = await getDb();
 
   const retrieved = await retrieveKnowledge(db, message, 8);
   const contextBlock = retrieved.length > 0
     ? retrieved.map((r, i) => `[Đoạn ${i + 1}] ${r.content}`).join('\n\n')
     : '';
+
+  // Contextual Ask Llama (spec §16): the caller can pass the question/topic/
+  // mistake the learner is currently looking at (e.g. from a quiz question or
+  // a Rescue Trail), so Llama's answer isn't generic.
+  const contextHint = context?.question
+    ? `\n\nBối cảnh hiện tại: người dùng đang xem câu hỏi thi "${context.question}"${context.topic ? ` (chủ đề: ${context.topic})` : ''}${context.mistakeLabel ? `, vừa mắc lỗi loại "${context.mistakeLabel}"` : ''}. Hãy trả lời có liên hệ tới bối cảnh này nếu phù hợp.`
+    : '';
+
+  const sources = [];
+  for (const r of retrieved) {
+    const doc = await getChunkSource(db, r.document_id);
+    if (doc && !sources.some((s) => s.documentId === doc.id)) {
+      sources.push({ documentId: doc.id, title: doc.title, updatedAt: doc.created_at });
+    }
+  }
 
   const insuranceContext = `You are "Llama Đại Lý", a sharp-tongued, sarcastic, and very funny bilingual AI tutor specializing in the Vietnam Ministry of Finance (MOF) Insurance Agent Certification.
 Persona: You tease the user a bit before helping them — a light "ơ, câu này cơ bản mà bạn cũng hỏi Llama à? 😏" style jab — but you ALWAYS follow up with the correct, accurate, genuinely helpful answer. The sarcasm is affectionate and playful, never mean, never discouraging, and never at the expense of correctness. Vary your teasing opener each time so it doesn't feel repetitive. If the user asks something genuinely hard or shows they're struggling, dial the sarcasm down and be warmer/more encouraging instead.
@@ -724,7 +952,7 @@ Knowledge Base Guidelines:
    - Contracts: 60-day grace period, 21-day free look period, void states, rights/obligations.
    - Regulations: Ministry of Finance (MOF) regulates licensing and solvency. Agent certification is required. Rebating/discounting commissions is illegal.
 3. If the user asks you to "quiz me", output a brief MCQ question.
-4. Keep the tone snappy, game-like, and use target/gunshot references occasionally (e.g. "Hãy nhắm thẳng mục tiêu!").${contextBlock ? `
+4. Keep the tone snappy, game-like, and use target/gunshot references occasionally (e.g. "Hãy nhắm thẳng mục tiêu!").${contextHint}${contextBlock ? `
 
 Bên dưới là các đoạn tài liệu được tìm kiếm tự động (không phải do người chọn tay), mỗi đoạn có dạng "Câu hỏi: ... Trả lời: ...". Vì tìm kiếm dựa trên từ khóa, có thể lẫn cả đoạn CÙNG CHỦ ĐỀ nhưng KHÁC CÂU HỎI với câu người dùng đang hỏi (ví dụ: đoạn nói "tính từ ngày nào" khác với đoạn nói "là bao nhiêu ngày"). TUYỆT ĐỐI không lấy đại đoạn xếp đầu tiên — hãy đọc kỹ phần "Câu hỏi:" của TỪNG đoạn, so khớp ý nghĩa với câu hỏi thật của người dùng, rồi chỉ dùng (các) đoạn nào thực sự trả lời đúng câu hỏi đó. Nếu không đoạn nào khớp, dùng kiến thức chung của bạn và nói rõ điều đó:
 
@@ -755,7 +983,7 @@ ${contextBlock}` : ''}`;
       if (geminiRes.ok) {
         const data = await geminiRes.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return res.json({ response: text });
+        if (text) return res.json({ response: text, sources });
       } else {
         console.warn('Gemini API returned non-ok status:', geminiRes.status, await geminiRes.text());
       }
@@ -784,7 +1012,7 @@ ${contextBlock}` : ''}`;
 
     if (response.ok) {
       const data = await response.json();
-      return res.json({ response: data.message.content });
+      return res.json({ response: data.message.content, sources });
     }
 
     throw new Error('Ollama endpoint returned non-ok status');
@@ -793,9 +1021,12 @@ ${contextBlock}` : ''}`;
 
     // If we found relevant uploaded material, surface the single best-matching chunk's
     // answer directly instead of dumping every retrieved passage — one clean answer,
-    // not a wall of "Đoạn 1, Đoạn 2..." text.
-    if (retrieved.length > 0) {
-      const best = retrieved[0].content;
+    // not a wall of "Đoạn 1, Đoạn 2..." text. Re-ranked by how well the message
+    // matches each chunk's own "Câu hỏi:" (BM25 alone can rank a topically-close
+    // but differently-answering chunk above the one that actually answers this).
+    const bestMatch = pickBestMatchingChunk(retrieved, message);
+    if (bestMatch) {
+      const best = bestMatch.chunk.content;
       const answerMatch = best.match(/Trả lời:\s*(.+)$/s);
       const answerText = answerMatch ? answerMatch[1].trim() : best;
       return res.json({
@@ -850,7 +1081,7 @@ Xin chào! Tôi là **Llama Đại Lý**, gia sư luyện thi chứng chỉ Bộ
 5. Gõ **"quiz me"** để thử làm câu hỏi trắc nghiệm!`;
     }
 
-    res.json({ response: reply });
+    res.json({ response: reply, sources });
   }
 });
 
