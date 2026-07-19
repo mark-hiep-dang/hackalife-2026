@@ -16,6 +16,7 @@ import { buildPriorityExplanation } from './engines/reasonCopy.js';
 import { assembleRescueTrail } from './engines/rescueTrail.js';
 import { masteryStateLabel } from './engines/mastery.js';
 import { explainExpedition, explainMistake, generateRescueTrail } from './llamaAIService.js';
+import { mountStudioRoutes } from './studio/routes.js';
 
 dotenv.config();
 
@@ -174,7 +175,7 @@ app.post('/api/auth/register', async (req, res) => {
     );
 
     const token = jwt.sign({ id: result.lastID, username }, JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ token, user: { id: result.lastID, username, xp: 0, level: 1, streak: 1, selected_path: null } });
+    res.status(201).json({ token, user: { id: result.lastID, username, xp: 0, level: 1, streak: 1, selected_path: null, role: 'learner' } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -215,7 +216,8 @@ app.post('/api/auth/login', async (req, res) => {
         xp: user.xp,
         level: currentLevel,
         streak: currentStreak,
-        selected_path: user.selected_path
+        selected_path: user.selected_path,
+        role: user.role || 'learner'
       }
     });
   } catch (err) {
@@ -227,7 +229,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/profile', authenticateToken, async (req, res) => {
   const db = await getDb();
   try {
-    const user = await db.get('SELECT id, username, xp, level, streak, last_login_date, selected_path FROM users WHERE id = ?', [req.user.id]);
+    const user = await db.get('SELECT id, username, xp, level, streak, last_login_date, selected_path, role FROM users WHERE id = ?', [req.user.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
     
     // Fresh check for streak when retrieving profile
@@ -243,10 +245,27 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
       level: user.level,
       streak: currentStreak,
       selected_path: user.selected_path,
+      role: user.role || 'learner',
       badges,
       completedLessons: lessons,
       quizHistory: quizzes
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Safe demo role switch (spec: NOT complex enterprise RBAC) — lets any
+// account flip between the learner app and Llama Studio for demo purposes.
+app.put('/api/profile/role', authenticateToken, async (req, res) => {
+  const { role } = req.body;
+  if (!['learner', 'trainer'].includes(role)) {
+    return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+  }
+  const db = await getDb();
+  try {
+    await db.run('UPDATE users SET role = ? WHERE id = ?', [role, req.user.id]);
+    res.json({ success: true, role });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1119,6 +1138,8 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+mountStudioRoutes(app, authenticateToken);
 
 // Serve the built frontend (frontend/dist) so a single Node process can host
 // both the app and the API — needed for hosts like Hostinger's Node.js App

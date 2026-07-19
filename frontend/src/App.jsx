@@ -13,6 +13,7 @@ import Chat from './components/Chat';
 import Settings from './components/Settings';
 import PathSelection from './components/PathSelection';
 import PathUpdatedModal from './components/PathUpdatedModal';
+import StudioApp from './studio/StudioApp';
 import { Home, Target, Layers, Trophy, Settings as SettingsIcon, Volume2, VolumeX, BookOpen, MessageCircle } from 'lucide-react';
 import llamaLogo from './assets/llama-logo.png';
 
@@ -101,6 +102,11 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  /* ── Llama Studio (trainer role) ───────────────────────── */
+  if (profile && profile.role === 'trainer') {
+    return <StudioApp profile={profile} onExitStudio={fetchUserDossier} />;
   }
 
   /* ── Path Interception ────────────────────────────────── */
@@ -213,7 +219,7 @@ export default function App() {
               {activeTab === 'flashcards' && <div className="max-w-4xl mx-auto"><Flashcards initialTopic={flashcardTopic} onConsumeInitialTopic={() => setFlashcardTopic(null)} onBack={() => setActiveTab('home')} /></div>}
               {activeTab === 'chat' && <Chat initialContext={chatContext} onConsumeInitialContext={() => setChatContext(null)} />}
               {activeTab === 'leaderboard' && <div className="max-w-3xl mx-auto"><Leaderboard profile={profile} /></div>}
-              {activeTab === 'settings' && <div className="max-w-2xl mx-auto"><Settings profile={profile} setSession={setSession} onMuteToggled={setMuted} /></div>}
+              {activeTab === 'settings' && <div className="max-w-2xl mx-auto"><Settings profile={profile} setSession={setSession} onMuteToggled={setMuted} onRoleChanged={fetchUserDossier} /></div>}
             </>
           )}
         </div>

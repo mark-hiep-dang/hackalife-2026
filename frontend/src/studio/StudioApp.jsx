@@ -1,0 +1,110 @@
+import { useState } from 'react';
+import { LayoutDashboard, GraduationCap, Library, Users2, UserCircle2, ClipboardList, Lightbulb, UploadCloud, LogOut, ArrowLeftRight } from 'lucide-react';
+import llamaLogo from '../assets/llama-logo.png';
+import { switchRole } from '../utils/studioApi';
+
+import Overview from './screens/Overview';
+import Courses from './screens/Courses';
+import ContentLibrary from './screens/ContentLibrary';
+import Cohorts from './screens/Cohorts';
+import LearnersAtRisk from './screens/LearnersAtRisk';
+import MockExamAnalytics from './screens/MockExamAnalytics';
+import Insights from './screens/Insights';
+import PublishCenter from './screens/PublishCenter';
+import TrainerCopilot from './components/TrainerCopilot';
+
+const NAV = [
+  { id: 'overview', icon: LayoutDashboard, label: 'Tổng quan' },
+  { id: 'courses', icon: GraduationCap, label: 'Khóa học' },
+  { id: 'library', icon: Library, label: 'Thư viện nội dung' },
+  { id: 'cohorts', icon: Users2, label: 'Nhóm học' },
+  { id: 'learners', icon: UserCircle2, label: 'Học viên' },
+  { id: 'exams', icon: ClipboardList, label: 'Thi thử' },
+  { id: 'insights', icon: Lightbulb, label: 'Insights' },
+  { id: 'publish', icon: UploadCloud, label: 'Publish Center' }
+];
+
+export default function StudioApp({ profile, onExitStudio }) {
+  const [tab, setTab] = useState('overview');
+  const [switching, setSwitching] = useState(false);
+
+  async function handleExit() {
+    setSwitching(true);
+    try {
+      await switchRole('learner');
+      onExitStudio();
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F3F0FA] flex flex-col md:flex-row">
+      <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
+        <div className="p-6 border-b-3 border-[#101A24]/10">
+          <button onClick={() => setTab('overview')} className="flex items-center gap-2 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
+            <img src={llamaLogo} alt="" className="w-9 h-9 object-contain" />
+            <span>Llama Studio</span>
+          </button>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-[#8B7BAE]">Bạn dựng đường. Học viên chinh phục đỉnh.</p>
+        </div>
+
+        <nav className="flex-1 px-4 py-6 flex flex-col gap-2 overflow-y-auto">
+          {NAV.map(({ id, icon: Icon, label }) => {
+            const active = tab === id;
+            return (
+              <button key={id} onClick={() => setTab(id)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wide transition-all border text-left ${
+                  active
+                    ? 'bg-[#E3D9F5] border-[#101A24]/10 text-[#101A24] shadow-sm -translate-y-0.5 -translate-x-0.5'
+                    : 'bg-white border-transparent text-[#101A24] hover:border-[#101A24]/10 hover:shadow-sm'
+                }`}
+              >
+                <Icon size={20} strokeWidth={active ? 2.75 : 2} /> {label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#EEF0F3] flex flex-col gap-3">
+          <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{profile?.username} · Trainer</span>
+          <button onClick={handleExit} disabled={switching}
+            className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center gap-2 text-[#101A24] hover:bg-[#B9E7EF] transition-colors font-extrabold text-xs uppercase tracking-widest disabled:opacity-50"
+          >
+            <ArrowLeftRight size={16} strokeWidth={3} /> Về app học viên
+          </button>
+        </div>
+      </aside>
+
+      <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
+        <div className="px-4 h-16 flex items-center justify-between">
+          <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Studio</span>
+          <button onClick={handleExit} className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-[#101A24]/10 bg-white flex items-center gap-1">
+            <LogOut size={14} /> Học viên
+          </button>
+        </div>
+        <div className="flex overflow-x-auto gap-2 px-3 pb-3">
+          {NAV.map(({ id, label }) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide border ${tab === id ? 'bg-[#E3D9F5] border-[#101A24]/10' : 'bg-white border-[#101A24]/10'}`}
+            >{label}</button>
+          ))}
+        </div>
+      </header>
+
+      <main className="flex-1 w-full overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-4 md:px-10 py-8 md:py-12">
+          {tab === 'overview' && <Overview onNavigate={setTab} />}
+          {tab === 'courses' && <Courses />}
+          {tab === 'library' && <ContentLibrary />}
+          {tab === 'cohorts' && <Cohorts onNavigate={setTab} />}
+          {tab === 'learners' && <LearnersAtRisk />}
+          {tab === 'exams' && <MockExamAnalytics />}
+          {tab === 'insights' && <Insights />}
+          {tab === 'publish' && <PublishCenter />}
+        </div>
+      </main>
+      <TrainerCopilot />
+    </div>
+  );
+}

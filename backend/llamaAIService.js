@@ -6,44 +6,10 @@
 // if anything goes wrong, the core flow continues using the fallback.
 
 import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk } from './knowledgeBase.js';
+import { callGemini as callGeminiShared, matchesShape } from './geminiClient.js';
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
-const TIMEOUT_MS = 6000;
-
-async function callGemini(systemInstruction, userMessage) {
-  if (!process.env.GEMINI_API_KEY) return null;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: [{ role: 'user', parts: [{ text: userMessage }] }]
-        })
-      }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-  } catch (err) {
-    console.warn('LlamaAIService: Gemini call failed, using deterministic fallback. Reason:', err.message);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// Minimal manual schema check (no ajv dependency needed) — just verifies the
-// required keys exist with the right primitive type before trusting an LLM
-// response shape.
-function matchesShape(shape, obj) {
-  if (!obj || typeof obj !== 'object') return false;
-  return Object.entries(shape).every(([key, type]) => typeof obj[key] === type);
+function callGemini(systemInstruction, userMessage) {
+  return callGeminiShared(systemInstruction, userMessage, { label: 'LlamaAIService' });
 }
 
 const PERSONALITY_RULES = `Bạn là "Llama" — bạn đồng hành học tập vui nhộn, tinh nghịch vừa phải, thân thiện, hay khích lệ. Nói chuyện tự nhiên như bạn bè, thỉnh thoảng xưng "Llama" ở ngôi thứ nhất. Không phải chatbot hành chính, không phải báo cáo AI.
