@@ -234,7 +234,87 @@ const vi = {
   campLockedMessage: '🔒 Trại này đang khóa. Hoàn thành trại trước đó để mở đường lên đây nhé!',
   campCardsIn: 'Trong trại này ({n} thẻ):',
   campCloseBtn: 'Đóng',
-  campStartBtn: 'Bắt đầu 🎯'
+  campStartBtn: 'Bắt đầu 🎯',
+
+  // Learner preferences (Settings)
+  expeditionPrefsTitle: 'Hành Trình Cá Nhân Hóa',
+  examDateLabel: 'Ngày dự kiến thi',
+  dailyMinutesLabel: 'Số phút muốn học mỗi ngày',
+  targetScoreLabel: 'Mục tiêu điểm',
+  experienceLevelLabel: 'Mức kinh nghiệm',
+  experience_new: 'Người mới',
+  experience_under1: 'Dưới 1 năm',
+  experience_1to3: '1–3 năm',
+  experience_over3: 'Trên 3 năm',
+  preferredFormatLabel: 'Hình thức học yêu thích',
+  format_quick: 'Học nhanh',
+  format_flashcard: 'Flashcard',
+  format_quiz: 'Luyện câu hỏi',
+  format_scenario: 'Tình huống thực tế',
+  goalLabel: 'Mục tiêu',
+  goal_pass: 'Đủ điểm vượt qua',
+  goal_good: 'Đạt điểm tốt',
+  goal_mastery: 'Nắm chắc để hành nghề',
+  savePrefsBtn: 'Lưu hành trình',
+
+  // Daily Expedition
+  expeditionCardTitle: 'Chặng hôm nay',
+  expeditionGoalLabel: 'Mục tiêu:',
+  expeditionActivitiesLabel: 'Hoạt động',
+  expeditionWhyLabel: 'Tại sao lại học phần này?',
+  expeditionStartBtn: 'Bắt đầu leo',
+  expeditionResumeBtn: 'Tiếp tục leo',
+  expeditionDoneBtn: 'Đã hoàn thành hôm nay ✓',
+  expeditionMinutesShort: '{n} phút',
+  activity_warmup: 'Khởi động nhanh',
+  activity_checkpoint: 'Checkpoint',
+  activity_rescue: 'Chặng cứu hộ',
+
+  // Summit Readiness
+  summitReadinessTitle: 'Summit Readiness',
+  summitStrongestLabel: 'Vững nhất:',
+  summitRiskLabel: 'Cần chú ý:',
+  summitNextActionLabel: 'Nên làm tiếp:',
+  summitDaysUntilExam: 'Còn {n} ngày',
+  summitDisclaimer: 'Summit Readiness là chỉ số hỗ trợ học tập, không phải cam kết kết quả kỳ thi.',
+
+  // Mistake DNA
+  mistakeDnaTitle: 'Llama vừa soi ra điểm dễ nhầm',
+  mistakeDnaCta: 'Để Llama gỡ rối',
+  mistakeTypeLabel: 'Loại lỗi:',
+
+  // Rescue Trail
+  rescueTrailTitle: 'Chặng cứu hộ',
+  rescueTrailFlashcardLabel: 'Flashcard ôn lại',
+  rescueTrailEasierLabel: 'Câu dễ khởi động',
+  rescueTrailSimilarLabel: 'Câu tương tự',
+  rescueTrailCheckpointLabel: 'Checkpoint',
+  rescueTrailCompleteBtn: 'Hoàn thành chặng cứu hộ',
+  rescueTrailConceptVs: 'so với',
+
+  // Path adaptation modal
+  pathUpdatedTitle: 'Llama vừa đổi đường!',
+  pathUpdatedViewMapBtn: 'Xem bản đồ mới',
+
+  // Quiz confidence
+  confidenceLabel: 'Bạn tự tin cỡ nào?',
+  confidence_certain: 'Chắc chắn',
+  confidence_fairly_sure: 'Khá chắc',
+  confidence_guessing: 'Đang cầu may',
+  askLlamaAboutThis: 'Hỏi Llama về câu này',
+
+  // Flashcard due list
+  fcDueLabel: '{n} thẻ đang phủ bụi',
+  fcFromMistake: 'Thẻ này Llama tạo từ câu bạn trượt hôm qua.',
+
+  // Chat quick prompts
+  quickPromptWhyWrong: 'Vì sao đáp án của tôi sai?',
+  quickPromptCompare: 'So sánh hai khái niệm này.',
+  quickPromptBeginner: 'Giải thích như tôi mới bắt đầu.',
+  quickPromptExample: 'Cho tôi ví dụ dễ nhớ.',
+  quickPromptQuizBack: 'Hỏi ngược lại để kiểm tra tôi.',
+  quickPromptSimilar: 'Tạo câu tương tự.',
+  chatSourceLabel: 'Nguồn: {title}'
 };
 
 const en = {
@@ -471,7 +551,87 @@ const en = {
   campLockedMessage: '🔒 This camp is locked. Complete the previous camp to open the way up here!',
   campCardsIn: 'In this camp ({n} cards):',
   campCloseBtn: 'Close',
-  campStartBtn: 'Start 🎯'
+  campStartBtn: 'Start 🎯',
+
+  // Learner preferences (Settings)
+  expeditionPrefsTitle: 'Personalized Expedition',
+  examDateLabel: 'Expected exam date',
+  dailyMinutesLabel: 'Minutes you want to study per day',
+  targetScoreLabel: 'Target score',
+  experienceLevelLabel: 'Experience level',
+  experience_new: 'Just starting out',
+  experience_under1: 'Under 1 year',
+  experience_1to3: '1–3 years',
+  experience_over3: 'Over 3 years',
+  preferredFormatLabel: 'Preferred study format',
+  format_quick: 'Quick study',
+  format_flashcard: 'Flashcards',
+  format_quiz: 'Practice questions',
+  format_scenario: 'Real-world scenarios',
+  goalLabel: 'Goal',
+  goal_pass: 'Just enough to pass',
+  goal_good: 'Score well',
+  goal_mastery: 'Master it for real practice',
+  savePrefsBtn: 'Save Expedition',
+
+  // Daily Expedition
+  expeditionCardTitle: "Today's Expedition",
+  expeditionGoalLabel: 'Goal:',
+  expeditionActivitiesLabel: 'Activities',
+  expeditionWhyLabel: 'Why study this?',
+  expeditionStartBtn: 'Start Climbing',
+  expeditionResumeBtn: 'Resume Climbing',
+  expeditionDoneBtn: 'Done for today ✓',
+  expeditionMinutesShort: '{n} min',
+  activity_warmup: 'Quick Warmup',
+  activity_checkpoint: 'Checkpoint',
+  activity_rescue: 'Rescue Trail',
+
+  // Summit Readiness
+  summitReadinessTitle: 'Summit Readiness',
+  summitStrongestLabel: 'Strongest:',
+  summitRiskLabel: 'Needs attention:',
+  summitNextActionLabel: 'Next up:',
+  summitDaysUntilExam: '{n} days left',
+  summitDisclaimer: 'Summit Readiness is a study aid, not a guaranteed exam result.',
+
+  // Mistake DNA
+  mistakeDnaTitle: 'Llama spotted a tricky spot',
+  mistakeDnaCta: 'Let Llama untangle it',
+  mistakeTypeLabel: 'Mistake type:',
+
+  // Rescue Trail
+  rescueTrailTitle: 'Rescue Trail',
+  rescueTrailFlashcardLabel: 'Review flashcard',
+  rescueTrailEasierLabel: 'Warmup question',
+  rescueTrailSimilarLabel: 'Similar question',
+  rescueTrailCheckpointLabel: 'Checkpoint',
+  rescueTrailCompleteBtn: 'Complete Rescue Trail',
+  rescueTrailConceptVs: 'vs.',
+
+  // Path adaptation modal
+  pathUpdatedTitle: 'Llama just changed the route!',
+  pathUpdatedViewMapBtn: 'View New Map',
+
+  // Quiz confidence
+  confidenceLabel: 'How confident are you?',
+  confidence_certain: 'Certain',
+  confidence_fairly_sure: 'Fairly sure',
+  confidence_guessing: 'Just guessing',
+  askLlamaAboutThis: 'Ask Llama about this',
+
+  // Flashcard due list
+  fcDueLabel: '{n} cards gathering dust',
+  fcFromMistake: 'Llama made this card from a question you missed.',
+
+  // Chat quick prompts
+  quickPromptWhyWrong: 'Why was my answer wrong?',
+  quickPromptCompare: 'Compare these two concepts.',
+  quickPromptBeginner: 'Explain it like I just started.',
+  quickPromptExample: 'Give me an easy-to-remember example.',
+  quickPromptQuizBack: 'Quiz me on this to check my understanding.',
+  quickPromptSimilar: 'Create a similar question.',
+  chatSourceLabel: 'Source: {title}'
 };
 
 const dictionaries = { vi, en };

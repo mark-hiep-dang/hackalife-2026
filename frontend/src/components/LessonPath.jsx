@@ -1,6 +1,8 @@
 // Duolingo-style winding path — Llama climbs alongside you, one lesson per camp, up to the MOF summit.
-import { useState } from 'react';
-import { useT } from '../translations';
+import { useState, useEffect, useMemo } from 'react';
+import { useT, useLanguage } from '../translations';
+import { getMastery } from '../utils/api';
+import { getLlamaReaction } from '../llamaPersonality';
 
 const VERTICAL_GAP = 132;
 const NODE_SIZE = 88;
@@ -12,6 +14,17 @@ const TOPIC_ICON = {
   products: '🛡️',
   contracts: '📜',
   regulations: '⚖️'
+};
+
+// The mountain journey's 4 camps use a coarser topic taxonomy than the real
+// exam bank's 8 topics (see PERSONALIZED_EXPEDITION_PLAN.md — "taxonomy
+// mismatch"). This rolls camp mastery up from the closest-matching real
+// topics rather than pretending it's a 1:1 mapping.
+const CAMP_TOPIC_MAP = {
+  fundamentals: ['1. Kiến thức chung & quản trị rủi ro', '3. Nguyên tắc & phân loại bảo hiểm'],
+  products: ['4. Bảo hiểm nhân thọ cơ bản', '5. Bảo hiểm sức khỏe'],
+  contracts: ['2. Thuật ngữ & chủ thể hợp đồng', '6. Hợp đồng bảo hiểm & pháp luật'],
+  regulations: ['7. Đại lý, đạo đức, quyền & nghĩa vụ', '8. Tình huống tổng hợp']
 };
 
 function getOffsetX(index) {
@@ -37,7 +50,27 @@ function getCampInfo(index, total, t) {
 
 export default function LessonPath({ lessons, onSelectLesson }) {
   const t = useT();
+  const { lang } = useLanguage();
   const [preview, setPreview] = useState(null);
+  const [masteryByTopic, setMasteryByTopic] = useState({});
+
+  useEffect(() => {
+    getMastery().then((rows) => {
+      const map = {};
+      rows.forEach((r) => { map[r.topic] = r.mastery; });
+      setMasteryByTopic(map);
+    }).catch(() => {});
+  }, []);
+
+  const campMastery = useMemo(() => {
+    const result = {};
+    for (const [camp, realTopics] of Object.entries(CAMP_TOPIC_MAP)) {
+      const scores = realTopics.map((rt) => masteryByTopic[rt]).filter((v) => typeof v === 'number');
+      result[camp] = scores.length ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : null;
+    }
+    return result;
+  }, [masteryByTopic]);
+
   const total = lessons.length;
   if (total === 0) return null;
 
@@ -101,10 +134,13 @@ export default function LessonPath({ lessons, onSelectLesson }) {
           const isCompleted = lesson.isCompleted;
           const isCurrent = origIdx === firstAvailableIdx;
           const icon = isSummit ? '⛰️' : (TOPIC_ICON[lesson.topic] || '🏕️');
+          const mastery = campMastery[lesson.topic];
+          const needsReinforcement = !isLocked && !isCompleted && typeof mastery === 'number' && mastery < 50;
 
           let bg = '#EEF0F3', shadowColor = 'rgba(0,0,0,0.08)', opacity = 1;
           if (isCompleted) { bg = '#C7D7F7'; shadowColor = 'rgba(76,111,196,0.3)'; }
           else if (isCurrent) { bg = '#C7EFC4'; shadowColor = 'rgba(79,154,90,0.3)'; }
+          else if (needsReinforcement) { bg = '#FCE7D0'; shadowColor = 'rgba(217,150,95,0.3)'; }
           else if (isLocked) { opacity = 0.55; }
 
           return (
@@ -116,7 +152,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
               )}
 
               <button
-                onClick={() => setPreview({ lesson, label, altitude, isLocked, isCompleted, icon })}
+                onClick={() => setPreview({ lesson, label, altitude, isLocked, isCompleted, icon, mastery, needsReinforcement })}
                 className="rounded-full border-none flex items-center justify-center text-4xl transition-transform hover:-translate-y-1"
                 style={{
                   width: `${NODE_SIZE}px`, height: `${NODE_SIZE}px`,
@@ -135,6 +171,11 @@ export default function LessonPath({ lessons, onSelectLesson }) {
               <div className="text-[11px] font-bold text-[#8A8A8A]">
                 {altitude.toLocaleString('en-US')}m
               </div>
+              {typeof mastery === 'number' && !isLocked && (
+                <div className={`text-[11px] font-extrabold ${needsReinforcement ? 'text-[#C2703F]' : 'text-[#4F9A5A]'}`}>
+                  {mastery}%
+                </div>
+              )}
             </div>
           );
         })}
@@ -152,6 +193,12 @@ export default function LessonPath({ lessons, onSelectLesson }) {
             <p className="text-sm font-bold text-[#8A8A8A] mb-4">
               {preview.altitude.toLocaleString('en-US')}m • {preview.lesson.topic} • {preview.lesson.difficulty}
             </p>
+
+            {!preview.isLocked && (
+              <p className="text-sm font-bold text-[#6B4FA8] bg-[#F4EDFA] rounded-2xl px-4 py-3 mb-4 leading-relaxed">
+                {getLlamaReaction(preview.isCompleted ? 'CAMP_COMPLETED' : 'GREETING', { lang, camp: preview.label, daysAbsent: 0 }).message}
+              </p>
+            )}
 
             {preview.isLocked ? (
               <p className="text-sm font-bold text-[#3A3A3A] bg-[#EEF0F3] rounded-2xl p-4 mb-5 leading-relaxed">

@@ -12,6 +12,7 @@ import Leaderboard from './components/Leaderboard';
 import Chat from './components/Chat';
 import Settings from './components/Settings';
 import PathSelection from './components/PathSelection';
+import PathUpdatedModal from './components/PathUpdatedModal';
 import { Home, Target, Layers, Trophy, Settings as SettingsIcon, Volume2, VolumeX, BookOpen, MessageCircle } from 'lucide-react';
 import llamaLogo from './assets/llama-logo.png';
 
@@ -25,6 +26,9 @@ export default function App() {
   const [effects, setEffects] = useState([]);
   const [flashcardTopic, setFlashcardTopic] = useState(null);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
+  const [rescueRequest, setRescueRequest] = useState(null);
+  const [pathUpdateInfo, setPathUpdateInfo] = useState(null);
+  const [chatContext, setChatContext] = useState(null);
 
   useEffect(() => {
     if (localStorage.getItem('pang_chiu_token')) setSession({ username: 'Agent' });
@@ -65,6 +69,9 @@ export default function App() {
   function handleLessonFinished(xp) { setActiveLesson(null); if (xp !== null) { markStudiedToday(); fetchUserDossier(); } }
   function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); }
   function handleStudyTopic(topicKey) { setFlashcardTopic(topicKey); setActiveTab('flashcards'); }
+  function handleStartRescue(request) { setRescueRequest(request); setActiveTab('quiz'); }
+  function handlePathChanged(masteryUpdate) { setPathUpdateInfo(masteryUpdate); }
+  function handleAskLlama(context) { setChatContext(context); setActiveTab('chat'); }
 
   const t = useT();
 
@@ -189,10 +196,22 @@ export default function App() {
             </div>
           ) : (
             <>
-              {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} onLogout={handleLogout} />}
-              {activeTab === 'quiz' && <div className="max-w-4xl mx-auto"><Quiz onQuizFinished={handleQuizFinished} onStudyTopic={handleStudyTopic} onBack={() => setActiveTab('home')} /></div>}
+              {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} onLogout={handleLogout} onStartRescue={handleStartRescue} />}
+              {activeTab === 'quiz' && (
+                <div className="max-w-4xl mx-auto">
+                  <Quiz
+                    onQuizFinished={handleQuizFinished}
+                    onStudyTopic={handleStudyTopic}
+                    onBack={() => setActiveTab('home')}
+                    initialRescue={rescueRequest}
+                    onConsumeInitialRescue={() => setRescueRequest(null)}
+                    onPathChanged={handlePathChanged}
+                    onAskLlama={handleAskLlama}
+                  />
+                </div>
+              )}
               {activeTab === 'flashcards' && <div className="max-w-4xl mx-auto"><Flashcards initialTopic={flashcardTopic} onConsumeInitialTopic={() => setFlashcardTopic(null)} onBack={() => setActiveTab('home')} /></div>}
-              {activeTab === 'chat' && <Chat />}
+              {activeTab === 'chat' && <Chat initialContext={chatContext} onConsumeInitialContext={() => setChatContext(null)} />}
               {activeTab === 'leaderboard' && <div className="max-w-3xl mx-auto"><Leaderboard profile={profile} /></div>}
               {activeTab === 'settings' && <div className="max-w-2xl mx-auto"><Settings profile={profile} setSession={setSession} onMuteToggled={setMuted} /></div>}
             </>
@@ -218,6 +237,14 @@ export default function App() {
           })}
         </div>
       </nav>
+
+      {pathUpdateInfo && (
+        <PathUpdatedModal
+          masteryUpdate={pathUpdateInfo}
+          onClose={() => setPathUpdateInfo(null)}
+          onViewMap={() => { setActiveLesson(null); setActiveTab('home'); }}
+        />
+      )}
 
       {/* ── FX ───────────────────────────────────────────── */}
       <div className="shoot-feedback-container">

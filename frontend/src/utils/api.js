@@ -160,16 +160,18 @@ export async function getQuizHistoryDetail(id) {
   return data;
 }
 
-export async function sendChatMessage(message, history) {
+// `context` (spec §16, contextual Ask Llama) can carry { question, topic, mistakeLabel }
+// so Llama's answer is grounded in whatever the learner is currently looking at.
+export async function sendChatMessage(message, history, context) {
   const ollamaUrl = localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434';
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ message, history, ollamaUrl })
+    body: JSON.stringify({ message, history, ollamaUrl, context })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to send chat message');
-  return data.response;
+  return { response: data.response, sources: data.sources || [] };
 }
 
 export async function getKnowledgeDocs() {
@@ -224,5 +226,90 @@ export async function getLeaderboard() {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to fetch leaderboard');
+  return data;
+}
+
+// --- Personalized Expedition ---
+
+export async function getPreferences() {
+  const res = await fetch(`${API_BASE}/preferences`, { headers: getHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch preferences');
+  return data;
+}
+
+export async function updatePreferences(prefs) {
+  const res = await fetch(`${API_BASE}/preferences`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(prefs)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to save preferences');
+  return data;
+}
+
+export async function getMastery() {
+  const res = await fetch(`${API_BASE}/mastery`, { headers: getHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch mastery');
+  return data;
+}
+
+export async function getSummitReadiness() {
+  const res = await fetch(`${API_BASE}/summit-readiness`, { headers: getHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch summit readiness');
+  return data;
+}
+
+export async function getDailyExpedition() {
+  const res = await fetch(`${API_BASE}/expedition/daily`, { headers: getHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch daily expedition');
+  return data;
+}
+
+export async function completeDailyExpedition() {
+  const res = await fetch(`${API_BASE}/expedition/complete`, { method: 'POST', headers: getHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to complete expedition');
+  return data;
+}
+
+export async function getRescueTrail(topic, mistakeType) {
+  const query = new URLSearchParams({ topic, mistakeType: mistakeType || '' }).toString();
+  const res = await fetch(`${API_BASE}/rescue-trail?${query}`, { headers: getHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch rescue trail');
+  return data;
+}
+
+export async function completeRescueTrail() {
+  const res = await fetch(`${API_BASE}/rescue-trail/complete`, { method: 'POST', headers: getHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to complete rescue trail');
+  return data;
+}
+
+export async function previewAnswerMistake({ question, topic, difficulty, isCorrect, confidence, responseTimeMs }) {
+  const res = await fetch(`${API_BASE}/quiz/answer-preview`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ question, topic, difficulty, isCorrect, confidence, responseTimeMs })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to preview answer');
+  return data.mistakeDNA;
+}
+
+export async function explainMistake({ mistakeLabel, explanation, question }) {
+  const res = await fetch(`${API_BASE}/llama/explain-mistake`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ mistakeLabel, explanation, question })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to explain mistake');
   return data;
 }

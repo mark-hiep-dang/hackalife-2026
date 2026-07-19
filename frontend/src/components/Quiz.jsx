@@ -9,13 +9,24 @@ import quizModeSelect from '../assets/quiz-mode-select.webp';
 import quizPracticeMode from '../assets/quiz-practice-mode.webp';
 import quizExamMode from '../assets/quiz-exam-mode.webp';
 import { pickCorrectResponse, pickWrongResponse } from '../llamaResponses';
+import { getLlamaReaction } from '../llamaPersonality';
+import { previewAnswerMistake } from '../utils/api';
+import MistakeDnaCard from './MistakeDnaCard';
 import ExamReport from './ExamReport';
 import QuizHistory from './QuizHistory';
+import RescueTrail from './RescueTrail';
 
 const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame, pang_sniper: Zap, topic_master: Medal, xp_1000: Crown };
 const CARD_SHADOW = '0 4px 20px rgba(0,0,0,0.06)';
+// Language-neutral codes sent to the backend (see backend/engines/mastery.js CONFIDENCE) —
+// only the display label is translated, the value itself must stay stable across languages.
+const CONFIDENCE_OPTIONS = [
+  { code: 'certain', labelKey: 'confidence_certain' },
+  { code: 'fairly_sure', labelKey: 'confidence_fairly_sure' },
+  { code: 'guessing', labelKey: 'confidence_guessing' }
+];
 
-export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
+export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialRescue, onConsumeInitialRescue, onPathChanged, onAskLlama }) {
   const t = useT();
   const { lang } = useLanguage();
   const [topic, setTopic] = useState('all');
@@ -40,7 +51,13 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
   const [newBadges, setNewBadges] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [examAnswers, setExamAnswers] = useState([]);
+  const [practiceAnswers, setPracticeAnswers] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [confidence, setConfidence] = useState('fairly_sure');
+  const [questionStartedAt, setQuestionStartedAt] = useState(null);
+  const [mistakeDNA, setMistakeDNA] = useState(null);
+  const [rescueNeeded, setRescueNeeded] = useState(null);
+  const [pendingRescue, setPendingRescue] = useState(initialRescue || null);
 
   useEffect(() => {
     if (started && mode === 'exam' && !finished) {
@@ -51,6 +68,12 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
     return () => clearInterval(timerRef.current);
   }, [started, finished, mode]);
 
+  // Response-time tracking (spec §14) — restarts the clock every time a new
+  // question is shown, regardless of mode.
+  useEffect(() => {
+    if (started && !finished) setQuestionStartedAt(Date.now());
+  }, [cidx, started, finished]);
+
   const q = questions[cidx];
 
   async function startQuiz(selectedMode = mode) {
@@ -60,7 +83,9 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
       if (qs.length === 0) throw new Error(t.quizNoQuestions);
       setQuestions(qs); setCidx(0); setScore(0); setCombo(0); setMaxCombo(0);
       setSelected(null); setAnswered(false); setTimeLeft(3600);
-      setExamAnswers([]); setStarted(true); setFinished(false); setShowDetailedReport(false);
+      setExamAnswers([]); setPracticeAnswers([]); setConfidence('fairly_sure');
+      setMistakeDNA(null); setRescueNeeded(null);
+      setStarted(true); setFinished(false);
     } catch (e) { setError(e.message || t.quizLoadError); }
     finally { setLoading(false); }
   }
@@ -68,8 +93,10 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
   function pick(optIdx, e) {
     if (answered) return;
     setSelected(optIdx); setAnswered(true);
+    setMistakeDNA(null);
 
     const correct = optIdx === q.correct_index;
+    const responseTimeMs = questionStartedAt ? Date.now() - questionStartedAt : undefined;
 
     if (correct) {
       setScore(p => p + 1);
@@ -85,12 +112,37 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
       const nw = wrongStreak + 1; setWrongStreak(nw);
       if (mode === 'practice') {
         playScream();
-        setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx], lang }));
         window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'chiu', x: e.clientX, y: e.clientY } }));
+        // Read-only preview (no writes) so Mistake DNA can show right away —
+        // the real mastery/mistake write happens once, at finishQuiz.
+        previewAnswerMistake({
+          question: q.question, topic: q.topic, difficulty: q.difficulty,
+          isCorrect: false, confidence, responseTimeMs
+        }).then((dna) => {
+          setMistakeDNA(dna);
+          if (dna?.type === 'concept_confusion' && confidence === 'certain') {
+            setFeedbackText(getLlamaReaction('HIGH_CONFIDENCE_MISTAKE', { lang }).message);
+          } else {
+            setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx], lang }));
+          }
+        }).catch(() => {
+          setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx], lang }));
+        });
       }
     }
+
+    if (mode === 'practice') {
+      setPracticeAnswers(p => [...p, {
+        question: q.question, topic: q.topic, difficulty: q.difficulty, options: q.options,
+        correct_index: q.correct_index, selected_index: optIdx, isCorrect: correct,
+        explanation: q.explanation, confidence, responseTimeMs
+      }]);
+    }
+
     if (mode === 'exam') {
-      setExamAnswers(p => [...p, { question: q, selected: optIdx, isCorrect: correct }]);
+      setExamAnswers(p => [...p, {
+        question: q, selected: optIdx, isCorrect: correct, difficulty: q.difficulty, confidence, responseTimeMs
+      }]);
       setTimeout(advance, 600);
     }
   }
@@ -108,15 +160,24 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
     const answers = mode === 'exam' ? examAnswers.map(a => ({
       question: a.question.question,
       topic: a.question.topic,
+      difficulty: a.difficulty,
       options: a.question.options,
       correct_index: a.question.correct_index,
       selected_index: a.selected,
       isCorrect: a.isCorrect,
-      explanation: a.question.explanation
-    })) : undefined;
+      explanation: a.question.explanation,
+      confidence: a.confidence,
+      responseTimeMs: a.responseTimeMs
+    })) : practiceAnswers;
     try {
       const r = await submitQuizScore({ score: fs, totalQuestions: questions.length, topic: mode === 'exam' ? 'full_exam' : topic, type: mode, maxCombo, answers });
       setXpEarned(r.xp_earned); setNewBadges(r.newBadges || []); playPang();
+
+      if (r.rescueNeeded) setRescueNeeded(r.rescueNeeded);
+      if (r.pathChanged && r.masteryUpdates?.length) {
+        const changed = r.masteryUpdates.find((u) => u.previousState !== u.newState) || r.masteryUpdates[0];
+        onPathChanged?.(changed);
+      }
     } catch (e) { setError(e.message || t.quizSaveError); }
     finally { setSubmitting(false); }
   }
@@ -127,13 +188,23 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
     onQuizFinished();
     setStarted(false); setFinished(false); setQuestions([]); setCidx(0);
     setScore(0); setCombo(0); setMaxCombo(0); setWrongStreak(0);
-    setSelected(null); setAnswered(false); setExamAnswers([]);
-    setXpEarned(0); setNewBadges([]); setError('');
+    setSelected(null); setAnswered(false); setExamAnswers([]); setPracticeAnswers([]);
+    setXpEarned(0); setNewBadges([]); setError(''); setMistakeDNA(null); setRescueNeeded(null);
   }
 
   const isCorrect = answered && selected === q?.correct_index;
 
   if (showHistory) return <QuizHistory onBack={() => setShowHistory(false)} onStudyTopic={onStudyTopic} />;
+
+  if (pendingRescue) {
+    return (
+      <RescueTrail
+        topic={pendingRescue.topic}
+        mistakeType={pendingRescue.mistakeType}
+        onDone={() => { setPendingRescue(null); onConsumeInitialRescue?.(); onQuizFinished(); }}
+      />
+    );
+  }
 
   /* ── Setup: "Chọn chế độ chiến!" ─── */
   if (!started && !finished) return (
@@ -251,6 +322,15 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
           </div>
         )}
 
+        {rescueNeeded && (
+          <button
+            onClick={() => setPendingRescue(rescueNeeded)}
+            className="btn-pro w-full text-lg bg-[#F4EDFA] text-[#6B4FA8] hover:bg-[#E9DCF7] py-4 mb-4"
+          >
+            🧗 {t.rescueTrailTitle}: {rescueNeeded.topic.replace(/^\d+\.\s*/, '')}
+          </button>
+        )}
+
         <button onClick={backToModeSelect} className="btn-pro w-full text-xl bg-[#4C6FC4] hover:bg-[#3D5DAE] text-white py-4">
           {t.backToDashboard}
         </button>
@@ -297,9 +377,24 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
           {t.quizReadyTag}
         </span>
 
-        <h3 className="font-comic font-extrabold text-xl md:text-2xl text-[#101A24] leading-snug mt-3 mb-7">
+        <h3 className="font-comic font-extrabold text-xl md:text-2xl text-[#101A24] leading-snug mt-3 mb-5">
           {q.question}
         </h3>
+
+        {mode === 'practice' && !answered && (
+          <div className="flex items-center gap-2 flex-wrap mb-6">
+            <span className="text-[11px] font-extrabold text-[#8A8A8A] uppercase tracking-widest">{t.confidenceLabel}</span>
+            {CONFIDENCE_OPTIONS.map((opt) => (
+              <button
+                key={opt.code}
+                onClick={() => setConfidence(opt.code)}
+                className={`px-3 py-1.5 rounded-full text-xs font-comic font-extrabold transition-all ${confidence === opt.code ? 'bg-[#8A6FC9] text-white' : 'bg-[#EEF0F3] text-[#101A24]'}`}
+              >
+                {t[opt.labelKey]}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-col gap-3.5">
           {(opts || []).map((opt, i) => {
@@ -341,8 +436,8 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
 
       {/* Feedback — centered popup with a Llama mascot bubble, impossible to miss */}
       {answered && mode === 'practice' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101A24]/55 p-5">
-          <div className="bounce-in bg-white w-full max-w-md overflow-hidden text-center" style={{ borderRadius: '2rem', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.3)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101A24]/55 p-5 overflow-y-auto">
+          <div className="bounce-in bg-white w-full max-w-md text-center my-auto" style={{ borderRadius: '2rem', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.3)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="flex justify-center py-8" style={{ background: isCorrect ? '#E7F5E5' : '#FBEAE6' }}>
               <div
                 className="relative w-[140px] h-[140px]"
@@ -376,11 +471,22 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
                 </p>
               )}
 
+              {!isCorrect && <MistakeDnaCard mistakeDNA={mistakeDNA} />}
+
               <div className="text-left bg-[#EEF0F3] rounded-2xl p-5 mb-6">
                 <strong className="block text-[#101A24] text-xs font-extrabold uppercase tracking-widest mb-2">{t.explanationTitle}</strong>
                 <p className="text-sm font-bold text-[#3A3A3A] leading-relaxed">{q.explanation}</p>
                 {q.source && <p className="mt-3 text-xs font-medium text-[#8A8A8A] italic">{t.quizSourceLabel.replace('{source}', q.source)}</p>}
               </div>
+
+              {!isCorrect && onAskLlama && (
+                <button
+                  onClick={() => onAskLlama({ question: q.question, topic: q.topic, mistakeLabel: mistakeDNA?.label })}
+                  className="w-full border-none cursor-pointer bg-white border border-[#101A24]/10 rounded-2xl py-3 mb-3 font-comic font-bold text-sm text-[#101A24]"
+                >
+                  💬 {t.askLlamaAboutThis}
+                </button>
+              )}
 
               <button
                 onClick={advance}
