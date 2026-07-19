@@ -5,7 +5,7 @@
 // needs VITE_API_URL set to that backend's public URL — see deploy docs.
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
-function getHeaders() {
+export function getHeaders() {
   const token = localStorage.getItem('pang_chiu_token');
   const headers = { 'Content-Type': 'application/json' };
   if (token) {

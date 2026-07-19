@@ -2,6 +2,7 @@ import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { initStudioDb } from './studioDb.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,6 +45,14 @@ export async function initDb() {
   // Migrate existing users table to add selected_path if it doesn't exist
   try {
     await db.exec('ALTER TABLE users ADD COLUMN selected_path TEXT');
+  } catch (err) {
+    // Column already exists, ignore
+  }
+
+  // Llama Studio: a safe demo role switch (spec §4) — no enterprise RBAC,
+  // just a column defaulting every existing account to 'learner'.
+  try {
+    await db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'learner'");
   } catch (err) {
     // Column already exists, ignore
   }
@@ -187,6 +196,22 @@ export async function initDb() {
       FOREIGN KEY (document_id) REFERENCES knowledge_documents(id) ON DELETE CASCADE
     )
   `);
+
+  // Llama Studio (spec §8): approved-source-material grounding reuses this same
+  // RAG system rather than duplicating it — existing chat documents just gain
+  // versioning/approval/course-linkage columns. Existing rows default to
+  // approved=1 so the learner "Hỏi Llama" feature keeps working unchanged.
+  for (const col of [
+    "approved INTEGER DEFAULT 1",
+    "content_version TEXT DEFAULT '1.0'",
+    "course_id INTEGER",
+    "effective_date TEXT",
+    "expiry_date TEXT"
+  ]) {
+    try { await db.exec(`ALTER TABLE knowledge_documents ADD COLUMN ${col}`); } catch (err) { /* already exists */ }
+  }
+  try { await db.exec('ALTER TABLE knowledge_chunks ADD COLUMN source_section TEXT'); } catch (err) { /* already exists */ }
+  try { await db.exec('ALTER TABLE knowledge_chunks ADD COLUMN tags TEXT'); } catch (err) { /* already exists */ }
 
   await db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_fts USING fts5(
@@ -682,5 +707,7 @@ export async function initDb() {
       }
     }
   }
+  await initStudioDb(db);
+
   console.log('Database initialized and seeded successfully.');
 }
