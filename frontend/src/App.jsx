@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getProfile, getLessons } from './utils/api';
-import { translations } from './translations';
+import { useT } from './translations';
 import { getMuteState, setMuteState } from './utils/sound';
 import { markStudiedToday, ensureStudyTrackingInitialized } from './utils/streak';
 import Auth from './components/Auth';
@@ -66,7 +66,7 @@ export default function App() {
   function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); }
   function handleStudyTopic(topicKey) { setFlashcardTopic(topicKey); setActiveTab('flashcards'); }
 
-  const t = translations; // Now just a single dict
+  const t = useT();
 
   const NAV = [
     { id: 'home',        icon: Home,        label: t.navHome },

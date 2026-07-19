@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { login, register } from '../utils/api';
-import { translations as t } from '../translations';
+import { useT } from '../translations';
 import { playPang } from '../utils/sound';
 import llamaLogo from '../assets/llama-logo.png';
 
 export default function Auth({ setSession }) {
+  const t = useT();
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

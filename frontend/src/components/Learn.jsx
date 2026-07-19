@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { completeLesson } from '../utils/api';
-import { translations as t } from '../translations';
+import { useT } from '../translations';
 import { ArrowRight, CheckCircle2, Zap } from 'lucide-react';
 import { playPang } from '../utils/sound';
 
 export default function Learn({ lesson, onLessonFinished }) {
+  const t = useT();
   const [cidx, setCidx] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   
@@ -52,7 +53,7 @@ export default function Learn({ lesson, onLessonFinished }) {
         <div className="card-pro p-8 md:p-12 text-center bg-white pop-in">
           <CheckCircle2 size={80} strokeWidth={3} className="text-[#4C6FC4] mx-auto mb-6" />
           <h3 className="text-4xl font-extrabold uppercase tracking-tighter text-[#101A24] mb-4">{t.lessonCompleted}</h3>
-          <p className="text-lg font-bold text-[#888] mb-10">Kinh nghiệm là tài sản lớn nhất của bạn.</p>
+          <p className="text-lg font-bold text-[#888] mb-10">{t.learnDoneSubtext}</p>
           <button onClick={handleFinish} disabled={submitting} className="btn-pro bg-[#B9E7EF] text-[#20606E] hover:bg-[#A8DEE8] w-full text-2xl py-6">
             {submitting ? '...' : t.lessonFinishBtn}
           </button>
@@ -76,7 +77,7 @@ export default function Learn({ lesson, onLessonFinished }) {
           </div>
 
           <button onClick={() => { setCidx(p => p + 1); playPang(); }} className="btn-pro bg-[#4C6FC4] hover:bg-[#3D5DAE] text-white w-full text-xl py-5">
-            Đã hiểu <ArrowRight size={24} strokeWidth={3} className="inline ml-2" />
+            {t.understoodBtn} <ArrowRight size={24} strokeWidth={3} className="inline ml-2" />
           </button>
         </div>
       )}

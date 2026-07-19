@@ -1,19 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { sendChatMessage, getKnowledgeDocs, uploadKnowledgeFile, pasteKnowledgeText, deleteKnowledgeDoc } from '../utils/api';
-import { translations as t } from '../translations';
+import { useT } from '../translations';
 import { Send, BookOpen, Upload, FileText, Trash2, X, Loader2 } from 'lucide-react';
 import llamaWalk from '../assets/llama-walk.webp';
 
-const SUGGESTED_QUESTIONS = [
-  'Thời gian cân nhắc là gì?',
-  'Bảo hiểm Tử kỳ là gì?',
-  'Phân biệt BMBH và NĐBH?',
-  '60 ngày gia hạn là sao?',
-  'Điều kiện để làm đại lý bảo hiểm?',
-  'Cho tôi mẹo nhớ các con số quan trọng'
-];
-
 export default function Chat() {
+  const t = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,7 +28,7 @@ export default function Chat() {
   async function loadDocs() {
     setDocsLoading(true); setDocsError('');
     try { setDocs(await getKnowledgeDocs()); }
-    catch (e) { setDocsError(e.message || 'Lỗi tải danh sách tài liệu'); }
+    catch (e) { setDocsError(e.message || t.chatDocsLoadError); }
     finally { setDocsLoading(false); }
   }
 
@@ -61,7 +53,7 @@ export default function Chat() {
       const [reply] = await Promise.all([sendChatMessage(text, history), minThinkTime]);
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (e) {
-      setError(e.message || 'Llama không trả lời được, thử lại nhé');
+      setError(e.message || t.chatReplyError);
     } finally {
       setLoading(false);
     }
@@ -77,7 +69,7 @@ export default function Chat() {
     if (!file) return;
     setSaving(true); setDocsError('');
     try { await uploadKnowledgeFile(file); await loadDocs(); }
-    catch (err) { setDocsError(err.message || 'Lỗi tải file'); }
+    catch (err) { setDocsError(err.message || t.chatUploadError); }
     finally { setSaving(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   }
 
@@ -88,13 +80,13 @@ export default function Chat() {
       await pasteKnowledgeText(pasteTitle, pasteText);
       setPasteTitle(''); setPasteText('');
       await loadDocs();
-    } catch (err) { setDocsError(err.message || 'Lỗi lưu tài liệu'); }
+    } catch (err) { setDocsError(err.message || t.chatSaveDocError); }
     finally { setSaving(false); }
   }
 
   async function handleDelete(id) {
     try { await deleteKnowledgeDoc(id); await loadDocs(); }
-    catch (err) { setDocsError(err.message || 'Lỗi xóa tài liệu'); }
+    catch (err) { setDocsError(err.message || t.chatDeleteDocError); }
   }
 
   return (
@@ -156,7 +148,7 @@ export default function Chat() {
 
           {/* Document list */}
           {docsLoading ? (
-            <div className="text-center py-6 text-[#101A24] font-extrabold uppercase tracking-widest text-sm">Đang tải...</div>
+            <div className="text-center py-6 text-[#101A24] font-extrabold uppercase tracking-widest text-sm">{t.chatDocsLoading}</div>
           ) : docs.length === 0 ? (
             <div className="text-center py-6 text-[#888] font-bold text-sm">{t.knowledgeEmptyState}</div>
           ) : (
@@ -165,7 +157,7 @@ export default function Chat() {
                 <div key={doc.id} className="flex items-center justify-between gap-3 bg-white border border-[#101A24]/10 rounded-xl px-4 py-3 shadow-sm">
                   <div className="min-w-0">
                     <p className="text-sm font-extrabold text-[#101A24] truncate">{doc.title}</p>
-                    <p className="text-xs font-bold text-[#888] uppercase tracking-widest">{doc.source_type} • {doc.chunk_count} đoạn</p>
+                    <p className="text-xs font-bold text-[#888] uppercase tracking-widest">{doc.source_type} • {t.chatChunkCount.replace('{count}', doc.chunk_count)}</p>
                   </div>
                   <button onClick={() => handleDelete(doc.id)} className="text-[#D9695F] hover:text-[#B4443B] shrink-0" title={t.knowledgeDeleteBtn}>
                     <Trash2 size={18} strokeWidth={2.5} />
@@ -182,10 +174,10 @@ export default function Chat() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-4">
           {messages.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 px-8">
-              <img src={llamaWalk} alt="Llama đang đi dạo chờ bạn hỏi" className="w-28 md:w-32 rounded-2xl border border-[#101A24]/10 shadow-sm wiggle" />
+              <img src={llamaWalk} alt={t.chatWalkAlt} className="w-28 md:w-32 rounded-2xl border border-[#101A24]/10 shadow-sm wiggle" />
               <p className="text-[#888] font-bold">{t.chatEmptyState}</p>
               <div className="flex flex-wrap justify-center gap-2 max-w-md">
-                {SUGGESTED_QUESTIONS.map(q => (
+                {t.suggestedQuestions.map(q => (
                   <button
                     key={q}
                     onClick={() => sendMessage(q)}

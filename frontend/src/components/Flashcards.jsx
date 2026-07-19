@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getFlashcards, getFlashcardTopics, markFlashcardProgress } from '../utils/api';
 import { playPang, playChiu } from '../utils/sound';
 import { pickFlashcardTip } from '../llamaResponses';
+import { useT, useLanguage } from '../translations';
 import llamaTipIcon from '../assets/llama-mood-cozy.webp';
 import { ArrowLeft } from 'lucide-react';
 
@@ -19,6 +20,8 @@ const TOPIC_STYLES = [
 ];
 
 export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack }) {
+  const t = useT();
+  const { lang } = useLanguage();
   const [topics, setTopics] = useState([]);
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState('');
@@ -35,7 +38,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
 
   async function loadTopics() {
     try { setTopics(await getFlashcardTopics()); }
-    catch (e) { setTopicsError(e.message || 'Lỗi tải danh sách bộ thẻ'); }
+    catch (e) { setTopicsError(e.message || t.fcTopicsLoadError); }
     finally { setTopicsLoading(false); }
   }
 
@@ -54,7 +57,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
     setSelectedTopic(topic);
     setLoading(true); setError(''); setIdx(0); setFlipped(false); setKnown(0); setUnknown(0); setDone(false);
     try { setCards(await getFlashcards(topic === '__random' ? undefined : topic)); }
-    catch (e) { setError(e.message || 'Lỗi tải thẻ bài'); }
+    catch (e) { setError(e.message || t.fcCardsLoadError); }
     finally { setLoading(false); }
   }
 
@@ -69,7 +72,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
 
   const card = cards[idx];
   const flip = () => { setFlipped(f => !f); flipped ? playChiu() : playPang(); };
-  const tip = useMemo(() => (card ? pickFlashcardTip({ term: card.keyword || card.front }) : ''), [idx, cards]);
+  const tip = useMemo(() => (card ? pickFlashcardTip({ term: card.keyword || card.front, lang }) : ''), [idx, cards, lang]);
 
   function mark(isKnown) {
     isKnown ? setKnown(k => k + 1) : setUnknown(u => u + 1);
@@ -92,16 +95,16 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
             onClick={onBack}
             className="self-start flex items-center gap-1.5 border-none cursor-pointer bg-white rounded-2xl py-2 px-3.5 mb-2 font-comic font-bold text-[13px] text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
           >
-            <ArrowLeft size={16} strokeWidth={3} /> Trang chủ
+            <ArrowLeft size={16} strokeWidth={3} /> {t.navHome}
           </button>
         )}
         <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide flex items-center gap-2">
-          <span>🗂️</span> Thẻ ghi nhớ
+          <span>🗂️</span> {t.fcDeckTitle}
         </h2>
-        <p className="text-sm font-bold text-[#8A8A8A] mb-4">Chọn một chủ đề để bắt đầu ôn nhé!</p>
+        <p className="text-sm font-bold text-[#8A8A8A] mb-4">{t.fcChooseTopic}</p>
 
         {topicsLoading && (
-          <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang tải bộ thẻ...</div>
+          <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">{t.fcLoadingDecks}</div>
         )}
         {topicsError && (
           <div className="py-6 text-center text-[#B4443B] bg-[#F7D2CC] rounded-2xl font-bold uppercase tracking-widest">{topicsError}</div>
@@ -116,8 +119,8 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
             >
               <span className="text-4xl shrink-0">🔀</span>
               <div className="min-w-0 flex-1">
-                <div className="font-comic font-extrabold text-[17px] text-[#101A24]">Ngẫu nhiên tổng hợp</div>
-                <div className="text-xs font-bold text-[#8A6D1F] mt-0.5">{totalKnown}/{totalCount} thẻ đã học</div>
+                <div className="font-comic font-extrabold text-[17px] text-[#101A24]">{t.fcRandomMix}</div>
+                <div className="text-xs font-bold text-[#8A6D1F] mt-0.5">{t.fcCardsStudied.replace('{known}', totalKnown).replace('{total}', totalCount)}</div>
                 <div className="h-1.5 bg-white/50 rounded-full overflow-hidden mt-1.5">
                   <div className="h-full rounded-full bg-[#8A6D1F]" style={{ width: `${totalCount ? (totalKnown / totalCount) * 100 : 0}%` }} />
                 </div>
@@ -137,7 +140,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
                   <span className="text-4xl shrink-0">📖</span>
                   <div className="min-w-0 flex-1">
                     <div className="font-comic font-extrabold text-[17px] truncate" style={{ color: st.color }}>{topicRow.topic}</div>
-                    <div className="text-xs font-bold mt-0.5" style={{ color: st.subColor }}>{known}/{topicRow.count} thẻ đã học</div>
+                    <div className="text-xs font-bold mt-0.5" style={{ color: st.subColor }}>{t.fcCardsStudied.replace('{known}', known).replace('{total}', topicRow.count)}</div>
                     <div className="h-1.5 bg-white/50 rounded-full overflow-hidden mt-1.5">
                       <div className="h-full rounded-full" style={{ width: `${topicRow.count ? (known / topicRow.count) * 100 : 0}%`, background: st.color }} />
                     </div>
@@ -154,7 +157,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
   /* ── Study screen ─── */
   return (
     <div className="flex flex-col gap-2 pop-in max-w-2xl mx-auto w-full">
-      {loading && <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang rút bài...</div>}
+      {loading && <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">{t.fcDrawingCards}</div>}
       {error && <div className="py-6 text-center text-[#B4443B] bg-[#F7D2CC] rounded-2xl font-bold uppercase tracking-widest">{error}</div>}
 
       {!loading && !error && !done && card && (
@@ -164,13 +167,13 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
               onClick={backToTopics}
               className="border-none cursor-pointer bg-white rounded-2xl py-2 px-3.5 font-comic font-bold text-[13px] text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
             >
-              ← Chủ đề
+              {t.fcBackToTopics}
             </button>
             <h2 className="font-comic font-extrabold text-lg text-[#101A24] uppercase tracking-wide truncate">
-              {selectedTopic === '__random' ? '🔀 Ngẫu nhiên tổng hợp' : `📖 ${selectedTopic}`}
+              {selectedTopic === '__random' ? `🔀 ${t.fcRandomMix}` : `📖 ${selectedTopic}`}
             </h2>
           </div>
-          <p className="text-sm font-bold text-[#8A8A8A] mb-4">Chạm vào thẻ để lật, rồi cho Llama biết bạn có nhớ không nhé!</p>
+          <p className="text-sm font-bold text-[#8A8A8A] mb-4">{t.fcTapHint}</p>
 
           {/* Progress */}
           <div className="flex items-center justify-between gap-4 mb-4">
@@ -205,7 +208,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
                   </span>
                 )}
                 <div className="font-comic font-extrabold text-2xl text-white leading-snug">{card.front}</div>
-                <div className="absolute bottom-5 text-xs font-bold text-white/85">👆 Chạm để xem đáp án</div>
+                <div className="absolute bottom-5 text-xs font-bold text-white/85">{t.fcTapToFlip}</div>
               </div>
 
               {/* Back */}
@@ -241,13 +244,13 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
                 className="flex-1 border-none cursor-pointer bg-white rounded-[1.25rem] py-4 font-comic font-extrabold text-[15px] text-[#C46A4F] transition-transform hover:-translate-y-0.5 shadow-[0_4px_16px_rgba(0,0,0,0.06)]"
                 style={{ border: '2px solid #F7D2CC' }}
               >
-                😓 Chưa nhớ
+                {t.fcNotKnownBtn}
               </button>
               <button
                 onClick={() => mark(true)}
                 className="flex-1 border-none cursor-pointer bg-[#C7EFC4] rounded-[1.25rem] py-4 font-comic font-extrabold text-[15px] text-[#2F5C37] transition-transform hover:-translate-y-0.5 shadow-[0_4px_16px_rgba(79,154,90,0.2)]"
               >
-                ✅ Đã nhớ
+                {t.fcKnownBtn}
               </button>
             </div>
           ) : (
@@ -257,7 +260,7 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
       )}
 
       {!loading && !error && !card && !done && (
-        <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Chưa có thẻ nào.</div>
+        <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">{t.emptyState}</div>
       )}
 
       {done && (
@@ -268,16 +271,16 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
           >
             🦙
           </div>
-          <div className="font-comic font-extrabold text-2xl text-[#101A24] uppercase mb-2">Xong bộ thẻ rồi! 🎉</div>
-          <div className="text-sm font-bold text-[#8A8A8A] mb-6">Llama tự hào về bạn lắm đó!</div>
+          <div className="font-comic font-extrabold text-2xl text-[#101A24] uppercase mb-2">{t.fcDeckDone}</div>
+          <div className="text-sm font-bold text-[#8A8A8A] mb-6">{t.fcProudMessage}</div>
           <div className="flex gap-3.5 mb-7">
             <div className="flex-1 bg-[#EEF9EE] rounded-2xl py-4">
               <div className="font-comic font-extrabold text-2xl text-[#4F9A5A]">{known}</div>
-              <div className="text-[11px] font-extrabold text-[#4F9A5A] uppercase">Đã nhớ</div>
+              <div className="text-[11px] font-extrabold text-[#4F9A5A] uppercase">{t.fcKnownLabel}</div>
             </div>
             <div className="flex-1 bg-[#FBEAE6] rounded-2xl py-4">
               <div className="font-comic font-extrabold text-2xl text-[#C46A4F]">{unknown}</div>
-              <div className="text-[11px] font-extrabold text-[#C46A4F] uppercase">Chưa nhớ</div>
+              <div className="text-[11px] font-extrabold text-[#C46A4F] uppercase">{t.fcNotKnownLabel}</div>
             </div>
           </div>
           <div className="flex gap-3">
@@ -285,13 +288,13 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
               onClick={backToTopics}
               className="flex-1 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-4 font-comic font-bold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
             >
-              Chủ đề khác
+              {t.fcAnotherTopicBtn}
             </button>
             <button
               onClick={restartDeck}
               className="flex-[2] border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-[15px] text-[#20606E] shadow-[0_4px_14px_rgba(59,147,168,0.2)]"
             >
-              Ôn lại lần nữa 🔁
+              {t.fcRestartBtn}
             </button>
           </div>
         </div>

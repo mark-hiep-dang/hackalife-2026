@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { translations as t } from '../translations';
+import { useT, useLanguage } from '../translations';
 import { getDaysSinceLastStudy } from '../utils/streak';
 import { getNagTier, getRandomWelcomeMessage, getLlamaAnimation } from '../nagMessages';
 import LessonPath from './LessonPath';
@@ -28,10 +28,12 @@ const LLAMA_MOOD_IMAGES = {
 };
 
 export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout }) {
+  const t = useT();
+  const { lang } = useLanguage();
   const [showPathSelect, setShowPathSelect] = useState(false);
   const daysAbsent = getDaysSinceLastStudy();
-  const nagTier = useMemo(() => getNagTier(daysAbsent), [daysAbsent]);
-  const welcome = useMemo(() => getRandomWelcomeMessage(), []);
+  const nagTier = useMemo(() => getNagTier(daysAbsent, lang), [daysAbsent, lang]);
+  const welcome = useMemo(() => getRandomWelcomeMessage(lang), [lang]);
   const llamaAnim = useMemo(() => getLlamaAnimation({ daysAbsent, streak: profile?.streak ?? 0 }), [daysAbsent, profile?.streak]);
 
   if (!profile) return null;
@@ -113,9 +115,9 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
       {/* Lessons — Llama's climb to the MOF summit */}
       <div>
         <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide mb-1 flex items-center gap-2">
-          <span>⛰️</span> Llama cùng bạn tiến đến đỉnh MOF
+          <span>⛰️</span> {t.climbTitle.replace('{path}', profile.selected_path || 'MOF')}
         </h2>
-        <p className="text-sm font-bold text-[#8A8A8A] mb-4">Bấm vào từng trại để xem nội dung nhé!</p>
+        <p className="text-sm font-bold text-[#8A8A8A] mb-4">{t.climbSubtitle}</p>
 
         <LessonPath lessons={lessons} onSelectLesson={onSelectLesson} />
       </div>
