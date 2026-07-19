@@ -357,10 +357,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
-      const learners = await db.all(
-        `SELECT u.id, u.username FROM studio_cohort_learners cl JOIN users u ON cl.learner_id = u.id WHERE cl.cohort_id = ?`,
-        [cohort.id]
-      );
+      const learners = await getRealLearnerAccounts(db);
       const mockExams = await db.all('SELECT * FROM studio_mock_exams WHERE cohort_id = ? ORDER BY round_number', [cohort.id]);
       res.json({ cohort, learners, mockExams });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -463,44 +460,15 @@ export function mountStudioRoutes(app, authenticateToken) {
   });
 
   // ── Learner Support List + Individual Profile ────────────────────────────
+  // Kept cohort-scoped as a route (Mock Exam Analytics' "learners needing
+  // support" tab is nested under a cohort), but backed by the same real
+  // learner data as the top-level "Học viên" screen — see getRealLearnersWithRisk.
   app.get('/api/studio/cohorts/:id/learners-at-risk', ...T, async (req, res) => {
     const db = req.db;
     try {
       const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
-      const course = await db.get('SELECT target_score, exam_date FROM studio_courses WHERE id = ?', [cohort.course_id]);
-      const learners = await db.all('SELECT u.id, u.username FROM studio_cohort_learners cl JOIN users u ON cl.learner_id = u.id WHERE cl.cohort_id = ?', [cohort.id]);
-      const exams = await getCohortMockExams(db, cohort.id);
-
-      const daysUntilExam = course?.exam_date ? Math.max(0, Math.round((new Date(course.exam_date) - new Date()) / 86400000)) : undefined;
-
-      const results = [];
-      for (const learner of learners) {
-        const attempts = [];
-        for (const exam of exams) {
-          const a = await db.get('SELECT * FROM studio_mock_exam_attempts WHERE mock_exam_id = ? AND learner_id = ?', [exam.id, learner.id]);
-          if (a) attempts.push(a);
-        }
-        const recentScores = attempts.map((a) => a.score);
-        const highConfidenceMistakes = await db.get(
-          `SELECT COUNT(*) c FROM studio_mock_exam_answers WHERE attempt_id IN (${attempts.map((a) => a.id).join(',') || '-1'}) AND is_correct = 0 AND confidence = 'certain'`
-        );
-        const risk = detectLearnerRisk({
-          recentScoresChronological: recentScores, targetScore: course?.target_score || 70,
-          summitReadiness: attempts[attempts.length - 1]?.summit_readiness_before, daysUntilExam,
-          highConfidenceMistakeCount: highConfidenceMistakes.c, hasAttemptedAssigned: attempts.length > 0
-        });
-        const weakestAnswers = attempts.length
-          ? await db.all(`SELECT topic, mistake_type FROM studio_mock_exam_answers WHERE attempt_id = ? AND is_correct = 0`, [attempts[attempts.length - 1].id])
-          : [];
-        results.push({
-          id: learner.id, name: learner.username, latestScore: recentScores[recentScores.length - 1] ?? null,
-          scoreTrend: classifyTrend(recentScores), status: risk.status, reasons: risk.reasons,
-          recommendedAction: risk.recommendedAction, weakestTopic: weakestAnswers[0]?.topic?.replace(/^\d+\.\s*/, '') ?? null,
-          commonMistakeType: weakestAnswers[0]?.mistake_type ?? null, daysUntilExam
-        });
-      }
-      res.json(results);
+      res.json(await getRealLearnersWithRisk(db));
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -529,27 +497,42 @@ export function mountStudioRoutes(app, authenticateToken) {
     return { quizzes, scores, prefs, daysUntilExam, summitReadiness, answers, highConfidenceMistakeCount, commonMistakeType, weakestTopic };
   }
 
+  // All real, non-trainer accounts that have actually studied (at least one
+  // quiz/exam attempt) — the trainer's real student roster.
+  async function getRealLearnerAccounts(db) {
+    const learners = await db.all("SELECT id, username FROM users WHERE role IS NULL OR role != 'trainer'");
+    const active = [];
+    for (const learner of learners) {
+      const hasActivity = await db.get('SELECT 1 FROM user_quizzes WHERE user_id = ? LIMIT 1', [learner.id]);
+      if (hasActivity) active.push(learner);
+    }
+    return active;
+  }
+
+  async function getRealLearnersWithRisk(db) {
+    const learners = await getRealLearnerAccounts(db);
+    const results = [];
+    for (const learner of learners) {
+      const summary = await computeRealLearnerSummary(db, learner);
+      const risk = detectLearnerRisk({
+        recentScoresChronological: summary.scores, targetScore: summary.prefs?.target_score || 70,
+        summitReadiness: summary.summitReadiness, daysUntilExam: summary.daysUntilExam,
+        highConfidenceMistakeCount: summary.highConfidenceMistakeCount,
+        hasAttemptedAssigned: true, recentActivityCount: summary.quizzes.length
+      });
+      results.push({
+        id: learner.id, name: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
+        scoreTrend: classifyTrend(summary.scores), status: risk.status, reasons: risk.reasons,
+        recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType
+      });
+    }
+    return results;
+  }
+
   app.get('/api/studio/learners', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const learners = await db.all("SELECT id, username FROM users WHERE role IS NULL OR role != 'trainer'");
-      const results = [];
-      for (const learner of learners) {
-        const summary = await computeRealLearnerSummary(db, learner);
-        if (summary.quizzes.length === 0) continue; // only students actually studying, not empty accounts
-        const risk = detectLearnerRisk({
-          recentScoresChronological: summary.scores, targetScore: summary.prefs?.target_score || 70,
-          summitReadiness: summary.summitReadiness, daysUntilExam: summary.daysUntilExam,
-          highConfidenceMistakeCount: summary.highConfidenceMistakeCount,
-          hasAttemptedAssigned: true, recentActivityCount: summary.quizzes.length
-        });
-        results.push({
-          id: learner.id, name: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
-          scoreTrend: classifyTrend(summary.scores), status: risk.status, reasons: risk.reasons,
-          recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType
-        });
-      }
-      res.json(results);
+      res.json(await getRealLearnersWithRisk(db));
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
