@@ -1,5 +1,6 @@
 // Duolingo-style winding path — Llama climbs alongside you, one lesson per camp, up to the MOF summit.
 import { useState } from 'react';
+import { useT } from '../translations';
 
 const VERTICAL_GAP = 132;
 const NODE_SIZE = 88;
@@ -18,14 +19,14 @@ function getOffsetX(index) {
   return Math.round(Math.sin(index * 1.15) * 80);
 }
 
-function getCampInfo(index, total) {
+function getCampInfo(index, total, t) {
   const isBase = index === 0;
   const isSummit = index === total - 1;
 
   let label;
-  if (isBase) label = 'Trại Nền';
-  else if (isSummit) label = 'Đỉnh MOF';
-  else label = `Trại ${index}`;
+  if (isBase) label = t.campBase;
+  else if (isSummit) label = t.campSummit;
+  else label = t.campNumbered.replace('{n}', index);
 
   const baseAlt = 5364;
   const summitAlt = 8849;
@@ -35,6 +36,7 @@ function getCampInfo(index, total) {
 }
 
 export default function LessonPath({ lessons, onSelectLesson }) {
+  const t = useT();
   const [preview, setPreview] = useState(null);
   const total = lessons.length;
   if (total === 0) return null;
@@ -94,7 +96,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
 
         {points.map(({ origIdx, x, y }) => {
           const lesson = lessons[origIdx];
-          const { label, altitude, isSummit } = getCampInfo(origIdx, total);
+          const { label, altitude, isSummit } = getCampInfo(origIdx, total, t);
           const isLocked = !lesson.isUnlocked;
           const isCompleted = lesson.isCompleted;
           const isCurrent = origIdx === firstAvailableIdx;
@@ -109,7 +111,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
             <div key={lesson.id} className="absolute text-center" style={{ left: `${x}px`, top: `${y}px`, transform: 'translate(-50%, -50%)' }}>
               {isCurrent && (
                 <div className="absolute left-1/2 whitespace-nowrap bg-[#8A6FC9] text-white font-comic text-xs font-bold px-3.5 py-1.5 rounded-full pointer-events-none" style={{ bottom: `${NODE_SIZE / 2 + 22}px`, transform: 'translateX(-50%)', boxShadow: '0 4px 14px rgba(138,111,201,0.3)' }}>
-                  Bắt đầu ở đây 👇
+                  {t.campStartHere}
                 </div>
               )}
 
@@ -153,12 +155,12 @@ export default function LessonPath({ lessons, onSelectLesson }) {
 
             {preview.isLocked ? (
               <p className="text-sm font-bold text-[#3A3A3A] bg-[#EEF0F3] rounded-2xl p-4 mb-5 leading-relaxed">
-                🔒 Trại này đang khóa. Hoàn thành trại trước đó để mở đường lên đây nhé!
+                {t.campLockedMessage}
               </p>
             ) : (
               <div className="text-left bg-[#EEF0F3] rounded-2xl p-4 mb-5">
                 <p className="text-xs font-extrabold text-[#8A8A8A] uppercase tracking-wide mb-3">
-                  Trong trại này ({preview.lesson.cards.length} thẻ):
+                  {t.campCardsIn.replace('{n}', preview.lesson.cards.length)}
                 </p>
                 <ul className="flex flex-col gap-2 list-disc pl-4">
                   {preview.lesson.cards.map((card) => (
@@ -175,14 +177,14 @@ export default function LessonPath({ lessons, onSelectLesson }) {
                 className="flex-1 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-3.5 font-comic font-bold text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
                 onClick={() => setPreview(null)}
               >
-                Đóng
+                {t.campCloseBtn}
               </button>
               {!preview.isLocked && (
                 <button
                   className="flex-[2] border-none cursor-pointer bg-[#C7EFC4] rounded-2xl py-3.5 font-comic font-bold text-[#2F5C37] shadow-[0_4px_14px_rgba(79,154,90,0.25)]"
                   onClick={() => { onSelectLesson(preview.lesson); setPreview(null); }}
                 >
-                  Bắt đầu 🎯
+                  {t.campStartBtn}
                 </button>
               )}
             </div>

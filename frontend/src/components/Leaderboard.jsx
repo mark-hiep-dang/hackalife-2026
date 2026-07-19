@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getLeaderboard } from '../utils/api';
+import { useT } from '../translations';
 import podiumGold from '../assets/podium-gold.webp';
 import podiumSilver from '../assets/podium-silver.webp';
 import podiumBronze from '../assets/podium-bronze.webp';
@@ -12,6 +13,7 @@ const STAND_STYLE = {
 const PODIUM_ORDER = [2, 1, 3]; // classic podium visual order: 2nd, 1st, 3rd
 
 export default function Leaderboard({ profile }) {
+  const t = useT();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -20,7 +22,7 @@ export default function Leaderboard({ profile }) {
   useEffect(() => {
     (async () => {
       try { setData(await getLeaderboard()); }
-      catch (e) { setError(e.message || 'Lỗi tải BXH'); }
+      catch (e) { setError(e.message || t.lbLoadError); }
       finally { setLoading(false); }
     })();
   }, []);
@@ -35,17 +37,17 @@ export default function Leaderboard({ profile }) {
   const restRows = rows.filter((r) => r.rank > 3);
 
   const tabs = [
-    { id: 'daily', label: 'Hôm nay' },
-    { id: 'weekly', label: 'Tuần này' },
-    { id: 'monthly', label: 'Tháng này' }
+    { id: 'daily', label: t.lbTabDaily },
+    { id: 'weekly', label: t.lbTabWeekly },
+    { id: 'monthly', label: t.lbTabMonthly }
   ];
 
   return (
     <div className="pop-in max-w-3xl mx-auto w-full">
       <h2 className="font-comic font-extrabold text-xl text-[#101A24] uppercase tracking-wide mb-1 flex items-center gap-2">
-        <span>🏁</span> Đường Đua Llama
+        <span>🏁</span> {t.lbHeading}
       </h2>
-      <p className="text-sm font-bold text-[#8A8A8A] mb-4">Ai chạy nhanh nhất tuần này? Cán đích để giành huy chương! 🥇</p>
+      <p className="text-sm font-bold text-[#8A8A8A] mb-4">{t.lbSubtitle}</p>
 
       <div
         className="relative rounded-[2rem] overflow-hidden"
@@ -77,7 +79,7 @@ export default function Leaderboard({ profile }) {
         </div>
 
         {loading && (
-          <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">Đang tải BXH...</div>
+          <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">{t.lbLoading}</div>
         )}
         {error && (
           <div className="mx-5 my-6 py-6 text-center text-[#B4443B] bg-[#F7D2CC] rounded-2xl font-bold uppercase tracking-widest">{error}</div>
@@ -128,10 +130,10 @@ export default function Leaderboard({ profile }) {
                     <div className="flex items-center gap-2">
                       <span className="font-comic font-bold text-sm text-[#101A24] truncate">{row.username}</span>
                       {row.isMe && (
-                        <span className="text-[9px] font-extrabold bg-[#8A6FC9] text-white px-2 py-0.5 rounded-lg uppercase tracking-wide shrink-0">Bạn</span>
+                        <span className="text-[9px] font-extrabold bg-[#8A6FC9] text-white px-2 py-0.5 rounded-lg uppercase tracking-wide shrink-0">{t.lbYouBadge}</span>
                       )}
                     </div>
-                    <div className="text-[11px] font-bold text-[#8A8A8A] mt-0.5">🔥 {row.streak} ngày · Lv {row.level}</div>
+                    <div className="text-[11px] font-bold text-[#8A8A8A] mt-0.5">🔥 {t.lbStreakLevel.replace('{streak}', row.streak).replace('{level}', row.level)}</div>
                   </div>
                   <div className="font-comic font-extrabold text-base text-[#101A24] shrink-0">
                     {row.xp.toLocaleString()} <span className="text-[10px] text-[#8A8A8A]">XP</span>

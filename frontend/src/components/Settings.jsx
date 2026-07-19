@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { translations as t } from '../translations';
+import { useT, useLanguage } from '../translations';
 import { logout } from '../utils/api';
 import { getMuteState, setMuteState } from '../utils/sound';
 import { Settings as SettingsIcon, Volume2, VolumeX, LogOut, Database } from 'lucide-react';
 
 export default function Settings({ profile, setSession, onMuteToggled }) {
+  const t = useT();
+  const { lang, setLang } = useLanguage();
   const [ollamaUrl, setOllamaUrl] = useState(localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434');
   const [muted, setMuted] = useState(getMuteState());
   const [saved, setSaved] = useState(false);
@@ -37,9 +39,27 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
 
       {saved && (
         <div className="bg-[#C7EFC4] border border-[#101A24]/10 text-[#2F5C37] text-base font-extrabold uppercase tracking-widest px-5 py-4 rounded-2xl mb-8 shadow-sm">
-          ✓ Đã lưu cài đặt!
+          ✓ {t.settingsSaved}
         </div>
       )}
+
+      {/* Language */}
+      <Section title={t.languageLabel}>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setLang('vi')}
+            className={`flex-1 py-3.5 rounded-xl font-comic font-extrabold text-base transition-all ${lang === 'vi' ? 'bg-[#7C9AE0] text-white shadow-sm' : 'bg-[#EEF0F3] text-[#101A24]'}`}
+          >
+            🇻🇳 Tiếng Việt
+          </button>
+          <button
+            onClick={() => setLang('en')}
+            className={`flex-1 py-3.5 rounded-xl font-comic font-extrabold text-base transition-all ${lang === 'en' ? 'bg-[#7C9AE0] text-white shadow-sm' : 'bg-[#EEF0F3] text-[#101A24]'}`}
+          >
+            🇬🇧 English
+          </button>
+        </div>
+      </Section>
 
       {/* Sound */}
       <Section title={t.soundLabel}>
@@ -47,11 +67,11 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
           <div>
             <div className="flex items-center gap-3 text-base font-extrabold text-[#101A24] uppercase tracking-widest mb-1">
               {muted ? <VolumeX size={24} strokeWidth={3} /> : <Volume2 size={24} strokeWidth={3} />}
-              Hiệu ứng âm thanh
+              {t.soundEffectsLabel}
             </div>
-            <p className="text-sm text-[#888] font-bold">Tắt để học trong tĩnh lặng</p>
+            <p className="text-sm text-[#888] font-bold">{t.soundEffectsDesc}</p>
           </div>
-          
+
           <button onClick={toggleMute}
             className={`relative w-20 h-10 rounded-full border transition-all shadow-sm ${muted ? 'bg-gray-300 border-[#101A24]/10' : 'bg-[#7C9AE0] border-[#101A24]/10'}`}
           >
@@ -64,7 +84,7 @@ export default function Settings({ profile, setSession, onMuteToggled }) {
       <Section title={t.connectionConfig}>
         <form onSubmit={handleSave}>
           <div className="flex items-center gap-3 text-base font-extrabold text-[#101A24] uppercase tracking-widest mb-6">
-            <Database size={24} strokeWidth={3} /> LLM Địa phương (Ollama)
+            <Database size={24} strokeWidth={3} /> {t.localLlmLabel}
           </div>
           <input type="text" value={ollamaUrl} onChange={e => setOllamaUrl(e.target.value)}
             className="input-pro mb-6 text-lg py-4" placeholder="http://localhost:11434" />

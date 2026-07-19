@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateQuiz, submitQuizScore } from '../utils/api';
-import { translations as t } from '../translations';
+import { useT, useLanguage } from '../translations';
 import { playPang, playCheer, playScream } from '../utils/sound';
 import { Target, Flame, Zap, Medal, Crown, Crosshair, Clock, ArrowRight, ArrowLeft } from 'lucide-react';
 import llamaSpit from '../assets/llama-spit.webp';
@@ -16,6 +16,8 @@ const BADGE_ICONS = { first_lesson: Crosshair, streak_3: Target, streak_7: Flame
 const CARD_SHADOW = '0 4px 20px rgba(0,0,0,0.06)';
 
 export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
+  const t = useT();
+  const { lang } = useLanguage();
   const [topic, setTopic] = useState('all');
   const [difficulty, setDifficulty] = useState('intermediate');
   const [mode, setMode] = useState('practice');
@@ -55,11 +57,11 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
     setLoading(true); setError('');
     try {
       const qs = await generateQuiz(topic, difficulty, selectedMode);
-      if (qs.length === 0) throw new Error("Không có câu hỏi nào cho chủ đề này.");
+      if (qs.length === 0) throw new Error(t.quizNoQuestions);
       setQuestions(qs); setCidx(0); setScore(0); setCombo(0); setMaxCombo(0);
       setSelected(null); setAnswered(false); setTimeLeft(3600);
       setExamAnswers([]); setStarted(true); setFinished(false); setShowDetailedReport(false);
-    } catch (e) { setError(e.message || 'Lỗi tải đề thi'); }
+    } catch (e) { setError(e.message || t.quizLoadError); }
     finally { setLoading(false); }
   }
 
@@ -75,7 +77,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
       setWrongStreak(0);
       if (mode === 'practice') {
         playCheer();
-        setFeedbackText(pickCorrectResponse({ streak: nc, difficulty: q.difficulty, topic: q.topic }));
+        setFeedbackText(pickCorrectResponse({ streak: nc, difficulty: q.difficulty, topic: q.topic, lang }));
         window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'pang', x: e.clientX, y: e.clientY } }));
       }
     } else {
@@ -83,7 +85,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
       const nw = wrongStreak + 1; setWrongStreak(nw);
       if (mode === 'practice') {
         playScream();
-        setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx] }));
+        setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx], lang }));
         window.dispatchEvent(new CustomEvent('pang-chiu-effect', { detail: { type: 'chiu', x: e.clientX, y: e.clientY } }));
       }
     }
@@ -115,7 +117,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
     try {
       const r = await submitQuizScore({ score: fs, totalQuestions: questions.length, topic: mode === 'exam' ? 'full_exam' : topic, type: mode, maxCombo, answers });
       setXpEarned(r.xp_earned); setNewBadges(r.newBadges || []); playPang();
-    } catch (e) { setError(e.message || 'Lỗi lưu kết quả'); }
+    } catch (e) { setError(e.message || t.quizSaveError); }
     finally { setSubmitting(false); }
   }
 
@@ -141,7 +143,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
           onClick={onBack}
           className="flex items-center gap-1.5 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-2 px-3.5 mb-5 font-comic font-bold text-[13px] text-[#101A24]"
         >
-          <ArrowLeft size={16} strokeWidth={3} /> Trang chủ
+          <ArrowLeft size={16} strokeWidth={3} /> {t.navHome}
         </button>
       )}
       <img
@@ -150,8 +152,8 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
         className="w-24 h-24 object-contain mx-auto mb-5 wiggle"
         style={{ transform: 'rotate(-6deg)' }}
       />
-      <h2 className="font-comic font-extrabold text-3xl text-[#101A24] uppercase mb-2">Chọn chế độ chiến!</h2>
-      <p className="text-sm font-bold text-[#8A8A8A] mb-7">Luyện súng nhẹ nhàng hay thử lửa thi thật?</p>
+      <h2 className="font-comic font-extrabold text-3xl text-[#101A24] uppercase mb-2">{t.quizChooseModeHeading}</h2>
+      <p className="text-sm font-bold text-[#8A8A8A] mb-7">{t.quizChooseModeSubtitle}</p>
 
       <div className="flex gap-4 mb-3">
         <button
@@ -165,7 +167,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
         >
           <img src={quizPracticeMode} alt="" className="w-14 h-14 object-contain" />
           <span className="font-comic font-extrabold text-base text-[#101A24]">{t.practiceMode}</span>
-          <span className="text-xs font-bold text-[#2F5C37]">5 câu, thoải mái xem giải thích</span>
+          <span className="text-xs font-bold text-[#2F5C37]">{t.quizPracticeDesc}</span>
         </button>
         <button
           onClick={() => { setMode('exam'); startQuiz('exam'); }}
@@ -178,12 +180,12 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
         >
           <img src={quizExamMode} alt="" className="w-14 h-14 object-contain" />
           <span className="font-comic font-extrabold text-base text-[#101A24]">{t.examMode}</span>
-          <span className="text-xs font-bold text-[#6B4FA8]">40 câu • 60 phút • tính giờ nghiêm túc</span>
+          <span className="text-xs font-bold text-[#6B4FA8]">{t.quizExamDesc}</span>
         </button>
       </div>
 
       {loading && (
-        <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#8A8A8A] mb-4">Đang chuẩn bị đạn...</p>
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#8A8A8A] mb-4">{t.quizPreparing}</p>
       )}
 
       {error && (
@@ -194,7 +196,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
         onClick={() => setShowHistory(true)}
         className="w-full border-none cursor-pointer bg-white rounded-2xl py-3 mt-3 font-comic font-extrabold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
       >
-        📜 Lịch sử thi thử
+        {t.quizHistoryBtn}
       </button>
     </div>
   );
@@ -216,7 +218,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
 
         {mode === 'exam' && (
           <div className={`inline-block mb-10 px-6 py-3 rounded-2xl border border-[#101A24]/10 shadow-sm font-extrabold uppercase tracking-widest text-white ${pct >= 70 ? 'bg-[#6B8AD6]' : 'bg-[#D9695F]'}`}>
-            {pct >= 70 ? 'ĐẠT RỒI! 🎉 Xạ thủ đúng chuẩn đại lý tương lai đây!' : 'Chưa đủ 70% đâu nha, đừng buồn! Xạ thủ giỏi cỡ nào cũng từng bắn trượt trước khi trăm phát trăm trúng 💪'}
+            {pct >= 70 ? t.quizPassMessage : t.quizFailMessage}
           </div>
         )}
 
@@ -233,7 +235,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
 
         {newBadges.length > 0 && (
           <div className="bg-[#B9E7EF] border border-[#101A24]/10 rounded-2xl p-6 shadow-sm text-left mb-10">
-            <p className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] mb-4">🏅 Huy hiệu mới</p>
+            <p className="text-sm font-extrabold uppercase tracking-widest text-[#101A24] mb-4">{t.quizNewBadges}</p>
             <div className="flex flex-col gap-3">
               {newBadges.map(bid => {
                 const Icon = BADGE_ICONS[bid] || Zap;
@@ -272,7 +274,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
             </span>
           ) : combo > 1 ? (
             <span className="flex items-center gap-1.5 font-comic font-extrabold text-sm px-4 py-2 rounded-2xl" style={{ background: '#F7DA8A', color: '#101A24', boxShadow: '0 4px 14px rgba(184,145,46,0.25)', transform: 'rotate(-2deg)' }}>
-              🔥 Combo {combo}x
+              {t.quizComboIndicator.replace('{combo}', combo)}
             </span>
           ) : null}
         </div>
@@ -292,7 +294,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
           className="absolute font-comic font-bold text-xs text-white bg-[#8A6FC9] px-4 py-2 rounded-full"
           style={{ top: '-18px', left: '28px', boxShadow: '0 4px 14px rgba(138,111,201,0.3)', transform: 'rotate(-3deg)' }}
         >
-          🎯 Sẵn sàng bắn chưa?
+          {t.quizReadyTag}
         </span>
 
         <h3 className="font-comic font-extrabold text-xl md:text-2xl text-[#101A24] leading-snug mt-3 mb-7">
@@ -352,7 +354,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
                 >
                   <img
                     src={isCorrect ? llamaCheer : llamaSpit}
-                    alt={isCorrect ? 'Llama hoan hô vì bạn trả lời đúng' : 'Llama phun nước vào mặt vì bạn trả lời sai'}
+                    alt={isCorrect ? t.quizCorrectAlt : t.quizWrongAlt}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -377,7 +379,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack }) {
               <div className="text-left bg-[#EEF0F3] rounded-2xl p-5 mb-6">
                 <strong className="block text-[#101A24] text-xs font-extrabold uppercase tracking-widest mb-2">{t.explanationTitle}</strong>
                 <p className="text-sm font-bold text-[#3A3A3A] leading-relaxed">{q.explanation}</p>
-                {q.source && <p className="mt-3 text-xs font-medium text-[#8A8A8A] italic">Nguồn: {q.source}</p>}
+                {q.source && <p className="mt-3 text-xs font-medium text-[#8A8A8A] italic">{t.quizSourceLabel.replace('{source}', q.source)}</p>}
               </div>
 
               <button
