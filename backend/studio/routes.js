@@ -78,8 +78,8 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.get('/api/studio/overview', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const courses = await db.all('SELECT * FROM studio_courses WHERE trainer_id = ?', [req.user.id]);
-      const cohorts = await db.all('SELECT * FROM studio_cohorts WHERE trainer_id = ?', [req.user.id]);
+      const courses = await db.all('SELECT * FROM studio_courses');
+      const cohorts = await db.all('SELECT * FROM studio_cohorts');
       const cohortIds = cohorts.map((c) => c.id);
       const learnerCountRow = cohortIds.length
         ? await db.get(`SELECT COUNT(DISTINCT learner_id) c FROM studio_cohort_learners WHERE cohort_id IN (${cohortIds.join(',')})`)
@@ -131,7 +131,7 @@ export function mountStudioRoutes(app, authenticateToken) {
 
   app.get('/api/studio/courses', ...T, async (req, res) => {
     try {
-      const courses = await req.db.all('SELECT * FROM studio_courses WHERE trainer_id = ? ORDER BY created_at DESC', [req.user.id]);
+      const courses = await req.db.all('SELECT * FROM studio_courses ORDER BY created_at DESC');
       res.json(courses);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -140,7 +140,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     const db = req.db;
     try {
       const bundle = await loadCourseBundle(db, req.params.id);
-      if (!bundle || bundle.course.trainer_id !== req.user.id) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      if (!bundle) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
       res.json({
         course: bundle.course,
         camps: bundle.camps,
@@ -153,7 +153,7 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.post('/api/studio/courses/:id/curriculum/generate', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const course = await db.get('SELECT * FROM studio_courses WHERE id = ? AND trainer_id = ?', [req.params.id, req.user.id]);
+      const course = await db.get('SELECT * FROM studio_courses WHERE id = ?', [req.params.id]);
       if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
 
       const curriculum = await generateCurriculum(db, { preferredCamps: course.preferred_camps || 4, targetDurationMinutes: (course.duration_weeks || 4) * 5 * 20 });
@@ -185,7 +185,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     const db = req.db;
     try {
       const bundle = await loadCourseBundle(db, req.params.id);
-      if (!bundle || bundle.course.trainer_id !== req.user.id) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      if (!bundle) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
       const { cohortId } = req.body;
 
       const latestCheck = await db.get('SELECT * FROM studio_quality_checks WHERE course_id = ? ORDER BY id DESC LIMIT 1', [bundle.course.id]);
@@ -210,8 +210,6 @@ export function mountStudioRoutes(app, authenticateToken) {
         [req.params.id]
       );
       if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
-      const course = await db.get('SELECT trainer_id FROM studio_courses WHERE id = ?', [lesson.course_id]);
-      if (course.trainer_id !== req.user.id) return res.status(403).json({ error: 'Không có quyền' });
 
       // The lesson's title doubles as its mapped real exam topic (see studioAIService's DEFAULT_CAMP_GROUPING).
       const topicRow = await db.get(`SELECT DISTINCT topic FROM test_questions WHERE topic LIKE ?`, [`%${lesson.title}%`]);
@@ -288,7 +286,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     const db = req.db;
     try {
       const bundle = await loadCourseBundle(db, req.params.id);
-      if (!bundle || bundle.course.trainer_id !== req.user.id) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      if (!bundle) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
 
       const quality = checkCourseQuality({
         course: { id: bundle.course.id, targetDurationMinutes: (bundle.course.duration_weeks || 4) * 5 * 20 },
@@ -348,8 +346,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const cohorts = await req.db.all(
         `SELECT co.*, cr.title as courseTitle, (SELECT COUNT(*) FROM studio_cohort_learners WHERE cohort_id = co.id) as learnerCount
-         FROM studio_cohorts co JOIN studio_courses cr ON co.course_id = cr.id WHERE co.trainer_id = ? ORDER BY co.created_at DESC`,
-        [req.user.id]
+         FROM studio_cohorts co JOIN studio_courses cr ON co.course_id = cr.id ORDER BY co.created_at DESC`
       );
       res.json(cohorts);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -358,7 +355,7 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.get('/api/studio/cohorts/:id', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ? AND trainer_id = ?', [req.params.id, req.user.id]);
+      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
       const learners = await db.all(
         `SELECT u.id, u.username FROM studio_cohort_learners cl JOIN users u ON cl.learner_id = u.id WHERE cl.cohort_id = ?`,
@@ -377,7 +374,7 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.get('/api/studio/cohorts/:id/mock-exam-analytics', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ? AND trainer_id = ?', [req.params.id, req.user.id]);
+      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
       const course = await db.get('SELECT target_score FROM studio_courses WHERE id = ?', [cohort.course_id]);
       const targetScore = course?.target_score || 70;
@@ -469,7 +466,7 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.get('/api/studio/cohorts/:id/learners-at-risk', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ? AND trainer_id = ?', [req.params.id, req.user.id]);
+      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
       const course = await db.get('SELECT target_score, exam_date FROM studio_courses WHERE id = ?', [cohort.course_id]);
       const learners = await db.all('SELECT u.id, u.username FROM studio_cohort_learners cl JOIN users u ON cl.learner_id = u.id WHERE cl.cohort_id = ?', [cohort.id]);
@@ -588,7 +585,7 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.post('/api/studio/cohorts/:id/detect-clusters', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ? AND trainer_id = ?', [req.params.id, req.user.id]);
+      const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
       const exams = await getCohortMockExams(db, cohort.id);
       if (exams.length === 0) return res.json({ clusters: [] });
