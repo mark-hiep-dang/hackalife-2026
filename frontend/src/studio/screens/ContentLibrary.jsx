@@ -3,11 +3,11 @@ import { getCourses, getCourse, generateLessonKit, reviewContentItem, rewriteCon
 import { Card, SectionTitle, Button, Spinner, EmptyState } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import { Sparkles, Check, X, Pencil, RefreshCw } from 'lucide-react';
+import { useT } from '../../translations';
 
-const TYPE_LABEL = { flashcard: 'Flashcard', mcq: 'Câu hỏi', scenario: 'Tình huống', checkpoint: 'Checkpoint' };
-const STATUS_LABEL = { AI_DRAFT: 'AI nháp', TRAINER_EDITING: 'Đang chỉnh sửa', READY_FOR_REVIEW: 'Chờ duyệt', APPROVED: 'Đã duyệt', PUBLISHED: 'Đã publish', ARCHIVED: 'Đã loại bỏ' };
-
-function ContentItemCard({ item, onChanged }) {
+function ContentItemCard({ item, onChanged, t }) {
+  const TYPE_LABEL = { flashcard: t.studioTypeFlashcard, mcq: t.studioTypeMcq, scenario: t.studioTypeScenario, checkpoint: t.studioTypeCheckpoint };
+  const STATUS_LABEL = { AI_DRAFT: t.studioStatusAiDraft, TRAINER_EDITING: t.studioStatusTrainerEditing, READY_FOR_REVIEW: t.studioStatusReadyForReview, APPROVED: t.studioStatusApproved, PUBLISHED: t.studioStatusPublished, ARCHIVED: t.studioStatusArchived };
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.questionText || '');
   const [rewrite, setRewrite] = useState(null);
@@ -38,19 +38,19 @@ function ContentItemCard({ item, onChanged }) {
           {item.options.map((o, i) => <li key={i} className={i === item.correctOption ? 'font-bold text-[#101A24]' : ''}>{o}</li>)}
         </ul>
       )}
-      {rewrite && <p className="text-xs bg-[#F5F6F8] rounded-lg p-2 text-[#101A24]"><strong>Gợi ý viết lại:</strong> {rewrite.rewrittenText || rewrite.suggestion}</p>}
+      {rewrite && <p className="text-xs bg-[#F5F6F8] rounded-lg p-2 text-[#101A24]"><strong>{t.studioSuggestRewrite}</strong> {rewrite.rewrittenText || rewrite.suggestion}</p>}
       <div className="flex flex-wrap gap-2 mt-1">
         {editing ? (
           <>
-            <Button variant="success" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => { act('edit', { questionText: draft }); setEditing(false); }} disabled={busy}><Check size={14} /> Lưu</Button>
-            <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={() => setEditing(false)}>Hủy</Button>
+            <Button variant="success" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => { act('edit', { questionText: draft }); setEditing(false); }} disabled={busy}><Check size={14} /> {t.studioSave}</Button>
+            <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={() => setEditing(false)}>{t.studioCancel}</Button>
           </>
         ) : (
           <>
-            <Button variant="success" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => act('approve')} disabled={busy}><Check size={14} /> Duyệt</Button>
-            <Button variant="secondary" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => setEditing(true)}><Pencil size={14} /> Sửa</Button>
-            <Button variant="secondary" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={handleRewrite} disabled={busy}><RefreshCw size={14} /> Llama viết lại</Button>
-            <Button variant="danger" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => act('reject')} disabled={busy}><X size={14} /> Loại bỏ</Button>
+            <Button variant="success" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => act('approve')} disabled={busy}><Check size={14} /> {t.studioApprove}</Button>
+            <Button variant="secondary" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => setEditing(true)}><Pencil size={14} /> {t.studioEdit}</Button>
+            <Button variant="secondary" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={handleRewrite} disabled={busy}><RefreshCw size={14} /> {t.studioLlamaRewrite}</Button>
+            <Button variant="danger" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => act('reject')} disabled={busy}><X size={14} /> {t.studioReject}</Button>
           </>
         )}
       </div>
@@ -58,7 +58,7 @@ function ContentItemCard({ item, onChanged }) {
   );
 }
 
-function LessonPanel({ lesson, items, onChanged }) {
+function LessonPanel({ lesson, items, onChanged, t }) {
   const [busy, setBusy] = useState(false);
   const [reaction, setReaction] = useState(null);
 
@@ -78,18 +78,18 @@ function LessonPanel({ lesson, items, onChanged }) {
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div>
           <h3 className="font-extrabold text-[#101A24]">{lesson.title}</h3>
-          <p className="text-xs text-[#888]">{lesson.estimatedMinutes} phút · {lesson.difficulty} · Trọng số thi {Math.round((lesson.examWeight || 0) * 100)}%</p>
+          <p className="text-xs text-[#888]">{t.studioMinutesLabel.replace('{n}', lesson.estimatedMinutes)} · {lesson.difficulty} · {t.studioExamWeightLabel.replace('{n}', Math.round((lesson.examWeight || 0) * 100))}</p>
         </div>
         <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2">
-          <Sparkles size={16} /> {items.length ? 'Tạo lại bộ nội dung' : 'Tạo bộ nội dung AI'}
+          <Sparkles size={16} /> {items.length ? t.studioRegenerateKit : t.studioGenerateKit}
         </Button>
       </div>
       {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} className="mb-3" />}
       {items.length === 0 ? (
-        <EmptyState>Chưa có nội dung. Bấm "Tạo bộ nội dung AI" để soạn flashcard, câu hỏi và tình huống.</EmptyState>
+        <EmptyState>{t.studioNoContentYet}</EmptyState>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.map((item) => <ContentItemCard key={item.id} item={item} onChanged={onChanged} />)}
+          {items.map((item) => <ContentItemCard key={item.id} item={item} onChanged={onChanged} t={t} />)}
         </div>
       )}
     </Card>
@@ -97,6 +97,7 @@ function LessonPanel({ lesson, items, onChanged }) {
 }
 
 export default function ContentLibrary() {
+  const t = useT();
   const [courses, setCourses] = useState(null);
   const [courseId, setCourseId] = useState(null);
   const [bundle, setBundle] = useState(null);
@@ -112,15 +113,15 @@ export default function ContentLibrary() {
   }
   useEffect(() => { loadBundle(); }, [courseId]);
 
-  if (!courses) return <Spinner />;
-  if (courses.length === 0) return <EmptyState>Chưa có khóa học nào. Tạo khóa học ở mục "Khóa học" trước.</EmptyState>;
+  if (!courses) return <Spinner label={t.studioLoading} />;
+  if (courses.length === 0) return <EmptyState>{t.studioNoCoursesForLibrary}</EmptyState>;
 
   const lesson = bundle?.lessons.find((l) => l.id === lessonId);
   const items = bundle?.contentItems.filter((c) => c.lessonId === lessonId) || [];
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionTitle subtitle="Soạn và duyệt flashcard, câu hỏi, tình huống cho từng chặng học.">Thư viện nội dung</SectionTitle>
+      <SectionTitle subtitle={t.studioLibrarySubtitle}>{t.studioLibraryTitle}</SectionTitle>
 
       <div className="flex gap-3 flex-wrap">
         <select value={courseId || ''} onChange={(e) => { setCourseId(Number(e.target.value)); setLessonId(null); }} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm font-bold">
@@ -128,8 +129,8 @@ export default function ContentLibrary() {
         </select>
       </div>
 
-      {!bundle ? <Spinner /> : bundle.lessons.length === 0 ? (
-        <EmptyState>Khóa học này chưa có chặng học nào. Vào "Khóa học" → Course Architect để tạo giáo trình trước.</EmptyState>
+      {!bundle ? <Spinner label={t.studioLoading} /> : bundle.lessons.length === 0 ? (
+        <EmptyState>{t.studioNoLessonsYet}</EmptyState>
       ) : (
         <div className="flex gap-6 flex-col md:flex-row">
           <div className="md:w-64 shrink-0 flex flex-col gap-2">
@@ -140,7 +141,7 @@ export default function ContentLibrary() {
             ))}
           </div>
           <div className="flex-1">
-            {lesson && <LessonPanel lesson={lesson} items={items} onChanged={loadBundle} />}
+            {lesson && <LessonPanel lesson={lesson} items={items} onChanged={loadBundle} t={t} />}
           </div>
         </div>
       )}

@@ -2,18 +2,16 @@ import { useState, useEffect } from 'react';
 import { useT, useLanguage } from '../translations';
 import { logout, getPreferences, updatePreferences } from '../utils/api';
 import { getMuteState, setMuteState } from '../utils/sound';
-import { Settings as SettingsIcon, Volume2, VolumeX, LogOut, Database, Compass, GraduationCap } from 'lucide-react';
-import { switchRole } from '../utils/studioApi';
+import { Settings as SettingsIcon, Volume2, VolumeX, LogOut, Database, Compass } from 'lucide-react';
 
 const DAILY_MINUTES_OPTIONS = [10, 15, 20, 30, 45, 60];
 
-export default function Settings({ profile, setSession, onMuteToggled, onRoleChanged }) {
+export default function Settings({ profile, setSession, onMuteToggled }) {
   const t = useT();
   const { lang, setLang } = useLanguage();
   const [ollamaUrl, setOllamaUrl] = useState(localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434');
   const [muted, setMuted] = useState(getMuteState());
   const [saved, setSaved] = useState(false);
-  const [switchingRole, setSwitchingRole] = useState(false);
 
   const [prefs, setPrefs] = useState(null);
   const [prefsSaved, setPrefsSaved] = useState(false);
@@ -31,11 +29,6 @@ export default function Settings({ profile, setSession, onMuteToggled, onRoleCha
     const n = !muted; setMuted(n); setMuteState(n); onMuteToggled(n);
   }
   function handleLogout() { logout(); setSession(null); }
-
-  async function handleEnterStudio() {
-    setSwitchingRole(true);
-    try { await switchRole('trainer'); onRoleChanged(); } finally { setSwitchingRole(false); }
-  }
 
   async function handleSavePrefs(e) {
     e.preventDefault();
@@ -215,19 +208,6 @@ export default function Settings({ profile, setSession, onMuteToggled, onRoleCha
             className="input-pro mb-6 text-lg py-4" placeholder="http://localhost:11434" />
           <button type="submit" className="btn-pro bg-[#B9E7EF] text-[#20606E] hover:bg-[#A8DEE8] w-full text-xl py-4">{t.saveConfig}</button>
         </form>
-      </Section>
-
-      {/* Llama Studio access */}
-      <Section title="Llama Studio">
-        <div className="flex items-center gap-3 text-base font-extrabold text-[#101A24] uppercase tracking-widest mb-3">
-          <GraduationCap size={24} strokeWidth={3} /> Chế độ trainer
-        </div>
-        <p className="text-sm text-[#888] font-bold mb-5">Chuyển sang Llama Studio để dựng giáo trình, soạn nội dung và theo dõi học viên. Đây là chế độ demo, bạn có thể quay lại app học viên bất cứ lúc nào.</p>
-        <button onClick={handleEnterStudio} disabled={switchingRole}
-          className="btn-pro bg-[#E3D9F5] text-[#101A24] hover:bg-[#D6C7EE] w-full text-lg py-4 disabled:opacity-50"
-        >
-          {switchingRole ? 'Đang chuyển…' : 'Vào Llama Studio'}
-        </button>
       </Section>
 
       {/* Logout */}

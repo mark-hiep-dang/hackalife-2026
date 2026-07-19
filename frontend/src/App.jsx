@@ -219,7 +219,7 @@ export default function App() {
               {activeTab === 'flashcards' && <div className="max-w-4xl mx-auto"><Flashcards initialTopic={flashcardTopic} onConsumeInitialTopic={() => setFlashcardTopic(null)} onBack={() => setActiveTab('home')} /></div>}
               {activeTab === 'chat' && <Chat initialContext={chatContext} onConsumeInitialContext={() => setChatContext(null)} />}
               {activeTab === 'leaderboard' && <div className="max-w-3xl mx-auto"><Leaderboard profile={profile} /></div>}
-              {activeTab === 'settings' && <div className="max-w-2xl mx-auto"><Settings profile={profile} setSession={setSession} onMuteToggled={setMuted} onRoleChanged={fetchUserDossier} /></div>}
+              {activeTab === 'settings' && <div className="max-w-2xl mx-auto"><Settings profile={profile} setSession={setSession} onMuteToggled={setMuted} /></div>}
             </>
           )}
         </div>

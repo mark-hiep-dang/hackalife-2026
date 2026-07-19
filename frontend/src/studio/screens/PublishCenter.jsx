@@ -3,6 +3,7 @@ import { getCourses, getCourse, getCohorts, runQualityCheck, getQuality, publish
 import { Card, SectionTitle, Button, Spinner, EmptyState } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import { CheckCircle2, XCircle, UploadCloud } from 'lucide-react';
+import { useT } from '../../translations';
 
 function ChecklistItem({ ok, label }) {
   return (
@@ -14,6 +15,7 @@ function ChecklistItem({ ok, label }) {
 }
 
 export default function PublishCenter() {
+  const t = useT();
   const [courses, setCourses] = useState(null);
   const [cohorts, setCohorts] = useState(null);
   const [courseId, setCourseId] = useState(null);
@@ -50,8 +52,8 @@ export default function PublishCenter() {
     finally { setBusy(false); }
   }
 
-  if (!courses || !cohorts) return <Spinner />;
-  if (courses.length === 0) return <EmptyState>Chưa có khóa học nào để publish.</EmptyState>;
+  if (!courses || !cohorts) return <Spinner label={t.studioLoading} />;
+  if (courses.length === 0) return <EmptyState>{t.studioNoCoursesToPublish}</EmptyState>;
 
   const lessons = bundle?.lessons || [];
   const hasBlockers = quality?.issues?.some((i) => i.severity === 'BLOCKER');
@@ -65,39 +67,39 @@ export default function PublishCenter() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionTitle subtitle="Kiểm tra toàn bộ trước khi mở khóa học cho học viên.">Publish Center</SectionTitle>
+      <SectionTitle subtitle={t.studioPublishSubtitle}>{t.studioPublishTitle}</SectionTitle>
 
       <select value={courseId || ''} onChange={(e) => setCourseId(Number(e.target.value))} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm font-bold w-fit">
         {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
       </select>
 
-      {!bundle ? <Spinner /> : (
+      {!bundle ? <Spinner label={t.studioLoading} /> : (
         <>
           <Card>
             <div className="flex items-center justify-between mb-4">
-              <SectionTitle>Checklist trước khi publish</SectionTitle>
-              <Button variant="secondary" onClick={handleCheck} disabled={busy}>{busy ? 'Đang kiểm tra…' : 'Chạy Quality Check'}</Button>
+              <SectionTitle>{t.studioChecklistTitle}</SectionTitle>
+              <Button variant="secondary" onClick={handleCheck} disabled={busy}>{busy ? t.studioChecking : t.studioRunQualityCheck}</Button>
             </div>
             <div className="flex flex-col gap-3">
-              <ChecklistItem ok={hasLessons} label="Đã có chặng học trong giáo trình" />
-              <ChecklistItem ok={hasSources} label="Mọi chặng học đều có nguồn tài liệu đã duyệt" />
-              <ChecklistItem ok={hasCheckpoints} label="Có ít nhất một checkpoint kiểm tra" />
-              <ChecklistItem ok={!!quality && !hasBlockers} label="Không còn vấn đề chặn publish (blocker)" />
-              <ChecklistItem ok={unapprovedDrafts === 0} label={`Không còn nội dung AI Draft chưa duyệt (${unapprovedDrafts} còn lại)`} />
-              <ChecklistItem ok={cohortSelected} label="Đã chọn nhóm học để publish" />
+              <ChecklistItem ok={hasLessons} label={t.studioChecklistHasLessons} />
+              <ChecklistItem ok={hasSources} label={t.studioChecklistHasSources} />
+              <ChecklistItem ok={hasCheckpoints} label={t.studioChecklistHasCheckpoints} />
+              <ChecklistItem ok={!!quality && !hasBlockers} label={t.studioChecklistNoBlockers} />
+              <ChecklistItem ok={unapprovedDrafts === 0} label={t.studioChecklistNoDrafts.replace('{n}', unapprovedDrafts)} />
+              <ChecklistItem ok={cohortSelected} label={t.studioChecklistCohortSelected} />
             </div>
           </Card>
 
           <Card>
-            <SectionTitle>Chọn nhóm học và publish</SectionTitle>
+            <SectionTitle>{t.studioChooseCohortTitle}</SectionTitle>
             <select value={cohortId} onChange={(e) => setCohortId(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm font-bold w-fit mb-4">
-              <option value="">— Chọn nhóm học —</option>
+              <option value="">{t.studioChooseCohortPlaceholder}</option>
               {availableCohorts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
             <div>
               <Button onClick={handlePublish} disabled={!canPublish || busy} className="flex items-center gap-2">
-                <UploadCloud size={16} /> {busy ? 'Đang publish…' : 'Publish khóa học'}
+                <UploadCloud size={16} /> {busy ? t.studioPublishing : t.studioPublishCourseBtn}
               </Button>
             </div>
             {published && <StudioLlamaBubble event="COURSE_PUBLISHED" className="mt-4" />}
