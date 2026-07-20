@@ -34,13 +34,20 @@ export function buildFtsQuery(message) {
   return words.map((w) => `"${w}"*`).join(' OR ');
 }
 
+// AI usage audit §8: only ever retrieve from documents the trainer has
+// approved — a chunk from an unapproved/draft upload must never reach a
+// generation prompt. (Previously this had no approved-flag check at all.)
 export async function retrieveKnowledge(db, message, limit = 5) {
   const ftsQuery = buildFtsQuery(message);
   if (!ftsQuery) return [];
   try {
     return await db.all(
-      `SELECT chunk_id, document_id, content, bm25(knowledge_chunks_fts) as score
-       FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ? ORDER BY score LIMIT ?`,
+      `SELECT knowledge_chunks_fts.chunk_id as chunk_id, knowledge_chunks_fts.document_id as document_id,
+              knowledge_chunks_fts.content as content, bm25(knowledge_chunks_fts) as score
+       FROM knowledge_chunks_fts
+       JOIN knowledge_documents d ON knowledge_chunks_fts.document_id = d.id
+       WHERE knowledge_chunks_fts MATCH ? AND d.approved = 1
+       ORDER BY score LIMIT ?`,
       [ftsQuery, limit]
     );
   } catch (err) {

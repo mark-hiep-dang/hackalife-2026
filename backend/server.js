@@ -768,7 +768,7 @@ app.get('/api/expedition/daily', authenticateToken, async (req, res) => {
       focusTopicLabel: plan.focusTopic || '',
       deterministicExplanation: plan.explanation,
       dailyMinutes
-    });
+    }, db);
 
     const result = { ...plan, explanation, date: today, completed: false };
     await db.run(
@@ -836,7 +836,8 @@ app.post('/api/rescue-trail/complete', authenticateToken, async (req, res) => {
 app.post('/api/llama/explain-mistake', authenticateToken, async (req, res) => {
   const { mistakeLabel, explanation, question } = req.body;
   try {
-    const result = await explainMistake({ mistakeLabel, explanation, question });
+    const db = await getDb();
+    const result = await explainMistake({ mistakeLabel, explanation, question }, db);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

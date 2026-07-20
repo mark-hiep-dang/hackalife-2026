@@ -295,7 +295,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const item = await req.db.get('SELECT * FROM studio_content_items WHERE id = ?', [req.params.id]);
       if (!item) return res.status(404).json({ error: 'Không tìm thấy nội dung' });
-      const result = await suggestQuestionRewrite({ questionText: item.question_text, flags: req.body.flags || [] });
+      const result = await suggestQuestionRewrite({ questionText: item.question_text, flags: req.body.flags || [] }, req.db);
       res.json(result);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -304,7 +304,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const lesson = await req.db.get('SELECT l.*, c.title as campTitle FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id WHERE l.id = ?', [req.params.id]);
       if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
-      const result = await explainCurriculumDecision({ lessonTitle: lesson.title, campTitle: lesson.campTitle, examWeight: lesson.exam_weight });
+      const result = await explainCurriculumDecision({ lessonTitle: lesson.title, campTitle: lesson.campTitle, examWeight: lesson.exam_weight }, req.db);
       res.json(result);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -357,7 +357,7 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const issue = await req.db.get('SELECT * FROM studio_quality_issues WHERE id = ?', [req.params.id]);
       if (!issue) return res.status(404).json({ error: 'Không tìm thấy vấn đề' });
-      const result = await suggestQualityFix({ category: issue.category, message: issue.message });
+      const result = await suggestQualityFix({ category: issue.category, message: issue.message, severity: issue.severity }, req.db);
       res.json(result);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -446,7 +446,7 @@ export function mountStudioRoutes(app, authenticateToken) {
       const insight = await summarizeMockExamInsight({
         averageScore: overview.averageScore, changeFromPrevious: overview.changeFromPrevious,
         weakestTopic: topics[0]?.topic?.replace(/^\d+\.\s*/, ''), passRate: overview.passRate
-      });
+      }, db);
 
       res.json({ overview, topics, trend, cohortTrend, insight: insight.summary, latestExamId: latestExam.id });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -575,7 +575,7 @@ export function mountStudioRoutes(app, authenticateToken) {
       const insight = await summarizeLearnerInsight({
         learnerName: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
         trend: classifyTrend(summary.scores), weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType
-      });
+      }, db);
 
       res.json({
         learner, mockExamHistory: summary.scores, latestScore: summary.scores[summary.scores.length - 1] ?? null,
