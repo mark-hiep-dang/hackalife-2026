@@ -12,7 +12,7 @@ import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk } from '../kno
 import { assembleRescueTrail, getConceptPair } from '../engines/rescueTrail.js';
 import { AI_TASKS } from '../aiConfig.js';
 import { validateCurriculumProposal, validateInterventionProposal } from '../aiValidation.js';
-import { withGenerationCache } from '../aiCache.js';
+import { withGenerationCache, withCacheControl } from '../aiCache.js';
 
 function studioCallGemini(systemInstruction, userMessage, task, db) {
   return callGemini(systemInstruction, userMessage, { task, db, label: 'StudioAIService' });
@@ -126,7 +126,10 @@ async function buildCurriculumProposal(db, input = {}) {
   );
   if (raw) proposal.summary = raw.trim();
 
-  return proposal;
+  // Only cache a result that actually used AI — caching a fallback-only
+  // attempt would lock in the fallback for this fingerprint even after a
+  // transient Gemini failure clears up.
+  return withCacheControl(proposal, !!raw);
 }
 
 // ── Lesson Kit generation — pulls REAL content for the lesson's mapped topic ──
@@ -267,7 +270,7 @@ async function buildInterventionProposal(db, { topic, mistakeType, learnerCount,
     } catch (err) { /* keep fallback */ }
   }
 
-  return {
+  return withCacheControl({
     title,
     trainerSummary,
     learnerIntroduction,
@@ -279,7 +282,7 @@ async function buildInterventionProposal(db, { topic, mistakeType, learnerCount,
     checkpoint: trail.checkpointQuestion,
     durationMinutes,
     successCriteria: fallback.successCriteria
-  };
+  }, !!raw);
 }
 
 // ── Insight summaries ─────────────────────────────────────────────────────

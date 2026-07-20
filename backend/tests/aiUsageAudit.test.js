@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 
 import { AI_TASKS, selectModelForTask, modelNameForTask, shouldCallAI } from '../aiConfig.js';
 import { validateCurriculumProposal, validateGeneratedQuestion, validateInterventionProposal } from '../aiValidation.js';
-import { computeFingerprint, withGenerationCache } from '../aiCache.js';
+import { computeFingerprint, withGenerationCache, withCacheControl } from '../aiCache.js';
 import { generateRescueTrail } from '../llamaAIService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,8 +40,8 @@ describe('AI task router', () => {
   });
 
   test('modelNameForTask resolves to the configured main/light model name, or null for "none"', () => {
-    assert.strictEqual(modelNameForTask(AI_TASKS.GENERATE_CURRICULUM), process.env.GEMINI_MAIN_MODEL || 'gemini-2.0-flash');
-    assert.strictEqual(modelNameForTask(AI_TASKS.REWRITE_QUESTION), process.env.GEMINI_LIGHT_MODEL || 'gemini-2.0-flash-lite');
+    assert.strictEqual(modelNameForTask(AI_TASKS.GENERATE_CURRICULUM), process.env.GEMINI_MAIN_MODEL || 'gemini-3.5-flash');
+    assert.strictEqual(modelNameForTask(AI_TASKS.REWRITE_QUESTION), process.env.GEMINI_LIGHT_MODEL || 'gemini-3.1-flash-lite');
     assert.strictEqual(modelNameForTask(AI_TASKS.GENERATE_LLAMA_COPY), null);
   });
 });
@@ -159,6 +159,41 @@ describe('Generation caching', () => {
     assert.strictEqual(first.cached, false);
     assert.strictEqual(second.cached, true);
     assert.deepStrictEqual(second.result, first.result);
+  });
+
+  test('withCacheControl(value, false) is not cached — a failed AI attempt gets a fresh retry next time, not a locked-in fallback', async () => {
+    const rows = new Map();
+    const fakeDb = {
+      get: async (sql, params) => (rows.has(params[0]) ? { result: rows.get(params[0]) } : undefined),
+      run: async (sql, params) => { rows.set(params[0], params[2]); }
+    };
+    let calls = 0;
+    const compute = async () => { calls++; return withCacheControl({ summary: 'fallback text' }, false); };
+    const fp = { taskType: 'GENERATE_CURRICULUM', normalizedInput: 'ai-was-down' };
+
+    const first = await withGenerationCache(fakeDb, fp, compute);
+    const second = await withGenerationCache(fakeDb, fp, compute);
+
+    assert.strictEqual(calls, 2, 'a shouldCache:false result must not be reused — every call recomputes');
+    assert.strictEqual(first.cached, false);
+    assert.strictEqual(second.cached, false);
+  });
+
+  test('a plain (non-withCacheControl) result is always cached, unaffected by a coincidental "value" property', async () => {
+    const rows = new Map();
+    const fakeDb = {
+      get: async (sql, params) => (rows.has(params[0]) ? { result: rows.get(params[0]) } : undefined),
+      run: async (sql, params) => { rows.set(params[0], params[2]); }
+    };
+    const compute = async () => ({ value: 'this looks like the wrapper shape but is not' });
+    const fp = { taskType: 'GENERATE_CURRICULUM', normalizedInput: 'plain-object-with-value-key' };
+
+    const first = await withGenerationCache(fakeDb, fp, compute);
+    const second = await withGenerationCache(fakeDb, fp, compute);
+
+    assert.strictEqual(first.cached, false);
+    assert.strictEqual(second.cached, true, 'must still cache normally — no accidental opt-out from a plain "value" key');
+    assert.deepStrictEqual(second.result, { value: 'this looks like the wrapper shape but is not' });
   });
 });
 

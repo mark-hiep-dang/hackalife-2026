@@ -5,17 +5,21 @@
 // (cheap, fast) light model, and which should never call an LLM at all.
 //
 // Model IDs are read from env so they can be swapped without a code change;
-// the defaults below are real, currently-shipping Gemini model names. If an
-// operator sets GEMINI_MAIN_MODEL/GEMINI_LIGHT_MODEL to a model name that
-// doesn't exist, the API call fails and the existing deterministic fallback
-// in geminiClient.js takes over — it does not break the app.
+// the defaults below are confirmed live against this project's actual key
+// (GET /v1beta/models lists both, and gemini-3.1-flash-lite returns a real
+// generateContent response — gemini-3.5-flash is a valid model for this key
+// too, occasionally 503 "high demand" at the moment, which the existing
+// retry+deterministic-fallback path already handles). If an operator sets
+// GEMINI_MAIN_MODEL/GEMINI_LIGHT_MODEL to a model name that doesn't exist,
+// the API call fails and the deterministic fallback in geminiClient.js takes
+// over — it does not break the app.
 
 // Getters, not plain fields — read process.env live on every access rather
 // than freezing a snapshot at import time. Without this, tests (and any
 // runtime env change) couldn't affect behavior after the module first loads.
 export const AI_CONFIG = {
-  get mainModel() { return process.env.GEMINI_MAIN_MODEL || 'gemini-2.0-flash'; },
-  get lightModel() { return process.env.GEMINI_LIGHT_MODEL || 'gemini-2.0-flash-lite'; },
+  get mainModel() { return process.env.GEMINI_MAIN_MODEL || 'gemini-3.5-flash'; },
+  get lightModel() { return process.env.GEMINI_LIGHT_MODEL || 'gemini-3.1-flash-lite'; },
   get enabled() { return process.env.AI_ENABLED !== 'false'; },
   get demoMode() { return process.env.DEMO_MODE === 'true'; }
 };

@@ -30,8 +30,27 @@ export async function setCached(db, fingerprint, taskType, result) {
   );
 }
 
+// Unambiguous marker for the cache-control wrapper below — plain result
+// objects are cached as-is, so opting out of caching can't be duck-typed
+// off of an ordinary "value"/"shouldCache" property name (a real result
+// could legitimately have either) without risking a false match.
+const CACHE_CONTROL_MARKER = Symbol('withCacheControl');
+
+/** Wraps a computeFn's return value with an explicit cache-or-not decision —
+ * use when a build may have fallen back to deterministic-only output and a
+ * failed AI attempt shouldn't be locked in for this fingerprint. */
+export function withCacheControl(value, shouldCache) {
+  return { [CACHE_CONTROL_MARKER]: true, value, shouldCache };
+}
+
 /**
  * Runs `computeFn` only on a cache miss; logs a cache-hit usage row either way.
+ * `computeFn` may return a plain result object (always cached), or the
+ * result of `withCacheControl(value, shouldCache)` to opt out when the
+ * underlying AI call didn't actually succeed — there's no spend to save by
+ * caching a call that never succeeded, and doing so would lock in the
+ * fallback for every future request with this fingerprint even after the AI
+ * recovers a moment later.
  * @param {import('sqlite').Database} db
  * @param {{ taskType: string, sourceChunkIds?: string[], sourceVersions?: string[], normalizedInput?: string, model?: string }} fingerprintInput
  * @param {() => Promise<object>} computeFn
@@ -44,7 +63,10 @@ export async function withGenerationCache(db, fingerprintInput, computeFn) {
     await logAIUsage(db, { taskType: fingerprintInput.taskType, provider: 'cache', cached: true, success: true, durationMs: Date.now() - start });
     return { result: cached, cached: true };
   }
-  const result = await computeFn();
-  await setCached(db, fingerprint, fingerprintInput.taskType, result);
+  const computed = await computeFn();
+  const isControlled = computed && typeof computed === 'object' && computed[CACHE_CONTROL_MARKER] === true;
+  const result = isControlled ? computed.value : computed;
+  const shouldCache = isControlled ? computed.shouldCache : true;
+  if (shouldCache) await setCached(db, fingerprint, fingerprintInput.taskType, result);
   return { result, cached: false };
 }
