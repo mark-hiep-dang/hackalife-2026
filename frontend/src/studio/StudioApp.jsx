@@ -27,7 +27,7 @@ function getNav(t) {
   ];
 }
 
-export default function StudioApp({ profile, onExitStudio }) {
+export default function StudioApp({ profile, onExitStudio, onLogout }) {
   const t = useT();
   const { lang, setLang } = useLanguage();
   const NAV = getNav(t);
@@ -85,15 +85,25 @@ export default function StudioApp({ profile, onExitStudio }) {
           >
             <ArrowLeftRight size={16} strokeWidth={3} /> {t.studioExitToLearner}
           </button>
+          <button onClick={onLogout}
+            className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center gap-2 text-[#D9695F] hover:bg-[#F7D2CC] transition-colors font-extrabold text-xs uppercase tracking-widest"
+          >
+            <LogOut size={16} strokeWidth={3} /> {t.logout}
+          </button>
         </div>
       </aside>
 
       <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
         <div className="px-4 h-16 flex items-center justify-between">
           <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Trainer</span>
-          <button onClick={handleExit} className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-[#101A24]/10 bg-white flex items-center gap-1">
-            <LogOut size={14} /> {t.modeLearner}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleExit} className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-[#101A24]/10 bg-white flex items-center gap-1">
+              <ArrowLeftRight size={14} /> {t.modeLearner}
+            </button>
+            <button onClick={onLogout} className="w-8 h-8 rounded-lg border border-[#101A24]/10 bg-white flex items-center justify-center text-[#D9695F]">
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
         <div className="flex overflow-x-auto gap-2 px-3 pb-3">
           {NAV.map(({ id, label }) => (

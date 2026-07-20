@@ -29,6 +29,7 @@ export const suggestQualityFix = (issueId) => req(`/quality-issues/${issueId}/su
 export const ignoreQualityIssue = (issueId, reason) => req(`/quality-issues/${issueId}/ignore`, { method: 'PUT', body: { reason } });
 
 export const generateLessonKit = (lessonId) => req(`/lessons/${lessonId}/kit/generate`, { method: 'POST' });
+export const createContentItem = (lessonId, fields) => req(`/lessons/${lessonId}/content-items`, { method: 'POST', body: fields });
 export const getLessonContent = (lessonId) => req(`/lessons/${lessonId}/content`);
 export const explainLesson = (lessonId) => req(`/lessons/${lessonId}/explain`, { method: 'POST' });
 export const reviewContentItem = (itemId, action, fields = {}) => req(`/content-items/${itemId}`, { method: 'PUT', body: { action, ...fields } });
