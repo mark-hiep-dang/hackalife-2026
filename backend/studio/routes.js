@@ -245,6 +245,34 @@ export function mountStudioRoutes(app, authenticateToken) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  // Manually-authored content (spec: trainer can add content directly, not
+  // only review AI drafts). Skips the AI_DRAFT review step since the trainer
+  // wrote it themselves — starts APPROVED, same as anything they've reviewed.
+  app.post('/api/studio/lessons/:id/content-items', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const lesson = await db.get('SELECT id FROM studio_lessons WHERE id = ?', [req.params.id]);
+      if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
+      const { contentType, front, back, keyword, questionText, options, correctOption, explanation, difficulty, cognitiveLevel } = req.body;
+      if (!contentType) return res.status(400).json({ error: 'Thiếu loại nội dung' });
+      if (contentType === 'flashcard' && (!front?.trim() || !back?.trim())) {
+        return res.status(400).json({ error: 'Flashcard cần có mặt trước và mặt sau.' });
+      }
+      if (contentType !== 'flashcard' && !questionText?.trim()) {
+        return res.status(400).json({ error: 'Cần nhập nội dung câu hỏi.' });
+      }
+      const result = await db.run(
+        `INSERT INTO studio_content_items
+           (lesson_id, content_type, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_title, source_version, status, ai_generated, trainer_edited)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED', 0, 1)`,
+        [lesson.id, contentType, questionText || null, JSON.stringify(options || []), correctOption ?? null,
+          explanation || null, difficulty || 'Trung bình', cognitiveLevel || 'Hiểu',
+          front || null, back || null, keyword || null, 'Trainer tự tạo', '1.0']
+      );
+      res.status(201).json({ id: result.lastID });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   app.put('/api/studio/content-items/:id', ...T, async (req, res) => {
     const { action, questionText, explanation } = req.body; // action: approve | reject | edit
     const db = req.db;

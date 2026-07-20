@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { getCourses, getCourse, generateLessonKit, reviewContentItem, rewriteContentItem } from '../../utils/studioApi';
+import { getCourses, getCourse, generateLessonKit, reviewContentItem, rewriteContentItem, createContentItem } from '../../utils/studioApi';
 import { Card, SectionTitle, Button, Spinner, EmptyState } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
-import { Sparkles, Check, X, Pencil, RefreshCw } from 'lucide-react';
+import { Sparkles, Check, X, Pencil, RefreshCw, Plus } from 'lucide-react';
 import { useT } from '../../translations';
 
 function ContentItemCard({ item, onChanged, t }) {
@@ -58,9 +58,51 @@ function ContentItemCard({ item, onChanged, t }) {
   );
 }
 
+function AddFlashcardForm({ lessonId, onAdded, onCancel, t }) {
+  const [front, setFront] = useState('');
+  const [back, setBack] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true); setError(null);
+    try {
+      await createContentItem(lessonId, { contentType: 'flashcard', front, back, keyword });
+      onAdded();
+    } catch (err) { setError(err.message); } finally { setSaving(false); }
+  }
+
+  return (
+    <form onSubmit={submit} className="border border-[#101A24]/10 rounded-xl p-4 flex flex-col gap-3 bg-[#F5F6F8]">
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-bold text-[#101A24]">{t.studioFlashcardFront}</span>
+        <textarea value={front} onChange={(e) => setFront(e.target.value)} rows={2} required
+          className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-bold text-[#101A24]">{t.studioFlashcardBack}</span>
+        <textarea value={back} onChange={(e) => setBack(e.target.value)} rows={2} required
+          className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-bold text-[#101A24]">{t.studioFlashcardKeyword}</span>
+        <input value={keyword} onChange={(e) => setKeyword(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="submit" variant="success" disabled={saving}>{saving ? t.studioAdding : t.studioAddFlashcardBtn}</Button>
+        <Button type="button" variant="secondary" onClick={onCancel}>{t.studioCancel}</Button>
+      </div>
+    </form>
+  );
+}
+
 function LessonPanel({ lesson, items, onChanged, t }) {
   const [busy, setBusy] = useState(false);
   const [reaction, setReaction] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   async function handleGenerate() {
     setBusy(true);
@@ -80,15 +122,24 @@ function LessonPanel({ lesson, items, onChanged, t }) {
           <h3 className="font-extrabold text-[#101A24]">{lesson.title}</h3>
           <p className="text-xs text-[#888]">{t.studioMinutesLabel.replace('{n}', lesson.estimatedMinutes)} · {lesson.difficulty} · {t.studioExamWeightLabel.replace('{n}', Math.round((lesson.examWeight || 0) * 100))}</p>
         </div>
-        <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2">
-          <Sparkles size={16} /> {items.length ? t.studioRegenerateKit : t.studioGenerateKit}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowAddForm((v) => !v)} className="flex items-center gap-2">
+            <Plus size={16} /> {t.studioAddFlashcard}
+          </Button>
+          <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2">
+            <Sparkles size={16} /> {items.length ? t.studioRegenerateKit : t.studioGenerateKit}
+          </Button>
+        </div>
       </div>
-      {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} className="mb-3" />}
+      {showAddForm && (
+        <AddFlashcardForm lessonId={lesson.id} t={t} onCancel={() => setShowAddForm(false)}
+          onAdded={() => { setShowAddForm(false); onChanged(); }} />
+      )}
+      {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} className="mb-3 mt-3" />}
       {items.length === 0 ? (
         <EmptyState>{t.studioNoContentYet}</EmptyState>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
           {items.map((item) => <ContentItemCard key={item.id} item={item} onChanged={onChanged} t={t} />)}
         </div>
       )}

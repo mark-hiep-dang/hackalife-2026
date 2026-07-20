@@ -106,7 +106,7 @@ export default function App() {
 
   /* ── Llama Studio (trainer role) ───────────────────────── */
   if (profile && profile.role === 'trainer') {
-    return <StudioApp profile={profile} onExitStudio={fetchUserDossier} />;
+    return <StudioApp profile={profile} onExitStudio={fetchUserDossier} onLogout={handleLogout} />;
   }
 
   /* ── Path Interception ────────────────────────────────── */
