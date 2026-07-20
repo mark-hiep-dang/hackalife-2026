@@ -1,18 +1,21 @@
 // Shared Gemini call helper — used by both LlamaAIService (learner-facing)
 // and StudioAIService (trainer-facing). Every caller must still provide its
 // own deterministic fallback; this only wraps the network call itself with
-// a timeout and graceful null-on-failure.
+// task-based model routing, a timeout, one retry, usage logging, and
+// graceful null-on-failure (AI usage audit §4/§6/§10/§11).
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+import { shouldCallAI, modelNameForTask } from './aiConfig.js';
+import { logAIUsage } from './aiUsageLog.js';
+
 const DEFAULT_TIMEOUT_MS = 6000;
+const MAX_ATTEMPTS = 2; // one call + one retry, per audit §10 rule 9
 
-export async function callGemini(systemInstruction, userMessage, { timeoutMs = DEFAULT_TIMEOUT_MS, label = 'AIService' } = {}) {
-  if (!process.env.GEMINI_API_KEY) return null;
+async function requestOnce(model, systemInstruction, userMessage, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23,15 +26,59 @@ export async function callGemini(systemInstruction, userMessage, { timeoutMs = D
         })
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) return { text: null, error: `http_${res.status}` };
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-  } catch (err) {
-    console.warn(`${label}: Gemini call failed, using deterministic fallback. Reason:`, err.message);
-    return null;
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+    return {
+      text,
+      inputTokenCount: data.usageMetadata?.promptTokenCount ?? null,
+      outputTokenCount: data.usageMetadata?.candidatesTokenCount ?? null
+    };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * @param {string} systemInstruction
+ * @param {string} userMessage
+ * @param {{ task?: import('./aiConfig.js').LlamaAITask, db?: object, timeoutMs?: number, label?: string }} options
+ *   `task` drives model routing (aiConfig.selectModelForTask) — every call
+ *   site should pass one. `db`, if provided, gets a usage-log row regardless
+ *   of outcome (demo/skip/success/failure) — omit only when no db handle is
+ *   available yet (usage simply won't be logged for that call).
+ */
+export async function callGemini(systemInstruction, userMessage, { task, db = null, timeoutMs = DEFAULT_TIMEOUT_MS, label = 'AIService' } = {}) {
+  const start = Date.now();
+
+  if (!shouldCallAI(task)) {
+    // No key / AI disabled / demo mode / task routed to "none" (e.g. Llama
+    // reactions, which must always come from the local copy library).
+    await logAIUsage(db, { taskType: task || 'UNKNOWN', provider: 'demo', success: true, durationMs: 0, cached: false });
+    return null;
+  }
+
+  const model = modelNameForTask(task);
+  let lastErrorCode = null;
+  let usage = { inputTokenCount: null, outputTokenCount: null };
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const { text, error, inputTokenCount, outputTokenCount } = await requestOnce(model, systemInstruction, userMessage, timeoutMs);
+      usage = { inputTokenCount, outputTokenCount };
+      if (text != null) {
+        await logAIUsage(db, { taskType: task, provider: 'gemini', model, success: true, durationMs: Date.now() - start, ...usage });
+        return text;
+      }
+      lastErrorCode = error || 'empty_response';
+    } catch (err) {
+      lastErrorCode = err.name === 'AbortError' ? 'timeout' : (err.message || 'unknown_error');
+      console.warn(`${label}: Gemini call failed (attempt ${attempt}/${MAX_ATTEMPTS}). Reason:`, lastErrorCode);
+    }
+  }
+
+  await logAIUsage(db, { taskType: task, provider: 'gemini', model, success: false, durationMs: Date.now() - start, errorCode: lastErrorCode, ...usage });
+  return null;
 }
 
 // Minimal manual schema check (no ajv dependency) — verifies required keys

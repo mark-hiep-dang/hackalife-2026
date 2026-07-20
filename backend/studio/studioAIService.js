@@ -10,9 +10,12 @@
 import { callGemini, matchesShape } from '../geminiClient.js';
 import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk } from '../knowledgeBase.js';
 import { assembleRescueTrail, getConceptPair } from '../engines/rescueTrail.js';
+import { AI_TASKS } from '../aiConfig.js';
+import { validateCurriculumProposal, validateInterventionProposal } from '../aiValidation.js';
+import { withGenerationCache } from '../aiCache.js';
 
-function studioCallGemini(systemInstruction, userMessage) {
-  return callGemini(systemInstruction, userMessage, { label: 'StudioAIService' });
+function studioCallGemini(systemInstruction, userMessage, task, db) {
+  return callGemini(systemInstruction, userMessage, { task, db, label: 'StudioAIService' });
 }
 
 // Finds a real approved source chunk for a topic (spec §8 — generated content
@@ -49,6 +52,19 @@ const DEFAULT_CAMP_GROUPING = [
  * @param {{ preferredCamps?: number, targetDurationMinutes?: number }} input
  */
 export async function generateCurriculum(db, input = {}) {
+  const { result, cached } = await withGenerationCache(
+    db,
+    { taskType: AI_TASKS.GENERATE_CURRICULUM, normalizedInput: JSON.stringify({ preferredCamps: input.preferredCamps || 4, targetDurationMinutes: input.targetDurationMinutes || null }), model: 'deterministic-build' },
+    () => buildCurriculumProposal(db, input)
+  );
+  if (!cached) {
+    const check = validateCurriculumProposal(result, result.lessons.flatMap((l) => l.sourceChunkIds));
+    if (!check.valid) console.warn('generateCurriculum: proposal failed validation (kept anyway, deterministic build should never fail this):', check.errors);
+  }
+  return result;
+}
+
+async function buildCurriculumProposal(db, input = {}) {
   const grouping = DEFAULT_CAMP_GROUPING.slice(0, Math.max(1, Math.min(input.preferredCamps || 4, DEFAULT_CAMP_GROUPING.length)));
   // Fold any leftover topics into the last camp so nothing gets dropped if
   // preferredCamps < 4.
@@ -105,7 +121,8 @@ export async function generateCurriculum(db, input = {}) {
 
   const raw = await studioCallGemini(
     STUDIO_PERSONALITY_RULES + '\nViết lại phần "summary" bằng giọng Llama Studio, giữ nguyên số camp/chặng, không thêm bớt thông tin. Chỉ trả về đoạn văn.',
-    `Tóm tắt: ${proposal.summary}`
+    `Tóm tắt: ${proposal.summary}`,
+    AI_TASKS.GENERATE_CURRICULUM, db
   );
   if (raw) proposal.summary = raw.trim();
 
@@ -113,6 +130,14 @@ export async function generateCurriculum(db, input = {}) {
 }
 
 // ── Lesson Kit generation — pulls REAL content for the lesson's mapped topic ──
+// AI usage audit: deliberately makes ZERO Gemini calls. Flashcards/questions
+// are pulled from the trainer-approved exam bank rather than AI-generated —
+// fabricating new insurance-exam questions carries real legal/accuracy risk
+// that a same-shot AI call can't safely absorb, and the existing bank is
+// already higher-quality and already approved. The microLesson/memoryTips
+// copy is template text, not a separate AI call, per "do not add AI merely
+// to make the product appear more AI-powered" — template copy already reads
+// fine and errors here would only be a style nit, not worth the API cost.
 
 /**
  * @param {import('sqlite').Database} db
@@ -162,15 +187,18 @@ export async function generateLessonKit(db, { topic, lessonTitle }) {
 
 // ── Explanations, fixes, rewrites (LLM-assisted, deterministic fallback) ──
 
-export async function explainCurriculumDecision({ lessonTitle, campTitle, prerequisiteTitle, examWeight }) {
+export async function explainCurriculumDecision({ lessonTitle, campTitle, prerequisiteTitle, examWeight }, db) {
   const fallback = prerequisiteTitle
     ? `"${lessonTitle}" nằm trong ${campTitle} vì cần hoàn thành "${prerequisiteTitle}" trước, và chiếm khoảng ${Math.round((examWeight || 0.1) * 100)}% trọng số đề thi.`
     : `"${lessonTitle}" được xếp vào ${campTitle} vì đây là nền tảng cần học trước, chiếm khoảng ${Math.round((examWeight || 0.1) * 100)}% trọng số đề thi.`;
-  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Giải thích ngắn gọn bằng giọng Llama Studio vì sao lại sắp xếp như sau (giữ nguyên sự kiện): ${fallback}`);
+  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Giải thích ngắn gọn bằng giọng Llama Studio vì sao lại sắp xếp như sau (giữ nguyên sự kiện): ${fallback}`, AI_TASKS.EXPLAIN_METRIC, db);
   return { explanation: raw?.trim() || fallback };
 }
 
-export async function suggestQualityFix(issue) {
+// Routes simple wording fixes to the light model and structurally-significant
+// ones (BLOCKER/WARNING — missing outcomes, missing sources, etc.) to the
+// main model, per audit §2.3's complexity split.
+export async function suggestQualityFix(issue, db) {
   const FIX_TEMPLATES = {
     COVERAGE: 'Thêm câu hỏi hoặc tình huống để kiểm tra mục tiêu học tập này.',
     ASSESSMENT: 'Thêm câu hỏi tình huống hoặc vận dụng để cân bằng lại bộ câu hỏi.',
@@ -178,18 +206,20 @@ export async function suggestQualityFix(issue) {
     GOVERNANCE: 'Duyệt lại nội dung AI Draft hoặc cập nhật phiên bản nguồn tài liệu.'
   };
   const fallback = FIX_TEMPLATES[issue.category] || 'Xem lại nội dung này cùng Llama.';
-  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Vấn đề: "${issue.message}". Đề xuất 1 câu ngắn gọn cách khắc phục, giữ nguyên bản chất vấn đề: ${fallback}`);
+  const task = ['BLOCKER', 'WARNING'].includes(issue.severity) ? AI_TASKS.SUGGEST_COMPLEX_QUALITY_FIX : AI_TASKS.EXPLAIN_METRIC;
+  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Vấn đề: "${issue.message}". Đề xuất 1 câu ngắn gọn cách khắc phục, giữ nguyên bản chất vấn đề: ${fallback}`, task, db);
   return { suggestion: raw?.trim() || fallback };
 }
 
-export async function suggestQuestionRewrite({ questionText, flags = [] }) {
+export async function suggestQuestionRewrite({ questionText, flags = [] }, db) {
   let fallback = questionText;
   if (flags.includes('WORDING_TOO_LONG')) fallback = questionText.split('.')[0] + '?';
   else if (flags.includes('NEGATIVE_WORDING_RISK')) fallback = questionText.replace(/không đúng|KHÔNG đúng/gi, 'sai');
   else fallback = questionText;
   const raw = await studioCallGemini(
     STUDIO_PERSONALITY_RULES + '\nKHÔNG được đổi ý nghĩa pháp lý của câu hỏi, chỉ diễn đạt lại cho rõ ràng hơn.',
-    `Viết lại câu hỏi sau cho rõ ràng, ngắn gọn hơn, giữ nguyên đáp án đúng: "${questionText}"`
+    `Viết lại câu hỏi sau cho rõ ràng, ngắn gọn hơn, giữ nguyên đáp án đúng: "${questionText}"`,
+    AI_TASKS.REWRITE_QUESTION, db
   );
   return { rewrittenText: raw?.trim() || fallback };
 }
@@ -197,6 +227,17 @@ export async function suggestQuestionRewrite({ questionText, flags = [] }) {
 // ── Intervention (Rescue Expedition) — reuses the learner-side Rescue Trail engine ──
 
 export async function generateIntervention(db, { topic, mistakeType, learnerCount, durationMinutes = 10 }) {
+  const { result } = await withGenerationCache(
+    db,
+    { taskType: AI_TASKS.GENERATE_RESCUE_EXPEDITION, normalizedInput: JSON.stringify({ topic, mistakeType, durationMinutes }) },
+    () => buildInterventionProposal(db, { topic, mistakeType, learnerCount, durationMinutes })
+  );
+  const check = validateInterventionProposal(result);
+  if (!check.valid) console.warn('generateIntervention: proposal failed validation:', check.errors);
+  return result;
+}
+
+async function buildInterventionProposal(db, { topic, mistakeType, learnerCount, durationMinutes = 10 }) {
   const trail = await assembleRescueTrail(db, { topic, mistakeType });
   const conceptPair = trail.conceptPair || getConceptPair(topic);
   const title = conceptPair ? `${conceptPair.left.name} và ${conceptPair.right.name} — ai chịu trách nhiệm?` : `Chặng cứu hộ: ${topic.replace(/^\d+\.\s*/, '')}`;
@@ -208,9 +249,12 @@ export async function generateIntervention(db, { topic, mistakeType, learnerCoun
     successCriteria: 'Học viên trả lời đúng câu checkpoint và phân biệt được hai khái niệm dễ nhầm.'
   };
 
+  // Note: only aggregated learner count + mistake type + topic go to the
+  // model — never individual learner names/IDs (audit §12).
   const raw = await studioCallGemini(
     STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"trainerSummary": string, "learnerIntroduction": string}',
-    `Tạo tóm tắt cho trainer và lời giới thiệu cho học viên về chặng cứu hộ "${title}", chủ đề "${topic}", ${learnerCount} học viên bị ảnh hưởng, thời lượng ${durationMinutes} phút.`
+    `Tạo tóm tắt cho trainer và lời giới thiệu cho học viên về chặng cứu hộ "${title}", chủ đề "${topic}", ${learnerCount} học viên bị ảnh hưởng, thời lượng ${durationMinutes} phút.`,
+    AI_TASKS.GENERATE_RESCUE_EXPEDITION, db
   );
   let trainerSummary = fallback.trainerSummary;
   let learnerIntroduction = fallback.learnerIntroduction;
@@ -240,17 +284,17 @@ export async function generateIntervention(db, { topic, mistakeType, learnerCoun
 
 // ── Insight summaries ─────────────────────────────────────────────────────
 
-export async function summarizeMockExamInsight({ averageScore, changeFromPrevious, weakestTopic, passRate }) {
+export async function summarizeMockExamInsight({ averageScore, changeFromPrevious, weakestTopic, passRate }, db) {
   const changeText = changeFromPrevious ? (changeFromPrevious > 0 ? `tăng ${changeFromPrevious} điểm` : `giảm ${Math.abs(changeFromPrevious)} điểm`) : null;
   const fallback = `Điểm trung bình cả lớp là ${averageScore}, tỷ lệ đạt ngưỡng khoảng ${passRate}%.${changeText ? ` So với lần trước, điểm ${changeText}.` : ''}${weakestTopic ? ` Phần "${weakestTopic}" vẫn còn vài tảng đá trơn.` : ''}`;
-  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Viết lại nhận xét sau bằng giọng Llama Studio, giữ nguyên số liệu: "${fallback}"`);
+  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Viết lại nhận xét sau bằng giọng Llama Studio, giữ nguyên số liệu: "${fallback}"`, AI_TASKS.SUMMARIZE_INSIGHT, db);
   return { summary: raw?.trim() || fallback };
 }
 
-export async function summarizeLearnerInsight({ learnerName, latestScore, trend, weakestTopic, commonMistakeType }) {
+export async function summarizeLearnerInsight({ learnerName, latestScore, trend, weakestTopic, commonMistakeType }, db) {
   const trendText = { improving: 'đang cải thiện dần', declining: 'đang giảm dần', plateauing: 'đang chững lại', high_stable: 'ổn định ở mức cao', inconsistent: 'chưa ổn định', insufficient_data: 'chưa đủ dữ liệu' }[trend] || 'chưa đủ dữ liệu';
   const fallback = `${learnerName} có điểm gần nhất là ${latestScore}, xu hướng ${trendText}.${weakestTopic ? ` Phần yếu nhất là "${weakestTopic}"${commonMistakeType ? `, lỗi thường gặp: ${commonMistakeType}` : ''}.` : ''}`;
-  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Viết lại nhận xét sau bằng giọng Llama Studio, giữ nguyên số liệu: "${fallback}"`);
+  const raw = await studioCallGemini(STUDIO_PERSONALITY_RULES, `Viết lại nhận xét sau bằng giọng Llama Studio, giữ nguyên số liệu: "${fallback}"`, AI_TASKS.SUMMARIZE_INSIGHT, db);
   return { summary: raw?.trim() || fallback };
 }
 
@@ -277,9 +321,14 @@ export async function answerTrainerQuestion(db, { message, context = {} }) {
   }
 
   const contextBlock = retrieved.map((r, i) => `[Đoạn ${i + 1}] ${r.content}`).join('\n\n');
+  // Always TRAINER_COPILOT_SIMPLE: this path only answers grounded questions
+  // from existing sources, never triggers generation — TRAINER_COPILOT_COMPLEX
+  // would apply if the Copilot grows an actual "generate X from this chat"
+  // action, which it doesn't have yet (it can only answer, never write data).
   const raw = await studioCallGemini(
     `${STUDIO_PERSONALITY_RULES}\nBạn trả lời câu hỏi của TRAINER (không phải học viên) CHỈ dựa trên tài liệu đã duyệt bên dưới. Không bịa thông tin.\n\n${contextBlock}`,
-    message
+    message,
+    AI_TASKS.TRAINER_COPILOT_SIMPLE, db
   );
   if (raw) return { answer: raw.trim(), sources, grounded: true };
 

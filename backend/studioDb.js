@@ -318,4 +318,32 @@ export async function initStudioDb(db) {
       FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
+
+  // AI usage audit (§10/§11) — one row per attempted AI call (cached, demo,
+  // success, or failure), and a fingerprint-keyed cache of prior generations
+  // so re-running the same request never re-spends a real API call.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_usage_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_type TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      model TEXT,
+      input_token_count INTEGER,
+      output_token_count INTEGER,
+      cached INTEGER DEFAULT 0,
+      success INTEGER DEFAULT 1,
+      duration_ms INTEGER,
+      error_code TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_generation_cache (
+      fingerprint TEXT PRIMARY KEY,
+      task_type TEXT NOT NULL,
+      result TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 }
