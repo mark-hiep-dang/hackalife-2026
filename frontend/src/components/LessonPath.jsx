@@ -59,7 +59,12 @@ export default function LessonPath({ lessons, onSelectLesson }) {
   useEffect(() => {
     getMastery().then((rows) => {
       const map = {};
-      rows.forEach((r) => { map[r.topic] = r.mastery; });
+      // `/api/mastery` defaults every exam topic to `mastery: 0` until the
+      // learner actually answers a quiz/practice question on it — finishing
+      // a lesson's Learn walkthrough never writes any mastery data. Without
+      // `evidenceCount`, that default-0 reads as a real (stuck) score; only
+      // topics with real evidence should count toward the camp badge below.
+      rows.forEach((r) => { map[r.topic] = { mastery: r.mastery, hasEvidence: (r.evidenceCount ?? 0) > 0 }; });
       setMasteryByTopic(map);
     }).catch(() => {});
     getDailyExpedition().then(setPlan).catch(() => {});
@@ -68,7 +73,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
   const campMastery = useMemo(() => {
     const result = {};
     for (const [camp, realTopics] of Object.entries(CAMP_TOPIC_MAP)) {
-      const scores = realTopics.map((rt) => masteryByTopic[rt]).filter((v) => typeof v === 'number');
+      const scores = realTopics.map((rt) => masteryByTopic[rt]).filter((v) => v?.hasEvidence).map((v) => v.mastery);
       result[camp] = scores.length ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : null;
     }
     return result;
