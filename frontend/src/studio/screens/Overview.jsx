@@ -3,7 +3,7 @@ import { getOverview } from '../../utils/studioApi';
 import { Card, Spinner, CAMP_COLORS } from '../components/ui';
 import { TrendChart, CircularGauge } from '../components/charts';
 import { getStudioLlamaReaction } from '../../studioPersonality';
-import { useT } from '../../translations';
+import { useT, useLanguage } from '../../translations';
 import mascotIllustration from '../../assets/mascot-illustration.png';
 
 function healthTierStyle(score) {
@@ -21,6 +21,7 @@ function deltaLabel(delta, t, suffix = '') {
 
 export default function Overview({ onNavigate }) {
   const t = useT();
+  const { lang } = useLanguage();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -32,7 +33,7 @@ export default function Overview({ onNavigate }) {
   if (!data) return <Spinner label={t.studioLoading} />;
 
   const event = data.activeCourses === 0 ? 'EMPTY_COURSE' : 'STUDIO_GREETING';
-  const { message: heroMessage } = getStudioLlamaReaction(event);
+  const { message: heroMessage } = getStudioLlamaReaction(event, {}, lang);
 
   const trend = data.mockExamTrend || [];
   const last = trend[trend.length - 1];

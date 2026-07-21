@@ -60,7 +60,12 @@ export const rewriteContentItem = (itemId, flags) => req(`/content-items/${itemI
 export const deleteContentItem = (itemId) => req(`/content-items/${itemId}`, { method: 'DELETE' });
 
 export const getCohorts = () => req('/cohorts');
+export const createCohort = (fields) => req('/cohorts', { method: 'POST', body: fields });
 export const getCohort = (id) => req(`/cohorts/${id}`);
+export const getCohortRoster = (cohortId) => req(`/cohorts/${cohortId}/roster`);
+export const addLearnerToCohort = (cohortId, learnerId) => req(`/cohorts/${cohortId}/roster`, { method: 'POST', body: { learnerId } });
+export const removeLearnerFromCohort = (cohortId, learnerId) => req(`/cohorts/${cohortId}/roster/${learnerId}`, { method: 'DELETE' });
+export const getAllLearnerAccounts = () => req('/all-learner-accounts');
 export const getMockExamAnalytics = (cohortId) => req(`/cohorts/${cohortId}/mock-exam-analytics`);
 export const getQuestionAnalytics = (mockExamId) => req(`/mock-exams/${mockExamId}/questions`);
 export const getLearnersAtRisk = (cohortId) => req(`/cohorts/${cohortId}/learners-at-risk`);

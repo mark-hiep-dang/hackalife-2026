@@ -102,6 +102,30 @@ export async function getLearnerInterventions(db, learnerId) {
   );
 }
 
+// Cohort roster membership — deliberately independent of quiz activity
+// (unlike getRealLearnerAccounts below), so a trainer can add a learner the
+// moment they enroll, before any attempt exists.
+export async function getCohortRoster(db, cohortId) {
+  return db.all(
+    `SELECT u.id, u.username FROM studio_cohort_learners cl JOIN users u ON u.id = cl.learner_id WHERE cl.cohort_id = ? ORDER BY u.username`,
+    [cohortId]
+  );
+}
+
+export async function addLearnerToCohort(db, cohortId, learnerId) {
+  await db.run('INSERT OR IGNORE INTO studio_cohort_learners (cohort_id, learner_id) VALUES (?, ?)', [cohortId, learnerId]);
+}
+
+export async function removeLearnerFromCohort(db, cohortId, learnerId) {
+  await db.run('DELETE FROM studio_cohort_learners WHERE cohort_id = ? AND learner_id = ?', [cohortId, learnerId]);
+}
+
+// All real (non-trainer) accounts, regardless of activity — the pool a
+// trainer picks from when adding someone to a cohort roster.
+export async function getAllLearnerAccounts(db) {
+  return db.all("SELECT id, username FROM users WHERE role IS NULL OR role != 'trainer' ORDER BY username");
+}
+
 // Real learners (spec follow-up): reuses the same deterministic engines as
 // the cohort/mock-exam demo, but reads from the actual learner-app tables
 // (user_quizzes/user_quiz_answers/topic_mastery) instead of the seeded
@@ -790,6 +814,22 @@ export function mountStudioRoutes(app, authenticateToken) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  app.post('/api/studio/cohorts', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const { courseId, name, startDate, deadline } = req.body;
+      if (!courseId) return res.status(400).json({ error: 'Cần chọn khóa học' });
+      if (!name?.trim()) return res.status(400).json({ error: 'Cần nhập tên nhóm học' });
+      const course = await db.get('SELECT id FROM studio_courses WHERE id = ?', [courseId]);
+      if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      const result = await db.run(
+        'INSERT INTO studio_cohorts (course_id, trainer_id, name, start_date, deadline) VALUES (?, ?, ?, ?, ?)',
+        [courseId, req.user.id, name.trim(), startDate || null, deadline || null]
+      );
+      res.status(201).json({ id: result.lastID });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   app.get('/api/studio/cohorts/:id', ...T, async (req, res) => {
     const db = req.db;
     try {
@@ -798,6 +838,49 @@ export function mountStudioRoutes(app, authenticateToken) {
       const learners = await getRealLearnerAccounts(db, cohort.id);
       const mockExams = await db.all('SELECT * FROM studio_mock_exams WHERE cohort_id = ? ORDER BY round_number', [cohort.id]);
       res.json({ cohort, learners, mockExams });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Cohort roster management ─────────────────────────────────────────────
+  // Membership is independent of quiz activity (unlike getRealLearnerAccounts,
+  // which only ever shows learners who've done at least one quiz) — a trainer
+  // must be able to add a real learner to a cohort the moment they enroll,
+  // before that learner has attempted anything.
+  app.get('/api/studio/cohorts/:id/roster', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const cohort = await db.get('SELECT id FROM studio_cohorts WHERE id = ?', [req.params.id]);
+      if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
+      res.json(await getCohortRoster(db, cohort.id));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/studio/cohorts/:id/roster', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const cohort = await db.get('SELECT id FROM studio_cohorts WHERE id = ?', [req.params.id]);
+      if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
+      const { learnerId } = req.body;
+      if (!learnerId) return res.status(400).json({ error: 'Cần chọn học viên' });
+      await addLearnerToCohort(db, cohort.id, learnerId);
+      res.status(201).json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.delete('/api/studio/cohorts/:id/roster/:learnerId', ...T, async (req, res) => {
+    try {
+      await removeLearnerFromCohort(req.db, req.params.id, req.params.learnerId);
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // All real (non-trainer) accounts, regardless of activity — the pool a
+  // trainer picks from when adding someone to a cohort roster. Deliberately
+  // not filtered by quiz activity like getRealLearnerAccounts is, since a
+  // freshly-enrolled learner legitimately has none yet.
+  app.get('/api/studio/all-learner-accounts', ...T, async (req, res) => {
+    try {
+      res.json(await getAllLearnerAccounts(req.db));
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

@@ -97,6 +97,22 @@ const POOLS = {
   ]
 };
 
+// English variants exist only where a trainer is actually likely to demo in
+// English (the Overview hero greeting) — everywhere else in Studio stays
+// Vietnamese-only per the app-wide convention (see translations.jsx). Falls
+// back to the Vietnamese pool for any event without an English one.
+const POOLS_EN = {
+  STUDIO_GREETING: [
+    'Hey trainer! Building a new trail today, or checking where learners are stumbling?',
+    'The curriculum is looking solid. Llama spotted one steep patch worth smoothing out.',
+    'You handle the expertise — Llama will put up signs, clear rocks, and check the trail.'
+  ],
+  EMPTY_COURSE: [
+    'No courses here yet. Shall we build the first trail together?',
+    'Pretty empty in here! Let’s start a new course.'
+  ]
+};
+
 const MOOD_BY_EVENT = {
   STUDIO_GREETING: 'welcoming',
   SOURCE_UPLOADED: 'helpful',
@@ -123,10 +139,11 @@ const MOOD_BY_EVENT = {
 /**
  * @param {StudioLlamaEvent} event
  * @param {object} [context]
+ * @param {'vi'|'en'} [lang] - falls back to the Vietnamese pool if no English one exists for this event
  * @returns {{ message: string, mood: StudioLlamaMood, secondaryMessage?: string, animation?: string }}
  */
-export function getStudioLlamaReaction(event, context = {}) {
-  const pool = POOLS[event];
+export function getStudioLlamaReaction(event, context = {}, lang = 'vi') {
+  const pool = (lang === 'en' && POOLS_EN[event]) || POOLS[event];
   if (!pool) return { message: '', mood: 'helpful' };
   return { message: fill(pick(pool), context), mood: MOOD_BY_EVENT[event] || 'helpful' };
 }

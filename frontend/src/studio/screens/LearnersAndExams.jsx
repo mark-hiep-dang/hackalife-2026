@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
-import { getCohorts, getMockExamAnalytics, getLearnersAtRisk, detectClusters, generateInterventionForCluster } from '../../utils/studioApi';
+import {
+  getCohorts, createCohort, getCourses, getMockExamAnalytics, getLearnersAtRisk, detectClusters, generateInterventionForCluster,
+  getCohortRoster, addLearnerToCohort, removeLearnerFromCohort, getAllLearnerAccounts
+} from '../../utils/studioApi';
 import { Card, SectionTitle, Spinner, EmptyState, RiskBadge, PatternBadge, Sparkline, Button, CAMP_COLORS } from '../components/ui';
 import InterventionDetail from './InterventionDetail';
 import LearnerProfile from './LearnerProfile';
-import { Rocket, X } from 'lucide-react';
+import { Rocket, X, Settings, Plus, Trash2 } from 'lucide-react';
 import { useT } from '../../translations';
 
 const RISK_TIER_STYLE = { Cao: 'bg-[#F5C9DA] text-[#8A2F55]', 'Trung bình': 'bg-[#FBE3B0] text-[#8A6414]', Thấp: 'bg-[#C7EFC4] text-[#3D7A2E]' };
+const NEEDS_ATTENTION_STATUSES = ['Cần hỗ trợ ngay', 'Cần theo dõi'];
 const KPI_STYLE = [
   { bg: 'bg-brand-green', shadow: '#8FCB82', ink: 'text-brand-green-ink' },
   { bg: 'bg-brand-cyan', shadow: '#7FBFC9', ink: 'text-brand-cyan-ink' },
@@ -96,28 +100,172 @@ const TREND_LABEL_KEYS = {
   declining: 'studioTrendDeclining', inconsistent: 'studioTrendInconsistent', insufficient_data: 'studioTrendInsufficientData'
 };
 
+// The pool to add from is every real learner account (studioApi's
+// getAllLearnerAccounts) — the same accounts the rest of Studio's learner
+// features read from — regardless of whether they've attempted anything yet.
+function CohortRosterModal({ cohortId, onClose, onChanged, t }) {
+  const [roster, setRoster] = useState(null);
+  const [allLearners, setAllLearners] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  async function load() {
+    setRoster(await getCohortRoster(cohortId));
+    setAllLearners(await getAllLearnerAccounts());
+  }
+  useEffect(() => { load(); }, [cohortId]);
+
+  async function handleAdd(learnerId) {
+    setBusyId(learnerId);
+    try { await addLearnerToCohort(cohortId, learnerId); await load(); onChanged(); } finally { setBusyId(null); }
+  }
+  async function handleRemove(learnerId) {
+    setBusyId(learnerId);
+    try { await removeLearnerFromCohort(cohortId, learnerId); await load(); onChanged(); } finally { setBusyId(null); }
+  }
+
+  if (!roster || !allLearners) return <Spinner label={t.studioLoading} />;
+  const rosterIds = new Set(roster.map((l) => l.id));
+  const available = allLearners.filter((l) => !rosterIds.has(l.id));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <h3 className="font-comic font-extrabold text-lg text-[#101A24]">⚙️ {t.studioManageRosterTitle}</h3>
+
+      <div>
+        <p className="text-xs font-extrabold uppercase tracking-wide text-[#8A8A8A] mb-2">{t.studioRosterCurrentMembers.replace('{n}', roster.length)}</p>
+        {roster.length === 0 ? (
+          <p className="text-sm text-[#888]">{t.studioRosterNoMembers}</p>
+        ) : (
+          <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+            {roster.map((l) => (
+              <div key={l.id} className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-[#F9FAFB]">
+                <span className="font-comic font-bold text-sm text-[#101A24] truncate">{l.username}</span>
+                <button onClick={() => handleRemove(l.id)} disabled={busyId === l.id}
+                  className="text-[#101A24]/50 hover:text-red-600 disabled:opacity-30 shrink-0"
+                ><Trash2 size={15} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-xs font-extrabold uppercase tracking-wide text-[#8A8A8A] mb-2">{t.studioRosterAddMember}</p>
+        {available.length === 0 ? (
+          <p className="text-sm text-[#888]">{t.studioRosterNoneAvailable}</p>
+        ) : (
+          <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+            {available.map((l) => (
+              <div key={l.id} className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-[#F9FAFB]">
+                <span className="font-comic font-bold text-sm text-[#101A24] truncate">{l.username}</span>
+                <button onClick={() => handleAdd(l.id)} disabled={busyId === l.id}
+                  className="text-[#101A24]/50 hover:text-[#3D7A2E] disabled:opacity-30 shrink-0"
+                ><Plus size={16} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Button variant="secondary" className="w-fit" onClick={onClose}>{t.studioCancel}</Button>
+    </div>
+  );
+}
+
+// Each cohort belongs to exactly one course (studio_cohorts.course_id), so
+// creating one means picking which course it's for first.
+function CreateCohortModal({ onClose, onCreated, t }) {
+  const [courses, setCourses] = useState(null);
+  const [courseId, setCourseId] = useState('');
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => { getCourses().then(setCourses); }, []);
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true); setError(null);
+    try {
+      const { id } = await createCohort({ courseId: Number(courseId), name });
+      onCreated(id);
+    } catch (err) { setError(err.message); } finally { setSaving(false); }
+  }
+
+  if (!courses) return <Spinner label={t.studioLoading} />;
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <h3 className="font-comic font-extrabold text-lg text-[#101A24]">➕ {t.studioCreateCohortTitle}</h3>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-bold text-[#101A24]">{t.studioCohortCourseLabel}</span>
+        <select value={courseId} onChange={(e) => setCourseId(e.target.value)} required className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white">
+          <option value="">{t.studioChooseCoursePlaceholder}</option>
+          {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-bold text-[#101A24]">{t.studioCohortNameLabel}</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} required className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={saving || !courseId}>{saving ? t.studioSaving : t.studioCreateCohortBtn}</Button>
+        <Button type="button" variant="secondary" onClick={onClose}>{t.studioCancel}</Button>
+      </div>
+    </form>
+  );
+}
+
 export default function LearnersAndExams() {
   const t = useT();
   const [cohorts, setCohorts] = useState(null);
   const [cohortId, setCohortId] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [learners, setLearners] = useState(null);
+  const [roster, setRoster] = useState(null);
   const [selectedLearnerId, setSelectedLearnerId] = useState(null);
   const [rescueTopic, setRescueTopic] = useState(null);
+  const [showAllLearners, setShowAllLearners] = useState(false);
+  const [showRosterModal, setShowRosterModal] = useState(false);
+  const [showCreateCohort, setShowCreateCohort] = useState(false);
 
-  useEffect(() => { getCohorts().then((cs) => { setCohorts(cs); if (cs.length) setCohortId(cs[0].id); }); }, []);
-  useEffect(() => {
+  function refreshCohorts(selectId) {
+    return getCohorts().then((cs) => { setCohorts(cs); if (selectId) setCohortId(selectId); else if (cs.length && !cohortId) setCohortId(cs[0].id); return cs; });
+  }
+  useEffect(() => { refreshCohorts(); }, []);
+
+  function loadCohortData() {
     if (!cohortId) return;
-    setAnalytics(null); setLearners(null);
     getMockExamAnalytics(cohortId).then(setAnalytics);
     getLearnersAtRisk(cohortId).then(setLearners);
+    getCohortRoster(cohortId).then(setRoster);
+  }
+  useEffect(() => {
+    if (!cohortId) return;
+    setAnalytics(null); setLearners(null); setRoster(null); setShowAllLearners(false);
+    loadCohortData();
   }, [cohortId]);
+
+  async function handleCohortCreated(newCohortId) {
+    setShowCreateCohort(false);
+    await refreshCohorts(newCohortId);
+  }
 
   if (selectedLearnerId) return <LearnerProfile learnerId={selectedLearnerId} onBack={() => setSelectedLearnerId(null)} />;
   if (!cohorts) return <Spinner label={t.studioLoading} />;
-  if (cohorts.length === 0) return <EmptyState>{t.studioNoCohorts}</EmptyState>;
 
+  const needsAttentionLearners = (learners || []).filter((l) => NEEDS_ATTENTION_STATUSES.includes(l.status) || (l.outlierPatterns || []).length > 0);
   const needsHelpCount = (learners || []).filter((l) => l.status === 'Cần hỗ trợ ngay').length;
+  // "View all" means every roster member, including those with zero quiz
+  // activity yet (getLearnersAtRisk silently excludes them) — merge in a
+  // placeholder row for those rather than hiding them.
+  const allRosterLearners = (roster || []).map((r) => {
+    const withRisk = (learners || []).find((l) => l.id === r.id);
+    if (withRisk) return withRisk;
+    return { id: r.id, name: r.username, latestScore: null, scoreHistory: [], status: 'Chưa đủ dữ liệu', reasons: [t.studioNoActivityYet], outlierPatterns: [] };
+  });
+  const visibleLearners = showAllLearners ? allRosterLearners : needsAttentionLearners;
   const weakestTopic = analytics?.topics?.[0];
   const overview = analytics?.overview;
 
@@ -133,14 +281,26 @@ export default function LearnersAndExams() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <SectionTitle subtitle={t.studioLearnersExamsSubtitle}>👥 {t.studioLearnersExamsTitle}</SectionTitle>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           {cohorts.map((c) => (
             <button key={c.id} onClick={() => setCohortId(c.id)}
               className={`font-comic font-extrabold text-xs px-4 py-2.5 rounded-2xl transition-all ${cohortId === c.id ? 'bg-[#101A24] text-white shadow-sm' : 'bg-white text-[#101A24] border border-[#101A24]/10 hover:shadow-sm'}`}
             >{c.name}</button>
           ))}
+          <button onClick={() => setShowRosterModal(true)} disabled={!cohortId}
+            className="flex items-center gap-1.5 font-comic font-extrabold text-xs px-4 py-2.5 rounded-2xl bg-white text-[#101A24] border border-[#101A24]/10 hover:shadow-sm disabled:opacity-40"
+          >
+            <Settings size={14} /> {t.studioManageRosterBtn}
+          </button>
+          <button onClick={() => setShowCreateCohort(true)}
+            className="flex items-center gap-1.5 font-comic font-extrabold text-xs px-4 py-2.5 rounded-2xl bg-[#E3D9F5] text-[#101A24] hover:shadow-sm"
+          >
+            <Plus size={14} /> {t.studioNewCohortBtn}
+          </button>
         </div>
       </div>
+
+      {cohorts.length === 0 && <EmptyState>{t.studioNoCohorts}</EmptyState>}
 
       {learners && (
         <div className="flex items-center gap-3.5 bg-[#E3D9F5] rounded-3xl px-5 py-4 shadow-sm">
@@ -180,16 +340,23 @@ export default function LearnersAndExams() {
         </>
       )}
 
+      {cohortId && (
       <Card>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h3 className="font-comic font-extrabold text-[#101A24]">🙋 {t.studioLearnerListTitle}</h3>
-          <span className="text-xs font-bold text-[#8A8A8A]">{t.studioLearnerListHint}</span>
+          <h3 className="font-comic font-extrabold text-[#101A24]">🙋 {showAllLearners ? t.studioLearnerListTitle : t.studioLearnerListNeedsAttentionTitle}</h3>
+          {roster && roster.length > 0 && (
+            <button onClick={() => setShowAllLearners((v) => !v)} className="font-comic font-extrabold text-xs px-3.5 py-2 rounded-xl bg-[#F9FAFB] text-[#101A24] hover:shadow-sm">
+              {showAllLearners ? t.studioShowNeedsAttentionOnly : t.studioViewAllLearners}
+            </button>
+          )}
         </div>
-        {!learners ? <Spinner label={t.studioLoading} /> : learners.length === 0 ? (
+        {!learners || !roster ? <Spinner label={t.studioLoading} /> : roster.length === 0 ? (
           <EmptyState>{t.studioNoLearnersInCohort}</EmptyState>
+        ) : visibleLearners.length === 0 ? (
+          <EmptyState>{t.studioNoLearnersNeedAttention}</EmptyState>
         ) : (
           <div className="flex flex-col gap-2">
-            {learners.map((l, i) => (
+            {visibleLearners.map((l, i) => (
               <button key={l.id} onClick={() => setSelectedLearnerId(l.id)}
                 className="text-left flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-[#F9FAFB] hover:translate-x-0.5 transition-transform"
               >
@@ -211,6 +378,7 @@ export default function LearnersAndExams() {
           </div>
         )}
       </Card>
+      )}
 
       {rescueTopic && (
         <div className="fixed inset-0 z-50 bg-[#101A24]/40 flex items-center justify-center p-4" onClick={() => setRescueTopic(null)}>
@@ -219,6 +387,28 @@ export default function LearnersAndExams() {
               <X size={16} />
             </button>
             <RescueExpeditionFlow cohortId={cohortId} topic={rescueTopic} t={t} onClose={() => setRescueTopic(null)} />
+          </div>
+        </div>
+      )}
+
+      {showRosterModal && (
+        <div className="fixed inset-0 z-50 bg-[#101A24]/40 flex items-center justify-center p-4" onClick={() => setShowRosterModal(false)}>
+          <div className="bg-[#F4F1FB] rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-6 relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowRosterModal(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+              <X size={16} />
+            </button>
+            <CohortRosterModal cohortId={cohortId} t={t} onClose={() => setShowRosterModal(false)} onChanged={loadCohortData} />
+          </div>
+        </div>
+      )}
+
+      {showCreateCohort && (
+        <div className="fixed inset-0 z-50 bg-[#101A24]/40 flex items-center justify-center p-4" onClick={() => setShowCreateCohort(false)}>
+          <div className="bg-[#F4F1FB] rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-6 relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowCreateCohort(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+              <X size={16} />
+            </button>
+            <CreateCohortModal t={t} onClose={() => setShowCreateCohort(false)} onCreated={handleCohortCreated} />
           </div>
         </div>
       )}

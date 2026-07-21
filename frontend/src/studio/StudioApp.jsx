@@ -40,7 +40,7 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
         <div className="p-7 pb-0">
           <button onClick={() => setTab('overview')} className="flex items-center gap-2 font-comic font-extrabold text-[21px] tracking-tight text-[#101A24]">
             <img src={llamaLogo} alt="" className="w-9 h-9 object-contain" />
-            <span>Tutor</span>
+            <span>Llama Tutor</span>
           </button>
           <p className="mt-1.5 mb-7 text-[11px] font-extrabold uppercase tracking-widest text-[#8B7BAE]">{t.studioTagline}</p>
         </div>
@@ -87,7 +87,7 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
 
       <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
         <div className="px-4 h-16 flex items-center justify-between">
-          <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Tutor</span>
+          <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Llama Tutor</span>
           <div className="flex items-center gap-2">
             <button onClick={handleExit} className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-[#101A24]/10 bg-white flex items-center gap-1">
               <ArrowLeftRight size={14} /> {t.modeLearner}

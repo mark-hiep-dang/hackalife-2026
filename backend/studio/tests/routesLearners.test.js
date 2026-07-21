@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initDb, getDb } from '../../db.js';
-import { getRealLearnerAccounts, getRealLearnersWithRisk, getCohortRosterSize, getLearnerInterventions } from '../routes.js';
+import {
+  getRealLearnerAccounts, getRealLearnersWithRisk, getCohortRosterSize, getLearnerInterventions,
+  getCohortRoster, addLearnerToCohort, removeLearnerFromCohort, getAllLearnerAccounts
+} from '../routes.js';
 
 async function makeLearner(db, username) {
   await db.run('DELETE FROM users WHERE username = ?', [username]);
@@ -77,6 +80,51 @@ test('getLearnerInterventions: returns assigned interventions with completion st
   const complete = interventions.find((iv) => iv.title === 'Ôn tập B');
   assert.equal(incomplete.completed_at, null);
   assert.ok(complete.completed_at);
+
+  await db.run('DELETE FROM users WHERE id IN (?, ?)', [trainer.lastID, learner]);
+});
+
+async function makeLearnerNoActivity(db, username) {
+  await db.run('DELETE FROM users WHERE username = ?', [username]);
+  const user = await db.run('INSERT INTO users (username, password_hash, xp, streak) VALUES (?, ?, 0, 0)', [username, 'x']);
+  return user.lastID;
+}
+
+test('addLearnerToCohort/getCohortRoster: a freshly-enrolled learner with zero quiz activity still shows up', async () => {
+  await initDb();
+  const db = await getDb();
+  const trainer = await db.run('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', ['test_routes_trainer_4', 'x', 'trainer']);
+  const learner = await makeLearnerNoActivity(db, 'test_routes_learner_f');
+  const cohort = await makeCohort(db, trainer.lastID, 'Cohort Roster Mgmt');
+
+  let roster = await getCohortRoster(db, cohort);
+  assert.ok(!roster.some((l) => l.id === learner));
+
+  await addLearnerToCohort(db, cohort, learner);
+  roster = await getCohortRoster(db, cohort);
+  assert.ok(roster.some((l) => l.id === learner));
+
+  // getRealLearnerAccounts still excludes them (no quiz activity yet) — the
+  // two views are intentionally different.
+  const realAccounts = await getRealLearnerAccounts(db, cohort);
+  assert.ok(!realAccounts.some((l) => l.id === learner));
+
+  await removeLearnerFromCohort(db, cohort, learner);
+  roster = await getCohortRoster(db, cohort);
+  assert.ok(!roster.some((l) => l.id === learner));
+
+  await db.run('DELETE FROM users WHERE id IN (?, ?)', [trainer.lastID, learner]);
+});
+
+test('getAllLearnerAccounts: includes real learners regardless of activity, excludes trainers', async () => {
+  await initDb();
+  const db = await getDb();
+  const trainer = await db.run('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', ['test_routes_trainer_5', 'x', 'trainer']);
+  const learner = await makeLearnerNoActivity(db, 'test_routes_learner_g');
+
+  const all = await getAllLearnerAccounts(db);
+  assert.ok(all.some((l) => l.id === learner));
+  assert.ok(!all.some((l) => l.id === trainer.lastID));
 
   await db.run('DELETE FROM users WHERE id IN (?, ?)', [trainer.lastID, learner]);
 });
