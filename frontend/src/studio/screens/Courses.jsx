@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getCourses, createCourse, getCourse, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue, getCourseKnowledge, uploadCourseKnowledge, approveCourseKnowledge, generateContentFromDocument } from '../../utils/studioApi';
+import {
+  getCourses, createCourse, getCourse, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
+  getCourseKnowledge, uploadCourseKnowledge, approveCourseKnowledge, generateContentFromDocument,
+  createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
+} from '../../utils/studioApi';
 import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
-import { Plus, ArrowLeft, Mountain, Sparkles, Upload, Check } from 'lucide-react';
+import { Plus, ArrowLeft, Mountain, Sparkles, Upload, Check, Pencil, Trash2 } from 'lucide-react';
 import { useT } from '../../translations';
 
 const CAMP_COLORS = ['bg-[#C7EFC4]', 'bg-[#B9E7EF]', 'bg-[#E3D9F5]', 'bg-[#FBE3B0]', 'bg-[#F5C9DA]'];
@@ -52,27 +56,168 @@ function CreateCourseForm({ onCreated, onCancel }) {
   );
 }
 
-function MountainVisual({ camps, lessons, t }) {
+function AddLessonForm({ campId, t, onAdded, onCancel }) {
+  const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true); setError(null);
+    try { await createLesson(campId, { title }); onAdded(); }
+    catch (err) { setError(err.message); } finally { setSaving(false); }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-2 flex flex-col gap-2">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.studioLessonTitleLabel} required
+        className="px-2 py-1.5 rounded-lg border border-[#101A24]/15 text-xs bg-white" />
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="submit" variant="success" className="!px-2 !py-1 text-[11px]" disabled={saving}>{saving ? t.studioAdding : t.studioSave}</Button>
+        <Button type="button" variant="secondary" className="!px-2 !py-1 text-[11px]" onClick={onCancel}>{t.studioCancel}</Button>
+      </div>
+    </form>
+  );
+}
+
+function LessonRow({ lesson, t, onChanged }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ title: lesson.title, description: lesson.description || '', estimatedMinutes: lesson.estimatedMinutes, difficulty: lesson.difficulty });
+  const [busy, setBusy] = useState(false);
+  const isPublished = lesson.status === 'PUBLISHED';
+
+  async function save() {
+    setBusy(true);
+    try { await updateLesson(lesson.id, draft); setEditing(false); onChanged(); } finally { setBusy(false); }
+  }
+  async function handleDelete() {
+    if (!window.confirm(t.studioDeleteLessonConfirm)) return;
+    setBusy(true);
+    try { await deleteLesson(lesson.id); onChanged(); } catch (err) { window.alert(err.message); } finally { setBusy(false); }
+  }
+
+  if (editing) {
+    return (
+      <div className="bg-white/90 rounded-lg p-2.5 flex flex-col gap-2">
+        <input value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} className="px-2 py-1 rounded border border-[#101A24]/15 text-xs bg-white" />
+        <textarea value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} rows={2}
+          placeholder={t.studioLessonDescriptionLabel} className="px-2 py-1 rounded border border-[#101A24]/15 text-xs bg-white" />
+        <div className="flex gap-2">
+          <input type="number" value={draft.estimatedMinutes} onChange={(e) => setDraft((d) => ({ ...d, estimatedMinutes: Number(e.target.value) }))}
+            className="w-16 px-2 py-1 rounded border border-[#101A24]/15 text-xs bg-white" />
+          <select value={draft.difficulty} onChange={(e) => setDraft((d) => ({ ...d, difficulty: e.target.value }))} className="px-2 py-1 rounded border border-[#101A24]/15 text-xs bg-white">
+            <option value="Dễ">Dễ</option>
+            <option value="Trung bình">Trung bình</option>
+            <option value="Khó">Khó</option>
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="success" className="!px-2 !py-1 text-[11px]" onClick={save} disabled={busy}>{t.studioSave}</Button>
+          <Button variant="secondary" className="!px-2 !py-1 text-[11px]" onClick={() => setEditing(false)}>{t.studioCancel}</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/80 rounded-lg px-3 py-2 text-xs font-bold text-[#101A24] flex items-center justify-between gap-2">
+      <span className="truncate">{lesson.title}</span>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="opacity-60">{lesson.status}</span>
+        <button onClick={() => setEditing(true)} className="text-[#101A24]/60 hover:text-[#101A24]"><Pencil size={12} /></button>
+        <button onClick={handleDelete} disabled={busy || isPublished} title={isPublished ? t.studioDeleteLessonBlockedPublished : undefined}
+          className="text-[#101A24]/60 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/60"><Trash2 size={12} /></button>
+      </div>
+    </div>
+  );
+}
+
+function CampCard({ camp, index, lessons, t, onChanged }) {
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(camp.title);
+  const [addingLesson, setAddingLesson] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const campLessons = lessons.filter((l) => l.campId === camp.id);
+  const hasPublished = campLessons.some((l) => l.status === 'PUBLISHED');
+
+  async function saveTitle() {
+    setBusy(true);
+    try { await updateCamp(camp.id, { title: titleDraft }); setEditingTitle(false); onChanged(); } finally { setBusy(false); }
+  }
+  async function handleDeleteCamp() {
+    if (!window.confirm(t.studioDeleteCampConfirm)) return;
+    setBusy(true);
+    try { await deleteCamp(camp.id); onChanged(); } catch (err) { window.alert(err.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className={`min-w-[240px] rounded-2xl border border-[#101A24]/10 p-4 ${CAMP_COLORS[index % CAMP_COLORS.length]}`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs font-extrabold uppercase tracking-widest text-[#101A24]/70">{t.studioCampLabel.replace('{n}', index + 1)}</div>
+        <div className="flex gap-1.5">
+          <button onClick={() => setEditingTitle(true)} className="text-[#101A24]/60 hover:text-[#101A24]"><Pencil size={13} /></button>
+          <button onClick={handleDeleteCamp} disabled={busy || hasPublished} title={hasPublished ? t.studioDeleteCampBlockedPublished : undefined}
+            className="text-[#101A24]/60 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/60"><Trash2 size={13} /></button>
+        </div>
+      </div>
+      {editingTitle ? (
+        <div className="flex flex-col gap-2 mb-3">
+          <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="px-2 py-1.5 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
+          <div className="flex gap-2">
+            <Button variant="success" className="!px-2 !py-1 text-xs" onClick={saveTitle} disabled={busy}>{t.studioSave}</Button>
+            <Button variant="secondary" className="!px-2 !py-1 text-xs" onClick={() => { setEditingTitle(false); setTitleDraft(camp.title); }}>{t.studioCancel}</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="font-extrabold text-[#101A24] mb-3">{camp.title}</div>
+      )}
+      <div className="flex flex-col gap-2">
+        {campLessons.map((l) => <LessonRow key={l.id} lesson={l} t={t} onChanged={onChanged} />)}
+      </div>
+      {addingLesson ? (
+        <AddLessonForm campId={camp.id} t={t} onCancel={() => setAddingLesson(false)} onAdded={() => { setAddingLesson(false); onChanged(); }} />
+      ) : (
+        <button onClick={() => setAddingLesson(true)} className="mt-2.5 text-xs font-extrabold text-[#101A24]/70 hover:text-[#101A24] flex items-center gap-1">
+          <Plus size={12} /> {t.studioAddLesson}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MountainVisual({ courseId, camps, lessons, t, onChanged }) {
+  const [addingCamp, setAddingCamp] = useState(false);
+  const [newCampTitle, setNewCampTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleAddCamp(e) {
+    e.preventDefault();
+    setSaving(true);
+    try { await createCamp(courseId, newCampTitle); setNewCampTitle(''); setAddingCamp(false); onChanged(); } finally { setSaving(false); }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 text-[#101A24] font-extrabold"><Mountain size={20} /> {t.studioMountainTitle}</div>
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {camps.map((camp, i) => (
-          <div key={camp.id} className={`min-w-[220px] rounded-2xl border border-[#101A24]/10 p-4 ${CAMP_COLORS[i % CAMP_COLORS.length]}`}>
-            <div className="text-xs font-extrabold uppercase tracking-widest text-[#101A24]/70 mb-2">{t.studioCampLabel.replace('{n}', i + 1)}</div>
-            <div className="font-extrabold text-[#101A24] mb-3">{camp.title}</div>
-            <div className="flex flex-col gap-2">
-              {lessons.filter((l) => l.campId === camp.id).map((l) => (
-                <div key={l.id} className="bg-white/80 rounded-lg px-3 py-2 text-xs font-bold text-[#101A24] flex items-center justify-between">
-                  <span>{l.title}</span>
-                  <span className="opacity-60">{l.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        <div className="min-w-[140px] rounded-2xl border border-[#101A24]/10 p-4 bg-[#101A24] text-white flex items-center justify-center font-extrabold">
-          🏔️ {t.studioSummitLabel}
+        {camps.map((camp, i) => <CampCard key={camp.id} camp={camp} index={i} lessons={lessons} t={t} onChanged={onChanged} />)}
+        <div className="min-w-[160px] rounded-2xl border border-[#101A24]/10 p-4 bg-[#101A24] text-white flex flex-col items-center justify-center gap-3">
+          <span className="font-extrabold text-center">🏔️ {t.studioSummitLabel}</span>
+          {addingCamp ? (
+            <form onSubmit={handleAddCamp} className="flex flex-col gap-2 w-full">
+              <input value={newCampTitle} onChange={(e) => setNewCampTitle(e.target.value)} required autoFocus
+                placeholder={t.studioCampTitleLabel} className="px-2 py-1 rounded text-xs text-[#101A24]" />
+              <div className="flex gap-1">
+                <Button type="submit" variant="success" className="!px-2 !py-1 text-[10px]" disabled={saving}>{t.studioSave}</Button>
+                <Button type="button" variant="secondary" className="!px-2 !py-1 text-[10px]" onClick={() => setAddingCamp(false)}>{t.studioCancel}</Button>
+              </div>
+            </form>
+          ) : (
+            <button onClick={() => setAddingCamp(true)} className="text-xs font-extrabold text-white/80 hover:text-white flex items-center gap-1">
+              <Plus size={12} /> {t.studioAddCamp}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -86,6 +231,7 @@ function CourseDetail({ courseId, onBack }) {
   const [busy, setBusy] = useState(false);
   const [reaction, setReaction] = useState(null);
   const [tab, setTab] = useState('architect');
+  const [prompt, setPrompt] = useState('');
 
   async function load() {
     const b = await getCourse(courseId);
@@ -98,9 +244,11 @@ function CourseDetail({ courseId, onBack }) {
   async function handleGenerate() {
     setBusy(true);
     try {
-      const result = await generateCourseCurriculum(courseId);
+      const result = await generateCourseCurriculum(courseId, prompt);
       setReaction({ event: 'CURRICULUM_CREATED', context: result });
       await load();
+    } catch (err) {
+      window.alert(err.message);
     } finally { setBusy(false); }
   }
 
@@ -137,17 +285,29 @@ function CourseDetail({ courseId, onBack }) {
         <Button variant={tab === 'quality' ? 'primary' : 'secondary'} onClick={() => setTab('quality')}>{t.studioCourseQualityTab}</Button>
       </div>
 
-      {tab === 'architect' && (
-        <Card>
-          <div className="flex items-center justify-between mb-4">
+      {tab === 'architect' && (() => {
+        const hasApprovedContent = lessons.some((l) => l.status === 'APPROVED' || l.status === 'PUBLISHED');
+        return (
+          <Card>
             <SectionTitle subtitle={t.studioCurriculumSubtitle}>{t.studioCurriculumTitle}</SectionTitle>
-            <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2">
-              <Sparkles size={16} /> {camps.length ? t.studioRegenerateCurriculum : t.studioGenerateCurriculum}
-            </Button>
-          </div>
-          {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual camps={camps} lessons={lessons} t={t} />}
-        </Card>
-      )}
+            {hasApprovedContent ? (
+              <p className="text-sm text-[#888] italic mb-4">{t.studioRegenerateBlockedMessage}</p>
+            ) : (
+              <div className="flex flex-col gap-3 mb-4">
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-bold text-[#101A24]">{t.studioCurriculumPromptLabel}</span>
+                  <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3}
+                    placeholder={t.studioCurriculumPromptPlaceholder} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm" />
+                </label>
+                <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2 w-fit">
+                  <Sparkles size={16} /> {camps.length ? t.studioRegenerateCurriculum : t.studioGenerateCurriculum}
+                </Button>
+              </div>
+            )}
+            {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
+          </Card>
+        );
+      })()}
 
       {tab === 'sources' && <SourcesTab courseId={courseId} lessons={lessons} t={t} />}
 

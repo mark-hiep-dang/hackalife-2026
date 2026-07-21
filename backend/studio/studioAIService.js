@@ -8,7 +8,7 @@
 // "AI proposal" is genuinely grounded even when Gemini is unavailable.
 
 import { callGemini, matchesShape } from '../geminiClient.js';
-import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk } from '../knowledgeBase.js';
+import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk, getApprovedChunksForCourse } from '../knowledgeBase.js';
 import { assembleRescueTrail, getConceptPair } from '../engines/rescueTrail.js';
 import { AI_TASKS } from '../aiConfig.js';
 import { validateCurriculumProposal, validateInterventionProposal, validateGeneratedQuestion, validateGeneratedFlashcard, validateGeneratedKnowledge } from '../aiValidation.js';
@@ -130,6 +130,122 @@ async function buildCurriculumProposal(db, input = {}) {
   // attempt would lock in the fallback for this fingerprint even after a
   // transient Gemini failure clears up.
   return withCacheControl(proposal, !!raw);
+}
+
+// ── Course-specific curriculum generation, grounded in the trainer's own
+// uploaded source material + stated goal — NOT the fixed 8-MOF-topic bank
+// above. Falls back to generateCurriculum (today's deterministic MOF-bank
+// path) when the course has no approved source documents yet, so an
+// MOF-standard course still works exactly as it does today with zero setup.
+/**
+ * @param {import('sqlite').Database} db
+ * @param {{ courseId: number, prompt?: string, preferredCamps?: number }} input
+ * @returns {Promise<{ summary: string, camps: object[], lessons: object[], usedSource: 'bank'|'document' }>}
+ */
+export async function generateCurriculumFromPrompt(db, { courseId, prompt = '', preferredCamps = 4 }) {
+  const chunks = await getApprovedChunksForCourse(db, courseId);
+  if (chunks.length === 0) {
+    return { ...(await generateCurriculum(db, { preferredCamps })), usedSource: 'bank' };
+  }
+
+  const sourceChunkIds = chunks.map((c) => c.id);
+  const sourceText = chunks.map((c) => c.content).join('\n\n').slice(0, 8000);
+  const grounding = `CHỈ dựa trên đoạn tài liệu bên dưới, TUYỆT ĐỐI không bịa thêm nội dung ngoài đoạn này.\n\nTài liệu:\n${sourceText}`;
+  const goalLine = prompt?.trim()
+    ? `Mục tiêu khóa học của trainer: "${prompt.trim()}"`
+    : 'Trainer chưa mô tả mục tiêu cụ thể — hãy tự đề xuất một lộ trình hợp lý bao trùm toàn bộ tài liệu.';
+
+  const raw = await studioCallGemini(
+    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"summary": string, "camps": [{"title": string}], "lessons": [{"title": string, "description": string, "campIndex": number, "estimatedMinutes": number, "difficulty": string, "learningOutcome": string}]}',
+    `${grounding}\n\n${goalLine}\n\nDựa vào tài liệu và mục tiêu trên, đề xuất lộ trình gồm tối đa ${preferredCamps} camp (campIndex bắt đầu từ 0) và các chặng học (lesson) hợp lý trong mỗi camp. difficulty chỉ dùng "Dễ", "Trung bình" hoặc "Khó".`,
+    AI_TASKS.GENERATE_CURRICULUM, db, 15000
+  );
+
+  let proposal = null;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(stripJsonFence(raw));
+      if (matchesShape({ summary: 'string' }, parsed) && Array.isArray(parsed.camps) && Array.isArray(parsed.lessons)) {
+        const camps = parsed.camps.map((c, i) => ({ id: i + 1, title: c.title, orderIndex: i }));
+        const lessons = parsed.lessons.map((l, i) => {
+          const camp = camps[l.campIndex] || camps[0];
+          return {
+            id: i + 1,
+            title: l.title,
+            description: l.description || '',
+            campId: camp?.id,
+            learningOutcome: l.learningOutcome || `Học viên hiểu và vận dụng được kiến thức về ${(l.title || '').toLowerCase()}.`,
+            skillIds: camp ? [camp.id] : [],
+            prerequisiteLessonIds: [],
+            estimatedMinutes: typeof l.estimatedMinutes === 'number' && l.estimatedMinutes > 0 ? l.estimatedMinutes : 20,
+            difficulty: ['Dễ', 'Trung bình', 'Khó'].includes(l.difficulty) ? l.difficulty : 'Trung bình',
+            recommendedActivities: ['micro-lesson', 'flashcard', 'mcq'],
+            examWeight: parsed.lessons.length ? Math.round((1 / parsed.lessons.length) * 100) / 100 : 0.1,
+            sourceChunkIds,
+            sourceTitle: 'Tài liệu trainer tải lên',
+            sourceVersion: '1.0',
+            status: 'AI_DRAFT'
+          };
+        });
+        proposal = { summary: parsed.summary, camps, lessons };
+      }
+    } catch (err) { /* falls through to the deterministic chunk-bucket fallback below */ }
+  }
+
+  if (proposal) {
+    const check = validateCurriculumProposal(proposal, sourceChunkIds);
+    if (!check.valid) {
+      console.warn('generateCurriculumFromPrompt: AI proposal failed validation, using chunk-bucket fallback:', check.errors);
+      proposal = null;
+    }
+  }
+
+  if (!proposal) proposal = buildChunkBucketProposal(chunks, preferredCamps);
+
+  return { ...proposal, usedSource: 'document' };
+}
+
+// Zero-AI fallback for prompt+document generation — buckets the trainer's
+// own approved chunks into camps/lessons directly, so there's always a
+// working, genuinely-grounded (never fabricated) result even with no API
+// key or an invalid AI response. Titles are stubbed from the chunk text;
+// the trainer is expected to rename them via the new camp/lesson edit UI.
+function buildChunkBucketProposal(chunks, preferredCamps) {
+  const campCount = Math.max(1, Math.min(preferredCamps, chunks.length));
+  const perCamp = Math.ceil(chunks.length / campCount);
+  const camps = [];
+  const lessons = [];
+  let lessonId = 1;
+  for (let i = 0; i < campCount; i++) {
+    const campChunks = chunks.slice(i * perCamp, (i + 1) * perCamp);
+    if (campChunks.length === 0) continue;
+    const camp = { id: camps.length + 1, title: `Phần ${camps.length + 1}`, orderIndex: camps.length };
+    camps.push(camp);
+    for (const chunk of campChunks) {
+      const stub = chunk.content.replace(/\s+/g, ' ').trim().slice(0, 50);
+      lessons.push({
+        id: lessonId++,
+        title: stub + (chunk.content.length > 50 ? '…' : ''),
+        description: chunk.content.slice(0, 200),
+        campId: camp.id,
+        learningOutcome: `Học viên nắm được nội dung: ${stub}`,
+        skillIds: [camp.id],
+        prerequisiteLessonIds: [],
+        estimatedMinutes: 15,
+        difficulty: 'Trung bình',
+        recommendedActivities: ['micro-lesson', 'flashcard', 'mcq'],
+        examWeight: 0.1,
+        sourceChunkIds: [chunk.id],
+        sourceTitle: 'Tài liệu trainer tải lên',
+        sourceVersion: '1.0',
+        status: 'AI_DRAFT'
+      });
+    }
+  }
+  return {
+    summary: `Llama đã chia tài liệu bạn tải lên thành ${camps.length} camp và ${lessons.length} chặng học — hãy đổi tên lại cho phù hợp nhé!`,
+    camps, lessons
+  };
 }
 
 // ── Lesson Kit generation — pulls REAL content for the lesson's mapped topic ──

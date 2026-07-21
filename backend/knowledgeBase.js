@@ -56,6 +56,19 @@ export async function retrieveKnowledge(db, message, limit = 5) {
   }
 }
 
+// Full-course retrieval (not keyword-matched) — used when a trainer wants
+// AI to structure a curriculum from everything they've uploaded for THIS
+// course, rather than a keyword-relevant excerpt of it.
+export async function getApprovedChunksForCourse(db, courseId) {
+  return db.all(
+    `SELECT c.* FROM knowledge_chunks c
+     JOIN knowledge_documents d ON c.document_id = d.id
+     WHERE d.course_id = ? AND d.approved = 1
+     ORDER BY c.document_id, c.chunk_index`,
+    [courseId]
+  );
+}
+
 function tokenize(text) {
   return new Set(
     (text || '')
