@@ -311,6 +311,16 @@
   100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0) rotate(180deg); opacity: 0; }
 }
 
+/* Respect the user's motion preference across every decorative animation
+   in the app (wiggle/bob/sparkle/floatCloud/pop-in/etc.) — freezes them on
+   their final frame instead of looping. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* Custom scrollbar for flashcards */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

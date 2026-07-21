@@ -115,7 +115,7 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
       </header>
 
       <main className="flex-1 w-full overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-4 md:px-10 py-8 md:py-12">
+        <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-8 md:py-12">
           {tab === 'overview' && <Overview onNavigate={setTab} />}
           {tab === 'courses' && <Courses />}
           {tab === 'library' && <ContentLibrary />}
