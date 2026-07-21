@@ -4,7 +4,7 @@
 // work, and never jokes inside legal/insurance content.
 //
 // @typedef {"welcoming"|"thinking"|"helpful"|"concerned"|"celebrating"|"reviewing"|"encouraging"} StudioLlamaMood
-// @typedef {"STUDIO_GREETING"|"SOURCE_UPLOADED"|"SOURCE_ANALYZING"|"CURRICULUM_CREATED"|"LESSON_KIT_CREATED"|"QUALITY_CHECK_COMPLETE"|"QUALITY_ISSUE_FOUND"|"COURSE_READY"|"COURSE_PUBLISHED"|"MOCK_EXAM_COMPLETED"|"COHORT_SCORE_IMPROVED"|"LEARNER_RISK_FOUND"|"MISCONCEPTION_CLUSTER_FOUND"|"QUESTION_QUALITY_WARNING"|"INTERVENTION_CREATED"|"INTERVENTION_ASSIGNED"|"INTERVENTION_IMPROVED_RESULTS"|"EMPTY_COURSE"|"AI_ERROR"} StudioLlamaEvent
+// @typedef {"STUDIO_GREETING"|"SOURCE_UPLOADED"|"SOURCE_ANALYZING"|"CURRICULUM_CREATED"|"LESSON_KIT_CREATED"|"QUALITY_CHECK_COMPLETE"|"QUALITY_ISSUE_FOUND"|"COURSE_READY"|"COURSE_PUBLISHED"|"MOCK_EXAM_COMPLETED"|"COHORT_SCORE_IMPROVED"|"LEARNER_RISK_FOUND"|"OUTLIER_PATTERN_FOUND"|"MISCONCEPTION_CLUSTER_FOUND"|"QUESTION_QUALITY_WARNING"|"INTERVENTION_CREATED"|"INTERVENTION_ASSIGNED"|"INTERVENTION_IMPROVED_RESULTS"|"EMPTY_COURSE"|"AI_ERROR"} StudioLlamaEvent
 
 function pick(pool) {
   return pool[Math.floor(Math.random() * pool.length)];
@@ -63,6 +63,10 @@ const POOLS = {
     '{count} học viên đang cần được chú ý thêm.',
     'Có vài học viên đang vấp ở cùng một chỗ, Llama đã ghi chú lại rồi.'
   ],
+  OUTLIER_PATTERN_FOUND: [
+    '{count} học viên đang có kiểu học hơi khác thường — không hẳn là yếu, chỉ là đáng để ý thêm.',
+    'Llama nhận thấy {count} học viên học theo cách khác lạ. Không phải lỗi của ai, chỉ là một góc nhìn mới thôi.'
+  ],
   MISCONCEPTION_CLUSTER_FOUND: [
     '{count} học viên đang vấp cùng một chỗ. Có vẻ tảng đá này cần gắn biển cảnh báo.',
     'Llama phát hiện một nhóm học viên đang nhầm cùng một khái niệm.'
@@ -106,6 +110,7 @@ const MOOD_BY_EVENT = {
   MOCK_EXAM_COMPLETED: 'reviewing',
   COHORT_SCORE_IMPROVED: 'celebrating',
   LEARNER_RISK_FOUND: 'concerned',
+  OUTLIER_PATTERN_FOUND: 'concerned',
   MISCONCEPTION_CLUSTER_FOUND: 'concerned',
   QUESTION_QUALITY_WARNING: 'reviewing',
   INTERVENTION_CREATED: 'helpful',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getLearnerProfile } from '../../utils/studioApi';
-import { Card, Spinner, Stat } from '../components/ui';
+import { Card, Spinner, Stat, Sparkline, PatternBadge } from '../components/ui';
 import { ArrowLeft } from 'lucide-react';
 import { useT } from '../../translations';
 
@@ -20,11 +20,16 @@ export default function LearnerProfile({ learnerId, onBack }) {
       <Card>
         <h2 className="text-xl font-extrabold text-[#101A24]">{data.learner.username}</h2>
         <p className="text-sm text-[#666] mt-1">{data.insight}</p>
+        {(data.outlierPatterns || []).length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {data.outlierPatterns.map((p) => <PatternBadge key={p.type} type={p.type} title={p.reason} />)}
+          </div>
+        )}
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Stat label={t.studioLatestScore} value={data.latestScore ?? '—'} />
-        <Stat label={t.studioTrendLabel} value={TREND_LABEL[data.scoreTrend] || data.scoreTrend} />
+        <Stat label={t.studioTrendLabel} value={<Sparkline points={data.mockExamHistory} />} sub={TREND_LABEL[data.scoreTrend] || data.scoreTrend} />
         <Stat label={t.studioCommonMistake} value={data.commonMistakeType || '—'} />
         <Stat label={t.studioExamHistory} value={data.mockExamHistory.join(' → ') || '—'} />
       </div>
@@ -32,12 +37,18 @@ export default function LearnerProfile({ learnerId, onBack }) {
       <Card>
         <h3 className="font-extrabold text-[#101A24] mb-3">{t.studioTopicPerformance}</h3>
         <div className="flex flex-col gap-2">
-          {data.topicPerformance.map((topic) => (
-            <div key={topic.topic} className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#101A24]/10 text-sm">
-              <span className="font-bold text-[#101A24]">{topic.topic}</span>
-              <span className="text-[#888]">{t.studioCorrectRateShort.replace('{n}', topic.correctRate)}</span>
-            </div>
-          ))}
+          {data.topicPerformance.map((topic) => {
+            const trend = (data.masteryTrend || []).find((m) => m.topic === topic.topic);
+            return (
+              <div key={topic.topic} className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#101A24]/10 text-sm gap-3">
+                <span className="font-bold text-[#101A24]">{topic.topic}</span>
+                <div className="flex items-center gap-3">
+                  {trend && <Sparkline points={trend.points} width={60} height={20} />}
+                  <span className="text-[#888]">{t.studioCorrectRateShort.replace('{n}', topic.correctRate)}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Card>
 
