@@ -351,9 +351,11 @@ export function mountStudioRoutes(app, authenticateToken) {
   // ── Source Documents (giáo án upload → grounds AI content generation) ───
   // Course-scoped, not global — reuses the same storeDocument/chunking/FTS
   // pipeline the learner-chat upload already uses (backend/knowledgeBase.js),
-  // just tagging the document with this course and defaulting it unapproved
-  // until a trainer reviews it (a document must be approved before any
-  // generation call is allowed to read its chunks).
+  // just tagging the document with this course. Immediately usable (approved
+  // on upload) — a course-scoped document only ever grounds that course's own
+  // generation (never the shared learner chat, see retrieveKnowledge's
+  // course_id IS NULL filter), and the generated camps/lessons/content still
+  // go through their own AI_DRAFT → APPROVED → PUBLISHED review regardless.
   app.post('/api/studio/courses/:id/knowledge', ...T, studioUpload.single('file'), async (req, res) => {
     const db = req.db;
     try {
@@ -374,7 +376,7 @@ export function mountStudioRoutes(app, authenticateToken) {
       }
 
       const title = (req.body.title || '').trim() || originalname;
-      const result = await storeDocument(db, title, sourceType, text, req.user.id, { courseId: course.id, approved: 0 });
+      const result = await storeDocument(db, title, sourceType, text, req.user.id, { courseId: course.id, approved: 1 });
       res.status(201).json({ title, ...result });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -391,13 +393,6 @@ export function mountStudioRoutes(app, authenticateToken) {
         id: d.id, title: d.title, sourceType: d.source_type, approved: !!d.approved,
         chunkCount: d.chunk_count, createdAt: d.created_at
       })));
-    } catch (err) { res.status(500).json({ error: err.message }); }
-  });
-
-  app.put('/api/studio/knowledge/:id/approve', ...T, async (req, res) => {
-    try {
-      await req.db.run('UPDATE knowledge_documents SET approved = 1 WHERE id = ?', [req.params.id]);
-      res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
