@@ -417,10 +417,12 @@ export function mountStudioRoutes(app, authenticateToken) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  // Real AI generation grounded in a specific approved document — distinct
-  // from kit/generate below, which never calls Gemini and only samples the
-  // pre-approved exam bank. Results land as AI_DRAFT content-items, same
-  // review queue as everything else — never auto-approved.
+  // Real AI generation grounded in a specific document the trainer uploaded
+  // for this course — distinct from kit/generate below, which never calls
+  // Gemini and only samples the pre-approved exam bank. Results land as
+  // AI_DRAFT content-items, same review queue as everything else — never
+  // auto-approved. No document-approval gate: uploading it for this course
+  // is the review step (see the upload route's comment).
   app.post('/api/studio/lessons/:id/generate-from-document', ...T, async (req, res) => {
     const db = req.db;
     try {
@@ -429,7 +431,6 @@ export function mountStudioRoutes(app, authenticateToken) {
       const { documentId } = req.body;
       const doc = await db.get('SELECT * FROM knowledge_documents WHERE id = ?', [documentId]);
       if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
-      if (!doc.approved) return res.status(400).json({ error: 'Tài liệu chưa được duyệt. Hãy duyệt tài liệu trước khi tạo nội dung.' });
 
       const result = await generateContentFromDocument(db, { lessonId: lesson.id, documentId: doc.id, documentTitle: doc.title });
       await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
