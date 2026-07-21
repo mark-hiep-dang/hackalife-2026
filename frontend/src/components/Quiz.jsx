@@ -10,7 +10,7 @@ import quizPracticeMode from '../assets/quiz-practice-mode.webp';
 import quizExamMode from '../assets/quiz-exam-mode.webp';
 import { pickCorrectResponse, pickWrongResponse } from '../llamaResponses';
 import { getLlamaReaction } from '../llamaPersonality';
-import { previewAnswerMistake } from '../utils/api';
+import { previewAnswerMistake, explainMistake } from '../utils/api';
 import MistakeDnaCard from './MistakeDnaCard';
 import ExamReport from './ExamReport';
 import QuizHistory from './QuizHistory';
@@ -56,6 +56,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
   const [confidence, setConfidence] = useState('fairly_sure');
   const [questionStartedAt, setQuestionStartedAt] = useState(null);
   const [mistakeDNA, setMistakeDNA] = useState(null);
+  const [mistakeAiExplanation, setMistakeAiExplanation] = useState(null);
   const [rescueNeeded, setRescueNeeded] = useState(null);
   const [pendingRescue, setPendingRescue] = useState(initialRescue || null);
 
@@ -107,6 +108,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
     if (answered) return;
     setSelected(optIdx); setAnswered(true);
     setMistakeDNA(null);
+    setMistakeAiExplanation(null);
 
     const correct = optIdx === q.correct_index;
     const responseTimeMs = questionStartedAt ? Date.now() - questionStartedAt : undefined;
@@ -137,6 +139,11 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
             setFeedbackText(getLlamaReaction('HIGH_CONFIDENCE_MISTAKE', { lang }).message);
           } else {
             setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx], lang }));
+          }
+          if (dna?.label) {
+            explainMistake({ mistakeLabel: dna.label, explanation: q.explanation, question: q.question })
+              .then(({ message }) => setMistakeAiExplanation(message))
+              .catch(() => {});
           }
         }).catch(() => {
           setFeedbackText(pickWrongResponse({ wrongStreak: nw, difficulty: q.difficulty, correct_answer: q.options[q.correct_index], wrong_answer: q.options[optIdx], lang }));
@@ -491,7 +498,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
                 </p>
               )}
 
-              {!isCorrect && <MistakeDnaCard mistakeDNA={mistakeDNA} />}
+              {!isCorrect && <MistakeDnaCard mistakeDNA={mistakeDNA} aiExplanation={mistakeAiExplanation} />}
 
               <div className="text-left bg-[#EEF0F3] rounded-2xl p-5 mb-6">
                 <strong className="block text-[#101A24] text-xs font-extrabold uppercase tracking-widest mb-2">{t.explanationTitle}</strong>

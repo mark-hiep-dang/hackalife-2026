@@ -10,10 +10,14 @@ import { logAIUsage } from './aiUsageLog.js';
 const DEFAULT_TIMEOUT_MS = 6000;
 const MAX_ATTEMPTS = 2; // one call + one retry, per audit §10 rule 9
 
-async function requestOnce(model, systemInstruction, userMessage, timeoutMs) {
+async function requestOnce(model, systemInstruction, userMessage, timeoutMs, history) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const contents = [
+      ...(history || []).map((h) => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.content }] })),
+      { role: 'user', parts: [{ text: userMessage }] }
+    ];
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -22,7 +26,7 @@ async function requestOnce(model, systemInstruction, userMessage, timeoutMs) {
         signal: controller.signal,
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: [{ role: 'user', parts: [{ text: userMessage }] }]
+          contents
         })
       }
     );
@@ -42,13 +46,15 @@ async function requestOnce(model, systemInstruction, userMessage, timeoutMs) {
 /**
  * @param {string} systemInstruction
  * @param {string} userMessage
- * @param {{ task?: import('./aiConfig.js').LlamaAITask, db?: object, timeoutMs?: number, label?: string }} options
+ * @param {{ task?: import('./aiConfig.js').LlamaAITask, db?: object, timeoutMs?: number, label?: string, history?: {role: string, content: string}[] }} options
  *   `task` drives model routing (aiConfig.selectModelForTask) — every call
  *   site should pass one. `db`, if provided, gets a usage-log row regardless
  *   of outcome (demo/skip/success/failure) — omit only when no db handle is
- *   available yet (usage simply won't be logged for that call).
+ *   available yet (usage simply won't be logged for that call). `history`
+ *   (optional) carries prior turns for a multi-turn conversation (e.g. Ask
+ *   Llama chat) — each entry's `role` is 'user' or 'assistant'.
  */
-export async function callGemini(systemInstruction, userMessage, { task, db = null, timeoutMs = DEFAULT_TIMEOUT_MS, label = 'AIService' } = {}) {
+export async function callGemini(systemInstruction, userMessage, { task, db = null, timeoutMs = DEFAULT_TIMEOUT_MS, label = 'AIService', history } = {}) {
   const start = Date.now();
 
   if (!shouldCallAI(task)) {
@@ -64,7 +70,7 @@ export async function callGemini(systemInstruction, userMessage, { task, db = nu
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const { text, error, inputTokenCount, outputTokenCount } = await requestOnce(model, systemInstruction, userMessage, timeoutMs);
+      const { text, error, inputTokenCount, outputTokenCount } = await requestOnce(model, systemInstruction, userMessage, timeoutMs, history);
       usage = { inputTokenCount, outputTokenCount };
       if (text != null) {
         await logAIUsage(db, { taskType: task, provider: 'gemini', model, success: true, durationMs: Date.now() - start, ...usage });
