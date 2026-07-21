@@ -17,6 +17,9 @@ import { assembleRescueTrail } from './engines/rescueTrail.js';
 import { masteryStateLabel } from './engines/mastery.js';
 import { explainExpedition, explainMistake, generateRescueTrail } from './llamaAIService.js';
 import { mountStudioRoutes } from './studio/routes.js';
+import { getTopicsForLesson, getLessonIdForTopic } from './campTopicMap.js';
+import { calculateLessonMastery } from './engines/lessonMastery.js';
+import { syncExpeditionActivity } from './completionService.js';
 
 dotenv.config();
 
@@ -354,12 +357,22 @@ app.post('/api/lessons/:id/complete', authenticateToken, async (req, res) => {
     const newlyUnlockedBadges = await evaluateBadges(db, req.user.id);
     const updatedUser = await db.get('SELECT xp, level, streak FROM users WHERE id = ?', [req.user.id]);
 
+    // Shared completion state (spec §9): whether the learner opened this
+    // lesson from the Camp or from today's Expedition, the same action
+    // updates both views — regardless of first-time-vs-revisit, since a
+    // revisit can still satisfy a pending Expedition activity for this lesson.
+    const expeditionSync = await syncExpeditionActivity(db, req.user.id, {
+      lessonId, completableTypes: ['LESSON', 'LESSON_REVIEW']
+    });
+
     res.json({
       message: 'Lesson completed successfully',
       xp_earned: xpEarned,
       xp: updatedUser.xp,
       level: updatedUser.level,
-      newBadges: newlyUnlockedBadges
+      newBadges: newlyUnlockedBadges,
+      expeditionActivityId: expeditionSync?.activityId ?? null,
+      expeditionCompleted: expeditionSync?.expeditionCompleted ?? false
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -367,52 +380,60 @@ app.post('/api/lessons/:id/complete', authenticateToken, async (req, res) => {
 });
 
 // Generate quiz questions
+function mapQuestionRow(q) {
+  return {
+    id: q.id,
+    stt: q.stt,
+    topic: q.topic,
+    difficulty: q.difficulty,
+    question: q.question,
+    options: [q.optA, q.optB, q.optC, q.optD].filter(Boolean),
+    correct_index: ['A', 'B', 'C', 'D'].indexOf(q.answer),
+    answer: q.answer,
+    explanation: q.explanation,
+    source: q.source,
+    type: 'mcq'
+  };
+}
+
 app.get('/api/quiz/generate', authenticateToken, async (req, res) => {
-  const { topic, difficulty, type } = req.query; // type: 'practice' or 'exam'
+  // type: 'practice' | 'exam' | 'checkpoint'. `topics` (comma-separated real
+  // exam topic strings) scopes practice/checkpoint to a specific lesson's
+  // mapped topics — see backend/campTopicMap.js. `topic` (singular) is kept
+  // for older callers but `topics` takes priority when both are present.
+  const { topic, topics, difficulty, type, count } = req.query;
   const db = await getDb();
-  
+
   try {
     if (type === 'exam') {
-      // Exam: 40 questions (according to "Đề mẫu 40 câu" standard)
+      // Full mock exam: intentionally comprehensive across every topic, not lesson-scoped.
       const examQuestions = await db.all('SELECT * FROM test_questions ORDER BY RANDOM() LIMIT 40');
-      return res.json(examQuestions.map(q => ({
-        id: q.id,
-        stt: q.stt,
-        topic: q.topic,
-        difficulty: q.difficulty,
-        question: q.question,
-        options: [q.optA, q.optB, q.optC, q.optD].filter(Boolean),
-        correct_index: ['A', 'B', 'C', 'D'].indexOf(q.answer),
-        answer: q.answer,
-        explanation: q.explanation,
-        source: q.source,
-        type: 'mcq'
-      })));
+      return res.json(examQuestions.map(mapQuestionRow));
     }
 
-    // Practice Mode: 5 questions
+    const topicList = topics ? topics.split(',').map((t) => t.trim()).filter(Boolean) : (topic && topic !== 'all' ? [topic] : []);
+    const defaultCount = type === 'checkpoint' ? 3 : 5;
+    const limit = Math.max(1, Math.min(parseInt(count, 10) || defaultCount, 40));
+
     let query = 'SELECT * FROM test_questions WHERE 1=1';
     const params = [];
-    
-    // In practice mode we can filter by topic if requested (though for now we might just randomize)
-    // if (topic && topic !== 'all') { query += ' AND topic LIKE ?'; params.push(`%${topic}%`); }
-    
-    query += ' ORDER BY RANDOM() LIMIT 5';
+    if (topicList.length) {
+      query += ` AND topic IN (${topicList.map(() => '?').join(',')})`;
+      params.push(...topicList);
+    }
+    // test_questions.difficulty is Vietnamese-valued ('Dễ'/'Trung bình'/'Khó');
+    // the frontend's difficulty state defaults to the English 'intermediate'
+    // and has no UI to change it, so only filter when the value actually
+    // matches — otherwise this would silently return zero questions.
+    if (['Dễ', 'Trung bình', 'Khó'].includes(difficulty)) {
+      query += ' AND difficulty = ?';
+      params.push(difficulty);
+    }
+    query += ' ORDER BY RANDOM() LIMIT ?';
+    params.push(limit);
+
     const questions = await db.all(query, params);
-    
-    res.json(questions.map(q => ({
-      id: q.id,
-      stt: q.stt,
-      topic: q.topic,
-      difficulty: q.difficulty,
-      question: q.question,
-      options: [q.optA, q.optB, q.optC, q.optD].filter(Boolean),
-      correct_index: ['A', 'B', 'C', 'D'].indexOf(q.answer),
-      answer: q.answer,
-      explanation: q.explanation,
-      source: q.source,
-      type: 'mcq'
-    })));
+    res.json(questions.map(mapQuestionRow));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -461,13 +482,36 @@ app.post('/api/flashcards/:id/progress', authenticateToken, async (req, res) => 
   }
 });
 
+// Marks a Daily Expedition flashcard-review activity done once the learner
+// finishes going through the due cards for that lesson (spec §9) — mirrors
+// the same syncExpeditionActivity call the lesson/quiz/rescue-trail routes
+// already make, just for the one activity type nothing else covers.
+app.post('/api/flashcards/complete-review', authenticateToken, async (req, res) => {
+  const db = await getDb();
+  try {
+    const { lessonId } = req.body;
+    const expeditionSync = await syncExpeditionActivity(db, req.user.id, {
+      lessonId, completableTypes: ['FLASHCARD_REVIEW']
+    });
+    res.json({
+      expeditionActivityId: expeditionSync?.activityId ?? null,
+      expeditionCompleted: expeditionSync?.expeditionCompleted ?? false
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get flashcards — pass ?topic= to get a full topic set, otherwise a random sample
 app.get('/api/flashcards', authenticateToken, async (req, res) => {
   const db = await getDb();
   try {
-    const { topic } = req.query;
-    const cards = topic
-      ? await db.all('SELECT * FROM flashcards WHERE topic = ? ORDER BY stt ASC', [topic])
+    const { topic, topics } = req.query;
+    // `topics` (comma-separated) scopes to a lesson's 2 mapped topics; `topic`
+    // (singular) is kept for the existing single-topic deep link.
+    const topicList = topics ? topics.split(',').map((t) => t.trim()).filter(Boolean) : (topic ? [topic] : []);
+    const cards = topicList.length
+      ? await db.all(`SELECT * FROM flashcards WHERE topic IN (${topicList.map(() => '?').join(',')}) ORDER BY stt ASC`, topicList)
       : await db.all('SELECT * FROM flashcards ORDER BY RANDOM() LIMIT 20');
     res.json(cards.map(c => ({
       id: c.id,
@@ -487,7 +531,7 @@ app.get('/api/flashcards', authenticateToken, async (req, res) => {
 
 // Submit Quiz score
 app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
-  const { score, totalQuestions, topic, type, maxCombo, answers } = req.body;
+  const { score, totalQuestions, topic, type, maxCombo, answers, expeditionContext } = req.body;
   const db = await getDb();
   try {
     // Base XP: 10 XP per correct answer
@@ -567,6 +611,23 @@ app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
       console.warn('Adaptive loop failed (quiz score is still saved):', adaptiveErr.message);
     }
 
+    // Shared completion state (spec §9): if this quiz was launched from a
+    // Daily Expedition activity (practice/checkpoint/scenario), sync it —
+    // never awards XP itself, just keeps the Expedition Player's progress
+    // view in sync with the score that was already saved above.
+    let expeditionSync = null;
+    if (expeditionContext?.lessonId && expeditionContext?.activityType) {
+      try {
+        expeditionSync = await syncExpeditionActivity(db, req.user.id, {
+          lessonId: expeditionContext.lessonId,
+          completableTypes: [expeditionContext.activityType],
+          resultId: quizResult.lastID
+        });
+      } catch (syncErr) {
+        console.warn('Expedition sync failed (quiz score is still saved):', syncErr.message);
+      }
+    }
+
     res.json({
       xp_earned: xpEarned,
       xp: updatedUser.xp,
@@ -575,7 +636,9 @@ app.post('/api/quiz/submit', authenticateToken, async (req, res) => {
       newBadges: newlyUnlockedBadges,
       masteryUpdates,
       rescueNeeded,
-      pathChanged
+      pathChanged,
+      expeditionActivityId: expeditionSync?.activityId ?? null,
+      expeditionCompleted: expeditionSync?.expeditionCompleted ?? false
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -740,14 +803,28 @@ app.get('/api/expedition/daily', authenticateToken, async (req, res) => {
     const ranked = await computeRankedTopics(db, req.user.id, daysUntilExam);
     const focusTopic = ranked[0]?.topic;
 
+    // Resolve the real lesson/camp this plan is about (never a copy of its
+    // content — every activity below just references this same lessonId).
+    const focusLessonId = (focusTopic && getLessonIdForTopic(focusTopic)) || 'lesson_1';
+    const focusLesson = await db.get('SELECT * FROM lessons WHERE id = ?', [focusLessonId]);
+    const allLessons = await db.all('SELECT id, order_index FROM lessons ORDER BY order_index ASC');
+    const campIndex = allLessons.findIndex((l) => l.id === focusLessonId);
+    const campLabel = campIndex === 0 ? 'Trại Nền' : campIndex === allLessons.length - 1 ? 'Đỉnh MOF' : `Trại ${campIndex}`;
+    const lessonCompletedRow = await db.get('SELECT 1 FROM user_lessons WHERE user_id = ? AND lesson_id = ?', [req.user.id, focusLessonId]);
+    const lessonTopics = getTopicsForLesson(focusLessonId);
+    const lessonMasteryRows = lessonTopics.length
+      ? await db.all(`SELECT mastery_score, last_reviewed_at FROM topic_mastery WHERE user_id = ? AND topic IN (${lessonTopics.map(() => '?').join(',')})`, [req.user.id, ...lessonTopics])
+      : [];
+    const { mastery: lessonMastery, daysSinceLastReview } = calculateLessonMastery(lessonMasteryRows);
+
     let dueFlashcardCount = 0;
-    if (focusTopic) {
-      const total = await db.get('SELECT COUNT(*) c FROM flashcards WHERE topic = ?', [focusTopic]);
+    if (lessonTopics.length) {
+      const total = await db.get(`SELECT COUNT(*) c FROM flashcards WHERE topic IN (${lessonTopics.map(() => '?').join(',')})`, lessonTopics);
       const known = await db.get(
         `SELECT COUNT(*) c FROM user_flashcard_progress ufp
          JOIN flashcards f ON f.id = ufp.flashcard_id
-         WHERE ufp.user_id = ? AND f.topic = ? AND ufp.known = 1`,
-        [req.user.id, focusTopic]
+         WHERE ufp.user_id = ? AND f.topic IN (${lessonTopics.map(() => '?').join(',')}) AND ufp.known = 1`,
+        [req.user.id, ...lessonTopics]
       );
       dueFlashcardCount = Math.max((total?.c ?? 0) - (known?.c ?? 0), 0);
     }
@@ -759,7 +836,11 @@ app.get('/api/expedition/daily', authenticateToken, async (req, res) => {
         : null;
 
     const plan = buildDailyExpedition(
-      { dailyMinutes, rankedTopics: ranked, dueFlashcardCount, preferredFormat, rescueNeeded },
+      {
+        dailyMinutes, rankedTopics: ranked, dueFlashcardCount, preferredFormat, rescueNeeded,
+        focusLessonId, focusLessonTitle: focusLesson?.title_vn, campLabel,
+        lessonCompleted: !!lessonCompletedRow, lessonMastery, daysSinceLastReview
+      },
       buildPriorityExplanation
     );
 
@@ -821,12 +902,22 @@ app.get('/api/rescue-trail', authenticateToken, async (req, res) => {
 app.post('/api/rescue-trail/complete', authenticateToken, async (req, res) => {
   const db = await getDb();
   try {
-    await db.run(
-      `UPDATE rescue_trail_log SET completed_at = CURRENT_TIMESTAMP
-       WHERE id = (SELECT id FROM rescue_trail_log WHERE user_id = ? ORDER BY id DESC LIMIT 1)`,
-      [req.user.id]
-    );
-    res.json({ success: true });
+    const lastTrail = await db.get('SELECT id, topic FROM rescue_trail_log WHERE user_id = ? ORDER BY id DESC LIMIT 1', [req.user.id]);
+    if (lastTrail) {
+      await db.run('UPDATE rescue_trail_log SET completed_at = CURRENT_TIMESTAMP WHERE id = ?', [lastTrail.id]);
+    }
+
+    let expeditionSync = null;
+    const lessonId = lastTrail?.topic ? getLessonIdForTopic(lastTrail.topic) : null;
+    if (lessonId) {
+      try {
+        expeditionSync = await syncExpeditionActivity(db, req.user.id, { lessonId, completableTypes: ['RESCUE_TRAIL'] });
+      } catch (syncErr) {
+        console.warn('Expedition sync failed (rescue trail is still marked complete):', syncErr.message);
+      }
+    }
+
+    res.json({ success: true, expeditionActivityId: expeditionSync?.activityId ?? null, expeditionCompleted: expeditionSync?.expeditionCompleted ?? false });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

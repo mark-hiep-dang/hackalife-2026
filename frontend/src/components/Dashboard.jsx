@@ -29,7 +29,7 @@ const LLAMA_MOOD_IMAGES = {
   'llama-angry-return': llamaMoodAngry,
 };
 
-export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout, onStartRescue }) {
+export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate, onLogout, onOpenExpedition }) {
   const t = useT();
   const { lang } = useLanguage();
   const [showPathSelect, setShowPathSelect] = useState(false);
@@ -116,7 +116,7 @@ export default function Dashboard({ profile, lessons, onSelectLesson, onNavigate
 
       {/* Personalized Expedition — today's plan + overall readiness */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DailyExpedition onNavigate={onNavigate} onStartRescue={onStartRescue} />
+        <DailyExpedition lessons={lessons} onOpenExpedition={onOpenExpedition} />
         <SummitReadiness />
       </div>
 

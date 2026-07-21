@@ -6,6 +6,7 @@ import { markStudiedToday, ensureStudyTrackingInitialized } from './utils/streak
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Learn from './components/Learn';
+import ExpeditionPlayer from './components/ExpeditionPlayer';
 import Quiz from './components/Quiz';
 import Flashcards from './components/Flashcards';
 import Leaderboard from './components/Leaderboard';
@@ -23,11 +24,11 @@ export default function App() {
   const [lessons, setLessons] = useState([]);
   const [activeTab, setActiveTab] = useState('home');
   const [activeLesson, setActiveLesson] = useState(null);
+  const [expeditionActive, setExpeditionActive] = useState(false);
   const [muted, setMuted] = useState(getMuteState());
   const [effects, setEffects] = useState([]);
   const [flashcardTopic, setFlashcardTopic] = useState(null);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
-  const [rescueRequest, setRescueRequest] = useState(null);
   const [pathUpdateInfo, setPathUpdateInfo] = useState(null);
   const [chatContext, setChatContext] = useState(null);
 
@@ -70,7 +71,6 @@ export default function App() {
   function handleLessonFinished(xp) { setActiveLesson(null); if (xp !== null) { markStudiedToday(); fetchUserDossier(); } }
   function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); }
   function handleStudyTopic(topicKey) { setFlashcardTopic(topicKey); setActiveTab('flashcards'); }
-  function handleStartRescue(request) { setRescueRequest(request); setActiveTab('quiz'); }
   function handlePathChanged(masteryUpdate) { setPathUpdateInfo(masteryUpdate); }
   function handleAskLlama(context) { setChatContext(context); setActiveTab('chat'); }
 
@@ -127,7 +127,7 @@ export default function App() {
       {/* ── Sidebar (Desktop) ─────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
         <div className="p-6 border-b-3 border-[#101A24]/10">
-          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
+          <button onClick={() => { setActiveLesson(null); setExpeditionActive(false); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
             <img src={llamaLogo} alt="" className="w-9 h-9 object-contain wiggle" />
             <span>LLAMA</span>
           </button>
@@ -137,7 +137,7 @@ export default function App() {
           {NAV.map(({ id, icon: Icon, label }) => {
             const active = activeTab === id && !activeLesson;
             return (
-              <button key={id} onClick={() => { setActiveLesson(null); setActiveTab(id); }}
+              <button key={id} onClick={() => { setActiveLesson(null); setExpeditionActive(false); setActiveTab(id); }}
                 className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-base font-extrabold uppercase tracking-widest transition-all border ${
                   active
                     ? 'bg-[#E3D9F5] border-[#101A24]/10 text-[#101A24] shadow-sm -translate-y-1 -translate-x-1'
@@ -175,7 +175,7 @@ export default function App() {
       {/* ── Top Bar (Mobile Only) ─────────────────────────────── */}
       <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50 shadow-[0_4px_0_rgba(0,0,0,0.05)]">
         <div className="px-4 h-16 flex items-center justify-between">
-          <button onClick={() => { setActiveLesson(null); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-xl tracking-tight text-[#101A24]">
+          <button onClick={() => { setActiveLesson(null); setExpeditionActive(false); setActiveTab('home'); }} className="flex items-center gap-2 font-comic font-extrabold text-xl tracking-tight text-[#101A24]">
             <img src={llamaLogo} alt="" className="w-7 h-7 object-contain wiggle" />
             LLAMA
           </button>
@@ -196,21 +196,27 @@ export default function App() {
       {/* ── Content Area ──────────────────────────────────────── */}
       <main className="flex-1 w-full overflow-y-auto pb-24 md:pb-10 relative">
         <div className="max-w-5xl mx-auto px-4 md:px-12 py-8 md:py-16">
-          {activeLesson ? (
+          {expeditionActive ? (
+            <ExpeditionPlayer
+              lessons={lessons}
+              onExit={() => { setExpeditionActive(false); fetchUserDossier(); }}
+              onProgress={handleQuizFinished}
+              onPathChanged={handlePathChanged}
+              onAskLlama={handleAskLlama}
+            />
+          ) : activeLesson ? (
             <div className="max-w-4xl mx-auto">
               <Learn lesson={activeLesson} onLessonFinished={handleLessonFinished} />
             </div>
           ) : (
             <>
-              {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} onLogout={handleLogout} onStartRescue={handleStartRescue} />}
+              {activeTab === 'home' && <Dashboard profile={profile} lessons={lessons} onSelectLesson={setActiveLesson} onNavigate={setActiveTab} onLogout={handleLogout} onOpenExpedition={() => setExpeditionActive(true)} />}
               {activeTab === 'quiz' && (
                 <div className="max-w-4xl mx-auto">
                   <Quiz
                     onQuizFinished={handleQuizFinished}
                     onStudyTopic={handleStudyTopic}
                     onBack={() => setActiveTab('home')}
-                    initialRescue={rescueRequest}
-                    onConsumeInitialRescue={() => setRescueRequest(null)}
                     onPathChanged={handlePathChanged}
                     onAskLlama={handleAskLlama}
                   />
@@ -231,7 +237,7 @@ export default function App() {
           {NAV.map(({ id, icon: Icon, label }) => {
             const active = activeTab === id && !activeLesson;
             return (
-              <button key={id} onClick={() => { setActiveLesson(null); setActiveTab(id); }}
+              <button key={id} onClick={() => { setActiveLesson(null); setExpeditionActive(false); setActiveTab(id); }}
                 className={`flex flex-col items-center gap-1 w-16 transition-colors ${active ? 'text-[#101A24]' : 'text-[#888]'}`}
               >
                 <div className={`flex items-center justify-center w-12 h-10 rounded-2xl border ${active ? 'bg-[#C7EFC4] border-[#101A24]/10 shadow-sm -translate-y-1' : 'bg-transparent border-transparent'}`}>
@@ -248,7 +254,7 @@ export default function App() {
         <PathUpdatedModal
           masteryUpdate={pathUpdateInfo}
           onClose={() => setPathUpdateInfo(null)}
-          onViewMap={() => { setActiveLesson(null); setActiveTab('home'); }}
+          onViewMap={() => { setActiveLesson(null); setExpeditionActive(false); setActiveTab('home'); }}
         />
       )}
 
