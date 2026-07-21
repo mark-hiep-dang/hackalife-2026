@@ -16,6 +16,8 @@ import { buildPriorityExplanation } from './engines/reasonCopy.js';
 import { assembleRescueTrail } from './engines/rescueTrail.js';
 import { masteryStateLabel } from './engines/mastery.js';
 import { explainExpedition, explainMistake, generateRescueTrail } from './llamaAIService.js';
+import { callGemini } from './geminiClient.js';
+import { AI_TASKS } from './aiConfig.js';
 import { mountStudioRoutes } from './studio/routes.js';
 import { getTopicsForLesson, getLessonIdForTopic } from './campTopicMap.js';
 import { calculateLessonMastery } from './engines/lessonMastery.js';
@@ -1071,36 +1073,16 @@ ${contextBlock}` : ''}`;
 
   const cleanOllamaUrl = ollamaUrl || 'http://localhost:11434';
 
-  // Tier 1: Gemini (free-tier cloud LLM — no local setup needed, works once deployed)
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const contents = [
-        ...(history || []).map(h => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.content }] })),
-        { role: 'user', parts: [{ text: message }] }
-      ];
-
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: insuranceContext }] },
-            contents
-          })
-        }
-      );
-
-      if (geminiRes.ok) {
-        const data = await geminiRes.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return res.json({ response: text, sources });
-      } else {
-        console.warn('Gemini API returned non-ok status:', geminiRes.status, await geminiRes.text());
-      }
-    } catch (err) {
-      console.warn('Gemini API call failed, falling back. Reason:', err.message);
-    }
+  // Tier 1: Gemini, via the shared, task-routed client (AI usage audit) —
+  // this used to hardcode `gemini-2.0-flash` directly, a model with zero
+  // quota on this key (confirmed 429 RESOURCE_EXHAUSTED), so every real
+  // chat message was silently falling all the way through to the local
+  // dictionary fallback below. Routing through callGemini fixes the model
+  // (LEARNER_CHAT → the light tier, gemini-3.1-flash-lite) and also gets
+  // this call retried and usage-logged like every other AI call in the app.
+  {
+    const text = await callGemini(insuranceContext, message, { task: AI_TASKS.LEARNER_CHAT, db, history, label: 'ChatRoute' });
+    if (text) return res.json({ response: text, sources });
   }
 
   try {
