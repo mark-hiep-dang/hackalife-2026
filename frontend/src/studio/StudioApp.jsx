@@ -45,7 +45,7 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F0FA] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#E6F7EF] flex flex-col md:flex-row">
       <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
         <div className="p-6 border-b-3 border-[#101A24]/10">
           <button onClick={() => setTab('overview')} className="flex items-center gap-2 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
