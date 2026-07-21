@@ -30,7 +30,8 @@ test('dailyExpedition: an unstarted lesson gets "Học bài trọng tâm" as the
   );
   assert.equal(plan.status, 'NEW');
   assert.equal(plan.activities[0].type, 'LESSON');
-  assert.equal(plan.activities[0].label, 'Học bài trọng tâm');
+  assert.equal(plan.activities[0].label.vi, 'Học bài trọng tâm');
+  assert.equal(plan.activities[0].label.en, 'Learn the core lesson');
   assert.ok(plan.activities.some((a) => a.type === 'CHECKPOINT'), 'every sequence ends with a checkpoint');
 });
 
@@ -98,15 +99,17 @@ test('dailyExpedition: practice activity subtitle references the focus lesson', 
     explain
   );
   const practice = plan.activities.find((a) => a.type === 'PRACTICE');
-  assert.match(practice.subtitle, /Kiến thức chung/);
+  assert.match(practice.subtitle.vi, /Kiến thức chung/);
+  assert.match(practice.subtitle.en, /Kiến thức chung/);
 });
 
-test('dailyExpedition: explanation names the focus topic', () => {
+test('dailyExpedition: explanation names the focus topic, in both languages', () => {
   const plan = buildDailyExpedition(
     { ...baseInput, dailyMinutes: 15, rankedTopics: [{ topic: 'Nghĩa vụ đại lý', score: 0.5, reasons: ['LOW_MASTERY'] }], lessonCompleted: true, lessonMastery: 65 },
     explain
   );
-  assert.match(plan.explanation, /Nghĩa vụ đại lý/);
+  assert.match(plan.explanation.vi, /Nghĩa vụ đại lý/);
+  assert.match(plan.explanation.en, /Nghĩa vụ đại lý/);
 });
 
 test('dailyExpedition: with no ranked topics yet, still returns a safe fallback plan', () => {

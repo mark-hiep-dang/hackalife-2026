@@ -29,8 +29,11 @@ const LOW_MASTERY_THRESHOLD = 50;
  * @param {boolean} [input.lessonCompleted]
  * @param {number} [input.lessonMastery] - 0-100, rolled up from the lesson's mapped topics
  * @param {number} [input.daysSinceLastReview]
- * @param {(reasons: string[], topicLabel: string) => string} explain
- * @returns {{ focusTopic: string|null, focusLessonId: string|null, status: string, totalMinutes: number, activities: object[], explanation: string }}
+ * @param {(reasons: string[], topicLabel: string) => {vi: string, en: string}} explain
+ * @returns {{ focusTopic: string|null, focusLessonId: string|null, status: string, totalMinutes: number, activities: object[], explanation: {vi: string, en: string} }}
+ *   each activity's `label`/`subtitle` is also `{vi, en}` — both baked in at
+ *   generation time since the plan is cached once per user/day and must
+ *   support either UI language being active on any later fetch that day.
  */
 export function buildDailyExpedition({
   dailyMinutes = 15,
@@ -49,7 +52,11 @@ export function buildDailyExpedition({
   const focusTopic = focus?.topic ?? null;
   const focusTopics = focusTopic ? [focusTopic] : [];
   const lessonLabel = focusLessonTitle || 'bài học';
+  // Camp/lesson names are domain content (like exam topic names) and stay
+  // as-is in both languages — only the surrounding UI phrasing below needs
+  // a real translation.
   const subtitleLabel = campLabel ? `${campLabel} · ${lessonLabel}` : lessonLabel;
+  const bi = (vi, en) => ({ vi, en });
 
   // Priority order matches spec §17: an active misconception always leads;
   // otherwise, has the learner even opened this lesson yet; otherwise,
@@ -98,17 +105,27 @@ export function buildDailyExpedition({
   }
 
   if (status === 'NEW') {
-    pushActivity({ type: 'LESSON', label: 'Học bài trọng tâm', subtitle: subtitleLabel, minutes: LESSON_MINUTES });
+    pushActivity({ type: 'LESSON', label: bi('Học bài trọng tâm', 'Learn the core lesson'), subtitle: bi(subtitleLabel, subtitleLabel), minutes: LESSON_MINUTES });
   } else if (status === 'LOW_MASTERY') {
-    pushActivity({ type: 'LESSON_REVIEW', label: `Ôn nhanh ${lessonLabel}`, subtitle: 'Xem lại phần bạn thường nhầm', minutes: REVIEW_MINUTES });
+    pushActivity({
+      type: 'LESSON_REVIEW', label: bi(`Ôn nhanh ${lessonLabel}`, `Quick review: ${lessonLabel}`),
+      subtitle: bi('Xem lại phần bạn thường nhầm', 'Review the parts you often mix up'), minutes: REVIEW_MINUTES
+    });
   } else if (status === 'MEMORY_DECAY') {
     const count = Math.max(dueFlashcardCount, 2);
-    pushActivity({ type: 'FLASHCARD_REVIEW', label: 'Ôn lại flashcard', subtitle: `${count} kiến thức đang hơi phủ bụi`, minutes: count * MIN_PER_FLASHCARD, count });
+    pushActivity({
+      type: 'FLASHCARD_REVIEW', label: bi('Ôn lại flashcard', 'Review flashcards'),
+      subtitle: bi(`${count} kiến thức đang hơi phủ bụi`, `${count} concepts gathering dust`),
+      minutes: count * MIN_PER_FLASHCARD, count
+    });
   } else if (status === 'STRONG') {
-    pushActivity({ type: 'SCENARIO', label: 'Tình huống nâng cao', subtitle: `Tình huống thực tế · ${lessonLabel}`, minutes: SCENARIO_MINUTES });
+    pushActivity({
+      type: 'SCENARIO', label: bi('Tình huống nâng cao', 'Advanced scenario'),
+      subtitle: bi(`Tình huống thực tế · ${lessonLabel}`, `Real-world scenario · ${lessonLabel}`), minutes: SCENARIO_MINUTES
+    });
   } else if (status === 'MISCONCEPTION') {
     pushActivity({
-      type: 'RESCUE_TRAIL', label: 'Chặng cứu hộ', subtitle: 'Gỡ rối hai khái niệm dễ nhầm',
+      type: 'RESCUE_TRAIL', label: bi('Chặng cứu hộ', 'Rescue Trail'), subtitle: bi('Gỡ rối hai khái niệm dễ nhầm', 'Untangle two easily-confused concepts'),
       minutes: Math.max(questionMinutes, 4), topic: rescueNeeded.topic, mistakeType: rescueNeeded.mistakeType,
       topics: [rescueNeeded.topic], insertedAdaptively: true
     });
@@ -116,8 +133,8 @@ export function buildDailyExpedition({
 
   pushActivity({
     type: 'PRACTICE',
-    label: `${questionCount} câu luyện tập`,
-    subtitle: `Câu hỏi từ ${lessonLabel}`,
+    label: bi(`${questionCount} câu luyện tập`, `${questionCount} practice questions`),
+    subtitle: bi(`Câu hỏi từ ${lessonLabel}`, `Questions from ${lessonLabel}`),
     minutes: questionMinutes,
     count: questionCount,
     difficulty: status === 'STRONG' ? 'Khó' : undefined
@@ -125,15 +142,18 @@ export function buildDailyExpedition({
 
   if (extraFlashcardCount > 0) {
     pushActivity({
-      type: 'FLASHCARD_REVIEW', label: `Ôn lại ${extraFlashcardCount} flashcard`,
-      subtitle: `Khái niệm từ ${lessonLabel}`, minutes: extraFlashcardMinutes, count: extraFlashcardCount
+      type: 'FLASHCARD_REVIEW', label: bi(`Ôn lại ${extraFlashcardCount} flashcard`, `Review ${extraFlashcardCount} flashcards`),
+      subtitle: bi(`Khái niệm từ ${lessonLabel}`, `Concepts from ${lessonLabel}`), minutes: extraFlashcardMinutes, count: extraFlashcardCount
     });
   }
 
   pushActivity({
     type: 'CHECKPOINT',
-    label: 'Chốt bài',
-    subtitle: `${CHECKPOINT_QUESTION_COUNT} câu xác nhận bạn đã nắm ${lessonLabel}`,
+    label: bi('Chốt bài', 'Checkpoint'),
+    subtitle: bi(
+      `${CHECKPOINT_QUESTION_COUNT} câu xác nhận bạn đã nắm ${lessonLabel}`,
+      `${CHECKPOINT_QUESTION_COUNT} questions confirming you've mastered ${lessonLabel}`
+    ),
     minutes: CHECKPOINT_MINUTES,
     count: CHECKPOINT_QUESTION_COUNT
   });
@@ -141,7 +161,10 @@ export function buildDailyExpedition({
   const totalMinutes = activities.reduce((s, a) => s + a.minutes, 0);
   const explanation = focus
     ? explain(focus.reasons, focusTopic)
-    : 'Llama chưa đủ dữ liệu để chọn chặng hôm nay — cứ bắt đầu bằng một chặng luyện tập nhẹ nhé!';
+    : bi(
+        'Llama chưa đủ dữ liệu để chọn chặng hôm nay — cứ bắt đầu bằng một chặng luyện tập nhẹ nhé!',
+        "Llama doesn't have enough data yet to pick today's trail — just start with a light practice round!"
+      );
 
   return { focusTopic, focusLessonId, status, totalMinutes, activities, explanation };
 }

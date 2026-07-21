@@ -40,14 +40,18 @@ test('priority: rankTopics sorts descending by score', () => {
   assert.ok(ranked[1].score >= ranked[2].score);
 });
 
-test('reasonCopy: turns reason codes into a readable Vietnamese sentence', () => {
+test('reasonCopy: turns reason codes into a readable sentence in both languages', () => {
   const text = buildPriorityExplanation([REASON_CODES.HIGH_CONFIDENCE_MISTAKE, REASON_CODES.REQUIRED_PREREQUISITE], 'Nghĩa vụ đại lý');
-  assert.match(text, /Nghĩa vụ đại lý/);
-  assert.match(text, /nhầm liên tiếp/);
-  assert.match(text, /kiến thức nền/);
+  assert.match(text.vi, /Nghĩa vụ đại lý/);
+  assert.match(text.vi, /nhầm liên tiếp/);
+  assert.match(text.vi, /kiến thức nền/);
+  assert.match(text.en, /Nghĩa vụ đại lý/);
+  assert.match(text.en, /mixed this up repeatedly/);
+  assert.match(text.en, /foundational/);
 });
 
 test('reasonCopy: falls back to a generic sentence when there are no reasons', () => {
   const text = buildPriorityExplanation([], 'Nghĩa vụ đại lý');
-  assert.match(text, /Nghĩa vụ đại lý/);
+  assert.match(text.vi, /Nghĩa vụ đại lý/);
+  assert.match(text.en, /Nghĩa vụ đại lý/);
 });

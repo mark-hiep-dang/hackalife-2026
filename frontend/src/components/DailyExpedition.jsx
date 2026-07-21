@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useT } from '../translations';
+import { useT, useLanguage } from '../translations';
 import { getDailyExpedition } from '../utils/api';
 import { getCampInfo } from './LessonPath';
 import { ACTIVITY_ICON } from '../expeditionCopy';
@@ -11,6 +11,7 @@ function stripTopicIndex(topic) {
 
 export default function DailyExpedition({ lessons, onOpenExpedition }) {
   const t = useT();
+  const { lang } = useLanguage();
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +49,7 @@ export default function DailyExpedition({ lessons, onOpenExpedition }) {
         {plan.activities.map((a) => (
           <div key={a.activityId} className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${a.status === 'COMPLETED' ? 'bg-white/40' : 'bg-white/70'}`}>
             <span className="text-lg shrink-0">{a.status === 'COMPLETED' ? '✅' : (ACTIVITY_ICON[a.type] || '📌')}</span>
-            <span className={`flex-1 text-sm font-bold ${a.status === 'COMPLETED' ? 'text-[#8A8A8A] line-through' : 'text-[#101A24]'}`}>{a.label}</span>
+            <span className={`flex-1 text-sm font-bold ${a.status === 'COMPLETED' ? 'text-[#8A8A8A] line-through' : 'text-[#101A24]'}`}>{a.label[lang]}</span>
             <span className="text-xs font-extrabold text-[#8A6D1F] shrink-0">{t.expeditionMinutesShort.replace('{n}', a.minutes)}</span>
           </div>
         ))}
@@ -58,7 +59,7 @@ export default function DailyExpedition({ lessons, onOpenExpedition }) {
         <Sparkles size={18} strokeWidth={3} className="text-[#6B4FA8] shrink-0 mt-0.5" />
         <div>
           <p className="text-xs font-extrabold text-[#6B4FA8] uppercase tracking-widest mb-1">{t.expeditionWhyLabel}</p>
-          <p className="text-sm font-bold text-[#101A24] leading-relaxed">{plan.explanation}</p>
+          <p className="text-sm font-bold text-[#101A24] leading-relaxed">{plan.explanation[lang]}</p>
         </div>
       </div>
 

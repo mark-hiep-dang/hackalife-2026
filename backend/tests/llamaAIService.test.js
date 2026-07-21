@@ -9,13 +9,17 @@ const savedKey = process.env.GEMINI_API_KEY;
 test.before(() => { delete process.env.GEMINI_API_KEY; });
 test.after(() => { if (savedKey) process.env.GEMINI_API_KEY = savedKey; });
 
-test('explainExpedition: falls back to the deterministic explanation verbatim without a key', async () => {
+test('explainExpedition: falls back to the deterministic explanation verbatim (both languages) without a key', async () => {
   const { message, mood } = await explainExpedition({
     focusTopicLabel: 'Nghĩa vụ đại lý',
-    deterministicExplanation: 'Llama chọn "Nghĩa vụ đại lý" vì bạn chưa vững phần này.',
+    deterministicExplanation: {
+      vi: 'Llama chọn "Nghĩa vụ đại lý" vì bạn chưa vững phần này.',
+      en: 'Llama picked "Nghĩa vụ đại lý" because you haven\'t gotten solid on this part yet.'
+    },
     dailyMinutes: 15
   });
-  assert.equal(message, 'Llama chọn "Nghĩa vụ đại lý" vì bạn chưa vững phần này.');
+  assert.equal(message.vi, 'Llama chọn "Nghĩa vụ đại lý" vì bạn chưa vững phần này.');
+  assert.equal(message.en, 'Llama picked "Nghĩa vụ đại lý" because you haven\'t gotten solid on this part yet.');
   assert.equal(mood, 'thinking');
 });
 
