@@ -8,7 +8,7 @@ import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
 import { getDb } from '../db.js';
 import { storeDocument } from '../knowledgeBase.js';
-import { generateCurriculum, generateLessonKit, generateContentFromDocument, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
+import { generateCurriculumFromPrompt, generateLessonKit, generateContentFromDocument, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
 import { checkCourseQuality } from './engines/courseQuality.js';
 import { calculateCohortOverview, calculateTopicPerformance, classifyTrend } from './engines/mockExamAnalytics.js';
 import { detectLearnerRisk } from './engines/learnerRisk.js';
@@ -162,7 +162,28 @@ export function mountStudioRoutes(app, authenticateToken) {
       const course = await db.get('SELECT * FROM studio_courses WHERE id = ?', [req.params.id]);
       if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
 
-      const curriculum = await generateCurriculum(db, { preferredCamps: course.preferred_camps || 4, targetDurationMinutes: (course.duration_weeks || 4) * 5 * 20 });
+      // Regenerating wipes every camp/lesson/content-item for the course (FK
+      // cascade below) — only safe while nothing has been confirmed yet.
+      // Once anything is approved/published, block it so confirmed work is
+      // never silently destroyed — manual add/edit/delete (routes below)
+      // takes over from there.
+      const approvedLesson = await db.get(
+        `SELECT 1 FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id
+         WHERE c.course_id = ? AND l.status IN ('APPROVED', 'PUBLISHED') LIMIT 1`,
+        [course.id]
+      );
+      const approvedContent = await db.get(
+        `SELECT 1 FROM studio_content_items ci JOIN studio_lessons l ON ci.lesson_id = l.id JOIN studio_camps c ON l.camp_id = c.id
+         WHERE c.course_id = ? AND (ci.status IN ('APPROVED', 'PUBLISHED') OR ci.published_question_id IS NOT NULL OR ci.published_flashcard_id IS NOT NULL) LIMIT 1`,
+        [course.id]
+      );
+      if (approvedLesson || approvedContent) {
+        return res.status(400).json({ error: 'Khóa học đã có nội dung được duyệt hoặc publish. Hãy dùng chức năng thêm/sửa/xoá camp và chặng học thủ công thay vì tạo lại toàn bộ, để tránh mất nội dung đã duyệt.' });
+      }
+
+      const curriculum = await generateCurriculumFromPrompt(db, {
+        courseId: course.id, prompt: req.body.prompt || '', preferredCamps: course.preferred_camps || 4
+      });
 
       // Persist as AI_DRAFT.
       await db.run('DELETE FROM studio_camps WHERE course_id = ?', [course.id]);
@@ -171,19 +192,101 @@ export function mountStudioRoutes(app, authenticateToken) {
         const r = await db.run('INSERT INTO studio_camps (course_id, title, order_index) VALUES (?, ?, ?)', [course.id, camp.title, camp.orderIndex]);
         campIdMap.set(camp.id, r.lastID);
       }
-      const lessonIdMap = new Map();
       for (const lesson of curriculum.lessons) {
         const outcomeResult = await db.run('INSERT INTO studio_learning_outcomes (course_id, description) VALUES (?, ?)', [course.id, lesson.learningOutcome]);
-        const r = await db.run(
+        await db.run(
           `INSERT INTO studio_lessons (camp_id, title, description, learning_outcome_id, estimated_minutes, difficulty, recommended_activities, exam_weight, source_chunk_ids, status, order_index)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT', ?)`,
           [campIdMap.get(lesson.campId), lesson.title, lesson.description, outcomeResult.lastID, lesson.estimatedMinutes, lesson.difficulty, JSON.stringify(lesson.recommendedActivities), lesson.examWeight, JSON.stringify(lesson.sourceChunkIds || []), curriculum.lessons.indexOf(lesson)]
         );
-        lessonIdMap.set(lesson.id, { dbId: r.lastID, topic: lesson.topic });
       }
       await db.run("UPDATE studio_courses SET status = 'AI_DRAFT', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [course.id]);
 
-      res.json({ summary: curriculum.summary, campCount: curriculum.camps.length, lessonCount: curriculum.lessons.length });
+      res.json({ summary: curriculum.summary, campCount: curriculum.camps.length, lessonCount: curriculum.lessons.length, usedSource: curriculum.usedSource });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Manual camp/lesson CRUD (spec: trainer must be able to add/edit/delete
+  // after AI generation, not only review a fixed proposal) ─────────────────
+  app.post('/api/studio/courses/:id/camps', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const course = await db.get('SELECT id FROM studio_courses WHERE id = ?', [req.params.id]);
+      if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      const { title } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Cần nhập tên camp' });
+      const maxOrder = await db.get('SELECT MAX(order_index) m FROM studio_camps WHERE course_id = ?', [course.id]);
+      const result = await db.run('INSERT INTO studio_camps (course_id, title, order_index) VALUES (?, ?, ?)', [course.id, title.trim(), (maxOrder?.m ?? -1) + 1]);
+      res.status(201).json({ id: result.lastID });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.put('/api/studio/camps/:id', ...T, async (req, res) => {
+    try {
+      const { title } = req.body;
+      await req.db.run('UPDATE studio_camps SET title = COALESCE(?, title) WHERE id = ?', [title, req.params.id]);
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.delete('/api/studio/camps/:id', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const blocked = await db.get(
+        `SELECT 1 FROM studio_lessons l LEFT JOIN studio_content_items ci ON ci.lesson_id = l.id
+         WHERE l.camp_id = ? AND (l.status = 'PUBLISHED' OR ci.published_question_id IS NOT NULL OR ci.published_flashcard_id IS NOT NULL) LIMIT 1`,
+        [req.params.id]
+      );
+      if (blocked) return res.status(400).json({ error: 'Camp này có chặng học hoặc nội dung đã publish cho học viên, không thể xoá trực tiếp.' });
+      await db.run('DELETE FROM studio_camps WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Manually-created lessons start APPROVED — the trainer wrote it
+  // themselves, same reasoning as manually-created content items.
+  app.post('/api/studio/camps/:id/lessons', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const camp = await db.get('SELECT id FROM studio_camps WHERE id = ?', [req.params.id]);
+      if (!camp) return res.status(404).json({ error: 'Không tìm thấy camp' });
+      const { title, description, estimatedMinutes, difficulty } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Cần nhập tên chặng học' });
+      const maxOrder = await db.get('SELECT MAX(order_index) m FROM studio_lessons WHERE camp_id = ?', [camp.id]);
+      const result = await db.run(
+        `INSERT INTO studio_lessons (camp_id, title, description, estimated_minutes, difficulty, status, order_index)
+         VALUES (?, ?, ?, ?, ?, 'APPROVED', ?)`,
+        [camp.id, title.trim(), description || '', estimatedMinutes || 15, difficulty || 'Trung bình', (maxOrder?.m ?? -1) + 1]
+      );
+      res.status(201).json({ id: result.lastID });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.put('/api/studio/lessons/:id', ...T, async (req, res) => {
+    try {
+      const { title, description, estimatedMinutes, difficulty } = req.body;
+      await req.db.run(
+        `UPDATE studio_lessons SET title = COALESCE(?, title), description = COALESCE(?, description),
+           estimated_minutes = COALESCE(?, estimated_minutes), difficulty = COALESCE(?, difficulty)
+         WHERE id = ?`,
+        [title, description, estimatedMinutes, difficulty, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.delete('/api/studio/lessons/:id', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const lesson = await db.get('SELECT status FROM studio_lessons WHERE id = ?', [req.params.id]);
+      if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
+      const blocked = lesson.status === 'PUBLISHED' || await db.get(
+        `SELECT 1 FROM studio_content_items WHERE lesson_id = ? AND (published_question_id IS NOT NULL OR published_flashcard_id IS NOT NULL) LIMIT 1`,
+        [req.params.id]
+      );
+      if (blocked) return res.status(400).json({ error: 'Chặng học này đã publish cho học viên, không thể xoá trực tiếp.' });
+      await db.run('DELETE FROM studio_lessons WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
