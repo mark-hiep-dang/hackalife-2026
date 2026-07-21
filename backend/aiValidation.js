@@ -33,6 +33,21 @@ export function validateGeneratedQuestion(q) {
   return { valid: errors.length === 0, errors };
 }
 
+/** A generated flashcard must have both a non-empty front and back. */
+export function validateGeneratedFlashcard(f) {
+  const errors = [];
+  if (!f || typeof f.front !== 'string' || !f.front.trim()) errors.push('missing front');
+  if (!f || typeof f.back !== 'string' || !f.back.trim()) errors.push('missing back');
+  return { valid: errors.length === 0, errors };
+}
+
+/** A generated knowledge (core lesson text) block must have a non-empty body. */
+export function validateGeneratedKnowledge(k) {
+  const errors = [];
+  if (!k || typeof k.body !== 'string' || !k.body.trim()) errors.push('missing body');
+  return { valid: errors.length === 0, errors };
+}
+
 /** Rescue Expedition proposals must stay grounded and time-boxed. */
 export function validateInterventionProposal(intervention) {
   const errors = [];

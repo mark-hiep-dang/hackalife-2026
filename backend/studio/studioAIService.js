@@ -11,11 +11,11 @@ import { callGemini, matchesShape } from '../geminiClient.js';
 import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk } from '../knowledgeBase.js';
 import { assembleRescueTrail, getConceptPair } from '../engines/rescueTrail.js';
 import { AI_TASKS } from '../aiConfig.js';
-import { validateCurriculumProposal, validateInterventionProposal } from '../aiValidation.js';
+import { validateCurriculumProposal, validateInterventionProposal, validateGeneratedQuestion, validateGeneratedFlashcard, validateGeneratedKnowledge } from '../aiValidation.js';
 import { withGenerationCache, withCacheControl } from '../aiCache.js';
 
-function studioCallGemini(systemInstruction, userMessage, task, db) {
-  return callGemini(systemInstruction, userMessage, { task, db, label: 'StudioAIService' });
+function studioCallGemini(systemInstruction, userMessage, task, db, timeoutMs) {
+  return callGemini(systemInstruction, userMessage, { task, db, label: 'StudioAIService', timeoutMs });
 }
 
 // Finds a real approved source chunk for a topic (spec §8 — generated content
@@ -186,6 +186,105 @@ export async function generateLessonKit(db, { topic, lessonTitle }) {
   };
 
   return kit;
+}
+
+// ── Document-grounded generation — the trainer's own uploaded giáo án ──
+// Unlike generateLessonKit above (zero AI calls, samples the pre-approved
+// exam bank), this makes REAL Gemini calls — but only ever against a
+// specific document the trainer uploaded and approved themselves, with
+// every prompt instructed to use nothing but that text. Every result lands
+// as an AI_DRAFT studio_content_item, going through the exact same
+// approve/edit/reject review queue as everything else — nothing here is
+// ever auto-approved or auto-published (see routes.js's publish bridge,
+// which only ever touches APPROVED items).
+function stripJsonFence(raw) {
+  return raw.replace(/```json|```/g, '').trim();
+}
+
+/**
+ * @param {import('sqlite').Database} db
+ * @param {{ lessonId: number, documentId: number, documentTitle: string }} input
+ */
+export async function generateContentFromDocument(db, { lessonId, documentId, documentTitle }) {
+  const chunks = await db.all('SELECT * FROM knowledge_chunks WHERE document_id = ? ORDER BY chunk_index', [documentId]);
+  if (chunks.length === 0) throw new Error('Tài liệu chưa có nội dung để tạo.');
+
+  const sourceChunkIds = chunks.map((c) => c.id);
+  // Bounded window rather than the whole document — keeps the prompt a
+  // reasonable size regardless of how long the uploaded file is.
+  const sourceText = chunks.map((c) => c.content).join('\n\n').slice(0, 6000);
+  const grounding = `CHỈ dựa trên đoạn tài liệu bên dưới, TUYỆT ĐỐI không bịa thêm nội dung/số liệu/pháp lý ngoài đoạn này.\n\nTài liệu:\n${sourceText}`;
+
+  let knowledge = null;
+  const knowledgeRaw = await studioCallGemini(
+    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"title": string, "body": string}',
+    `${grounding}\n\nTóm tắt đoạn tài liệu trên thành một khối kiến thức cốt lõi (3-6 câu) cho học viên ôn tập, kèm tiêu đề ngắn.`,
+    AI_TASKS.GENERATE_KNOWLEDGE_SUMMARY, db
+  );
+  if (knowledgeRaw) {
+    try {
+      const parsed = JSON.parse(stripJsonFence(knowledgeRaw));
+      if (matchesShape({ title: 'string', body: 'string' }, parsed) && validateGeneratedKnowledge(parsed).valid) knowledge = parsed;
+    } catch (err) { /* skip — no knowledge block this round */ }
+  }
+
+  let flashcards = [];
+  const flashcardsRaw = await studioCallGemini(
+    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"flashcards": [{"front": string, "back": string, "keyword": string}]}',
+    `${grounding}\n\nTạo 3-5 flashcard (mặt trước là thuật ngữ/câu hỏi ngắn, mặt sau là câu trả lời) từ đoạn tài liệu trên.`,
+    AI_TASKS.GENERATE_FLASHCARDS, db
+  );
+  if (flashcardsRaw) {
+    try {
+      const parsed = JSON.parse(stripJsonFence(flashcardsRaw));
+      if (Array.isArray(parsed.flashcards)) flashcards = parsed.flashcards.filter((f) => validateGeneratedFlashcard(f).valid);
+    } catch (err) { /* skip */ }
+  }
+
+  let mcqs = [];
+  const mcqRaw = await studioCallGemini(
+    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"questions": [{"questionText": string, "options": [string, string, string, string], "correctOption": number, "explanation": string}]}',
+    `${grounding}\n\nTạo 2-3 câu hỏi trắc nghiệm 4 đáp án (correctOption là chỉ số 0-3) từ đoạn tài liệu trên, chỉ dùng thông tin có trong tài liệu.`,
+    AI_TASKS.GENERATE_MCQ_FROM_SOURCE, db, 12000
+  );
+  if (mcqRaw) {
+    try {
+      const parsed = JSON.parse(stripJsonFence(mcqRaw));
+      if (Array.isArray(parsed.questions)) mcqs = parsed.questions.filter((q) => validateGeneratedQuestion(q).valid);
+    } catch (err) { /* skip */ }
+  }
+
+  let scenario = null;
+  const scenarioRaw = await studioCallGemini(
+    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"questionText": string, "options": [string, string, string, string], "correctOption": number, "explanation": string}',
+    `${grounding}\n\nTạo MỘT câu hỏi tình huống thực tế (áp dụng kiến thức) 4 đáp án từ đoạn tài liệu trên.`,
+    AI_TASKS.GENERATE_COMPLEX_SCENARIO, db, 12000
+  );
+  if (scenarioRaw) {
+    try {
+      const parsed = JSON.parse(stripJsonFence(scenarioRaw));
+      if (validateGeneratedQuestion(parsed).valid) scenario = parsed;
+    } catch (err) { /* skip */ }
+  }
+
+  const insertItem = (type, fields, title) => db.run(
+    `INSERT INTO studio_content_items
+       (lesson_id, content_type, title, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_chunk_ids, source_title, source_version, status, ai_generated)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT', 1)`,
+    [lessonId, type, title || null, fields.questionText || null, JSON.stringify(fields.options || []), fields.correctOption ?? null,
+      fields.explanation || null, 'Trung bình', 'Hiểu', fields.front || null, fields.back || null, fields.keyword || null,
+      JSON.stringify(sourceChunkIds), documentTitle || 'Tài liệu tải lên', '1.0']
+  );
+
+  if (knowledge) await insertItem('knowledge', { questionText: knowledge.body }, knowledge.title);
+  for (const f of flashcards) await insertItem('flashcard', f);
+  for (const q of mcqs) await insertItem('mcq', q);
+  if (scenario) await insertItem('scenario', scenario);
+
+  return {
+    itemCount: (knowledge ? 1 : 0) + flashcards.length + mcqs.length + (scenario ? 1 : 0),
+    generatedKnowledge: !!knowledge, generatedFlashcards: flashcards.length, generatedQuestions: mcqs.length, generatedScenario: !!scenario
+  };
 }
 
 // ── Explanations, fixes, rewrites (LLM-assisted, deterministic fallback) ──

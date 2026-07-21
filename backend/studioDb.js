@@ -134,6 +134,10 @@ export async function initStudioDb(db) {
       FOREIGN KEY (lesson_id) REFERENCES studio_lessons(id) ON DELETE CASCADE
     )
   `);
+  // Short title for a 'knowledge' content item (core lesson text) — every
+  // other content type is fine without one (a flashcard/mcq/checkpoint is
+  // self-describing), but a knowledge block reads much better with a heading.
+  try { await db.exec('ALTER TABLE studio_content_items ADD COLUMN title TEXT'); } catch (err) { /* already exists */ }
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS studio_content_reviews (
