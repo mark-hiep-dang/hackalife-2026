@@ -125,3 +125,40 @@ export function GaugeChart({ value, label, size = 160 }) {
     </div>
   );
 }
+
+function bandColorForValue(v) {
+  if (v == null) return '#6B7280';
+  const band = GAUGE_BANDS.find((b) => v <= b.to) || GAUGE_BANDS[GAUGE_BANDS.length - 1];
+  return band.color;
+}
+
+// Full-ring variant of GaugeChart — same fixed red/amber/green status bands
+// (never categorical), just a single tier color filling the ring instead of
+// three stacked arcs + needle. Meant for a dark card background.
+export function CircularGauge({ value, label, size = 150 }) {
+  const clamped = value == null ? null : Math.max(0, Math.min(100, value));
+  const radius = size / 2 - 13;
+  const circumference = 2 * Math.PI * radius;
+  const dash = clamped != null ? (clamped / 100) * circumference : 0;
+  const color = bandColorForValue(clamped);
+
+  return (
+    <div className="flex flex-col items-center w-full">
+      <div className="relative w-full" style={{ maxWidth: size, aspectRatio: '1 / 1' }}>
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="14" />
+          {clamped != null && (
+            <circle
+              cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
+              strokeDasharray={`${dash} ${circumference}`}
+            />
+          )}
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="font-comic font-extrabold text-white text-2xl">{clamped != null ? `${Math.round(clamped)}%` : '—'}</span>
+        </div>
+      </div>
+      <div className="text-[11px] font-extrabold uppercase tracking-widest text-white/70 text-center mt-2 break-words max-w-full px-1">{label}</div>
+    </div>
+  );
+}
