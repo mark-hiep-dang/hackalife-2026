@@ -22,6 +22,20 @@ export function chunkText(text, maxLen = 700) {
   return chunks;
 }
 
+// multer/busboy decodes the multipart Content-Disposition "filename" header as
+// latin1 (per the multipart spec, which is technically ASCII-only), so a
+// non-ASCII filename's real UTF-8 bytes come through as mojibake — each byte
+// re-interpreted as its own Latin-1 codepoint. Undo that single mis-decode by
+// reinterpreting the string's char codes as latin1 bytes and re-decoding them
+// as UTF-8, then normalize to NFC so composed accents render correctly.
+export function decodeUploadedFilename(name) {
+  try {
+    return Buffer.from(name, 'latin1').toString('utf8').normalize('NFC');
+  } catch (err) {
+    return name;
+  }
+}
+
 // Builds a permissive FTS5 MATCH query (prefix-match each word, OR'd together)
 // from free-text user input, since raw chat messages aren't valid FTS5 syntax.
 export function buildFtsQuery(message) {

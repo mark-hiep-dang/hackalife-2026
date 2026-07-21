@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   getCourses, createCourse, getCourse, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
-  getCourseKnowledge, uploadCourseKnowledge, generateContentFromDocument,
+  getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
 import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat } from '../components/ui';
@@ -228,6 +228,7 @@ function SourceMaterialsPanel({ courseId, docs, onDocsChanged, t }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [title, setTitle] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   async function handleUpload(e) {
     const file = e.target.files?.[0];
@@ -235,6 +236,13 @@ function SourceMaterialsPanel({ courseId, docs, onDocsChanged, t }) {
     setUploading(true); setError(null);
     try { await uploadCourseKnowledge(courseId, file, title); setTitle(''); await onDocsChanged(); }
     catch (err) { setError(err.message); } finally { setUploading(false); e.target.value = ''; }
+  }
+
+  async function handleDelete(docId) {
+    if (!window.confirm(t.studioDeleteSourceConfirm)) return;
+    setDeletingId(docId); setError(null);
+    try { await deleteCourseKnowledge(docId); await onDocsChanged(); }
+    catch (err) { setError(err.message); } finally { setDeletingId(null); }
   }
 
   return (
@@ -260,8 +268,12 @@ function SourceMaterialsPanel({ courseId, docs, onDocsChanged, t }) {
         <div className="flex flex-col gap-2">
           {docs.map((d) => (
             <div key={d.id} className="border border-[#101A24]/10 rounded-xl p-3 flex items-center justify-between gap-3 bg-white">
-              <p className="text-sm font-bold text-[#101A24]">{d.title}</p>
-              <p className="text-xs text-[#888] shrink-0">{d.chunkCount} đoạn · {d.sourceType}</p>
+              <p className="text-sm font-bold text-[#101A24] truncate">{d.title}</p>
+              <div className="flex items-center gap-3 shrink-0">
+                <p className="text-xs text-[#888]">{d.chunkCount} đoạn · {d.sourceType}</p>
+                <button onClick={() => handleDelete(d.id)} disabled={deletingId === d.id}
+                  className="text-[#101A24]/60 hover:text-red-600 disabled:opacity-30"><Trash2 size={14} /></button>
+              </div>
             </div>
           ))}
         </div>

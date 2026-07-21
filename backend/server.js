@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { PDFParse } from 'pdf-parse';
 import { initDb, getDb } from './db.js';
 import { generateDynamicQuestion, generateLlamaQuestion, questionBank } from './questions.js';
-import { chunkText, buildFtsQuery, retrieveKnowledge, storeDocument, getChunkSource, pickBestMatchingChunk } from './knowledgeBase.js';
+import { chunkText, buildFtsQuery, retrieveKnowledge, storeDocument, getChunkSource, pickBestMatchingChunk, decodeUploadedFilename } from './knowledgeBase.js';
 import { processQuizAnswers, previewMistakeDNA, computeRankedTopics, computeSummitReadiness, getExamWeights } from './engines/adaptiveLoop.js';
 import { buildDailyExpedition } from './engines/dailyExpedition.js';
 import { buildPriorityExplanation } from './engines/reasonCopy.js';
@@ -976,7 +976,8 @@ app.post('/api/knowledge/upload', authenticateToken, upload.single('file'), asyn
   try {
     if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file để tải lên' });
 
-    const { originalname, mimetype, buffer } = req.file;
+    const { mimetype, buffer } = req.file;
+    const originalname = decodeUploadedFilename(req.file.originalname);
     let text = '';
     let sourceType = 'txt';
 
