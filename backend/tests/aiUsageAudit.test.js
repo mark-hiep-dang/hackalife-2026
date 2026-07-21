@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { AI_TASKS, selectModelForTask, modelNameForTask, shouldCallAI } from '../aiConfig.js';
-import { validateCurriculumProposal, validateGeneratedQuestion, validateInterventionProposal } from '../aiValidation.js';
+import { validateCurriculumProposal, validateGeneratedQuestion, validateInterventionProposal, validateGeneratedFlashcard, validateGeneratedKnowledge } from '../aiValidation.js';
 import { computeFingerprint, withGenerationCache, withCacheControl } from '../aiCache.js';
 import { generateRescueTrail } from '../llamaAIService.js';
 
@@ -130,6 +130,17 @@ describe('Structured output validation', () => {
   test('rejects an intervention proposal with a non-positive duration', () => {
     const { valid } = validateInterventionProposal({ title: 'T', durationMinutes: 0, trainerSummary: 's', learnerIntroduction: 'i' });
     assert.strictEqual(valid, false);
+  });
+
+  test('rejects a generated flashcard missing front or back', () => {
+    assert.strictEqual(validateGeneratedFlashcard({ front: 'Q', back: '' }).valid, false);
+    assert.strictEqual(validateGeneratedFlashcard({ front: '', back: 'A' }).valid, false);
+    assert.strictEqual(validateGeneratedFlashcard({ front: 'Q', back: 'A' }).valid, true);
+  });
+
+  test('rejects a generated knowledge block with an empty body', () => {
+    assert.strictEqual(validateGeneratedKnowledge({ title: 'T', body: '' }).valid, false);
+    assert.strictEqual(validateGeneratedKnowledge({ title: 'T', body: 'Nội dung thật.' }).valid, true);
   });
 });
 

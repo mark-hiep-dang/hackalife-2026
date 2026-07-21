@@ -102,13 +102,18 @@ export async function getChunkSource(db, documentId) {
   return doc || null;
 }
 
-export async function storeDocument(db, title, sourceType, text, userId) {
+// `courseId`/`approved` (spec: Studio document uploads) default to null/1 —
+// unchanged behavior for the existing learner-chat upload/paste call sites,
+// which don't pass them. A Studio-originated upload passes `approved: 0`
+// so a trainer must explicitly review it before it's usable for RAG/generation
+// (same gate `retrieveKnowledge` already enforces on the `approved` column).
+export async function storeDocument(db, title, sourceType, text, userId, { courseId = null, approved = 1 } = {}) {
   const chunks = chunkText(text);
   if (chunks.length === 0) throw new Error('Không trích xuất được nội dung từ tài liệu.');
 
   const doc = await db.run(
-    'INSERT INTO knowledge_documents (title, source_type, uploaded_by) VALUES (?, ?, ?)',
-    [title, sourceType, userId]
+    'INSERT INTO knowledge_documents (title, source_type, uploaded_by, course_id, approved) VALUES (?, ?, ?, ?, ?)',
+    [title, sourceType, userId, courseId, approved ? 1 : 0]
   );
   const documentId = doc.lastID;
 

@@ -29,11 +29,29 @@ export const suggestQualityFix = (issueId) => req(`/quality-issues/${issueId}/su
 export const ignoreQualityIssue = (issueId, reason) => req(`/quality-issues/${issueId}/ignore`, { method: 'PUT', body: { reason } });
 
 export const generateLessonKit = (lessonId) => req(`/lessons/${lessonId}/kit/generate`, { method: 'POST' });
+export const generateContentFromDocument = (lessonId, documentId) => req(`/lessons/${lessonId}/generate-from-document`, { method: 'POST', body: { documentId } });
+export const getCourseKnowledge = (courseId) => req(`/courses/${courseId}/knowledge`);
+export const approveCourseKnowledge = (docId) => req(`/knowledge/${docId}/approve`, { method: 'PUT' });
+export async function uploadCourseKnowledge(courseId, file, title) {
+  const token = localStorage.getItem('pang_chiu_token');
+  const formData = new FormData();
+  formData.append('file', file);
+  if (title) formData.append('title', title);
+  const res = await fetch(`${API_BASE}/studio/courses/${courseId}/knowledge`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Tải tài liệu thất bại');
+  return data;
+}
 export const createContentItem = (lessonId, fields) => req(`/lessons/${lessonId}/content-items`, { method: 'POST', body: fields });
 export const getLessonContent = (lessonId) => req(`/lessons/${lessonId}/content`);
 export const explainLesson = (lessonId) => req(`/lessons/${lessonId}/explain`, { method: 'POST' });
 export const reviewContentItem = (itemId, action, fields = {}) => req(`/content-items/${itemId}`, { method: 'PUT', body: { action, ...fields } });
 export const rewriteContentItem = (itemId, flags) => req(`/content-items/${itemId}/rewrite`, { method: 'POST', body: { flags } });
+export const deleteContentItem = (itemId) => req(`/content-items/${itemId}`, { method: 'DELETE' });
 
 export const getCohorts = () => req('/cohorts');
 export const getCohort = (id) => req(`/cohorts/${id}`);

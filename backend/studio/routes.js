@@ -4,8 +4,11 @@
 // might legitimately hit, of which there are none here — Studio is
 // trainer-only end to end).
 
+import multer from 'multer';
+import { PDFParse } from 'pdf-parse';
 import { getDb } from '../db.js';
-import { generateCurriculum, generateLessonKit, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
+import { storeDocument } from '../knowledgeBase.js';
+import { generateCurriculum, generateLessonKit, generateContentFromDocument, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
 import { checkCourseQuality } from './engines/courseQuality.js';
 import { calculateCohortOverview, calculateTopicPerformance, classifyTrend } from './engines/mockExamAnalytics.js';
 import { detectLearnerRisk } from './engines/learnerRisk.js';
@@ -54,11 +57,12 @@ async function loadCourseBundle(db, courseId) {
 
 function toContentItemDTO(c) {
   return {
-    id: c.id, lessonId: c.lesson_id, contentType: c.content_type, questionText: c.question_text,
+    id: c.id, lessonId: c.lesson_id, contentType: c.content_type, title: c.title, questionText: c.question_text,
     options: parseJSON(c.options, []), correctOption: c.correct_option, explanation: c.explanation,
     difficulty: c.difficulty, cognitiveLevel: c.cognitive_level, front: c.front, back: c.back, keyword: c.keyword,
     sourceChunkIds: parseJSON(c.source_chunk_ids, []), sourceTitle: c.source_title, sourceVersion: c.source_version,
-    generatedAt: c.generated_at, aiGenerated: !!c.ai_generated, status: c.status, trainerEdited: !!c.trainer_edited
+    generatedAt: c.generated_at, aiGenerated: !!c.ai_generated, status: c.status, trainerEdited: !!c.trainer_edited,
+    publishedQuestionId: c.published_question_id, publishedFlashcardId: c.published_flashcard_id
   };
 }
 
@@ -70,6 +74,8 @@ function toLessonDTO(l) {
     sourceChunkIds: parseJSON(l.source_chunk_ids, []), status: l.status, aiLocked: !!l.ai_locked, orderIndex: l.order_index
   };
 }
+
+const studioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 export function mountStudioRoutes(app, authenticateToken) {
   const T = [authenticateToken, requireTrainer];
@@ -197,7 +203,118 @@ export function mountStudioRoutes(app, authenticateToken) {
 
       await db.run("UPDATE studio_courses SET status = 'PUBLISHED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [bundle.course.id]);
       await db.run(`UPDATE studio_lessons SET status = 'PUBLISHED' WHERE camp_id IN (SELECT id FROM studio_camps WHERE course_id = ?) AND status = 'APPROVED'`, [bundle.course.id]);
+
+      // Copy-on-publish bridge: an APPROVED content item is a draft until
+      // this point — it only becomes something a real learner can practice
+      // with once copied into the live test_questions/flashcards tables the
+      // learner app actually reads (Quiz.jsx/Flashcards.jsx). Idempotent via
+      // published_question_id/published_flashcard_id — republishing a course
+      // after adding more approved content never double-inserts what's
+      // already out there.
+      const lessonTitleById = new Map(bundle.lessons.map((l) => [l.id, l.title]));
+      let publishedCount = 0;
+      for (const item of bundle.contentItems) {
+        if (item.status !== 'APPROVED') continue;
+        const topic = lessonTitleById.get(item.lesson_id) || 'Llama Studio';
+
+        if (['mcq', 'scenario', 'checkpoint'].includes(item.content_type) && !item.published_question_id) {
+          const options = parseJSON(item.options, []);
+          const answer = ['A', 'B', 'C', 'D'][item.correct_option];
+          if (options.length !== 4 || !answer) continue; // malformed — skip rather than publish a broken question
+          const inserted = await db.run(
+            `INSERT INTO test_questions (topic, difficulty, question, optA, optB, optC, optD, answer, explanation, source)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [topic, item.difficulty || 'Trung bình', item.question_text, options[0], options[1], options[2], options[3], answer, item.explanation || '', item.source_title || 'Llama Studio']
+          );
+          await db.run('UPDATE studio_content_items SET published_question_id = ? WHERE id = ?', [inserted.lastID, item.id]);
+          publishedCount++;
+        } else if (item.content_type === 'flashcard' && !item.published_flashcard_id) {
+          const inserted = await db.run(
+            `INSERT INTO flashcards (topic, card_type, difficulty, front, back, keyword) VALUES (?, ?, ?, ?, ?, ?)`,
+            [topic, 'Kiến thức Studio', item.difficulty || 'Trung bình', item.front, item.back, item.keyword || null]
+          );
+          await db.run('UPDATE studio_content_items SET published_flashcard_id = ? WHERE id = ?', [inserted.lastID, item.id]);
+          publishedCount++;
+        }
+        // 'knowledge' items stay Studio-only — no learner-facing table for
+        // standalone lesson prose exists today (the learner app's lessons.cards
+        // is a structured flashcard-style array, not free text).
+      }
+
+      res.json({ success: true, publishedCount });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // ── Source Documents (giáo án upload → grounds AI content generation) ───
+  // Course-scoped, not global — reuses the same storeDocument/chunking/FTS
+  // pipeline the learner-chat upload already uses (backend/knowledgeBase.js),
+  // just tagging the document with this course and defaulting it unapproved
+  // until a trainer reviews it (a document must be approved before any
+  // generation call is allowed to read its chunks).
+  app.post('/api/studio/courses/:id/knowledge', ...T, studioUpload.single('file'), async (req, res) => {
+    const db = req.db;
+    try {
+      const course = await db.get('SELECT id FROM studio_courses WHERE id = ?', [req.params.id]);
+      if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file để tải lên' });
+
+      const { originalname, mimetype, buffer } = req.file;
+      let text = '';
+      let sourceType = 'txt';
+      if (mimetype === 'application/pdf' || originalname.toLowerCase().endsWith('.pdf')) {
+        sourceType = 'pdf';
+        const parser = new PDFParse({ data: buffer });
+        text = (await parser.getText()).text;
+        await parser.destroy();
+      } else {
+        text = buffer.toString('utf-8');
+      }
+
+      const title = (req.body.title || '').trim() || originalname;
+      const result = await storeDocument(db, title, sourceType, text, req.user.id, { courseId: course.id, approved: 0 });
+      res.status(201).json({ title, ...result });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get('/api/studio/courses/:id/knowledge', ...T, async (req, res) => {
+    try {
+      const docs = await req.db.all(
+        `SELECT d.*, COUNT(c.id) as chunk_count FROM knowledge_documents d
+         LEFT JOIN knowledge_chunks c ON c.document_id = d.id
+         WHERE d.course_id = ? GROUP BY d.id ORDER BY d.created_at DESC`,
+        [req.params.id]
+      );
+      res.json(docs.map((d) => ({
+        id: d.id, title: d.title, sourceType: d.source_type, approved: !!d.approved,
+        chunkCount: d.chunk_count, createdAt: d.created_at
+      })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.put('/api/studio/knowledge/:id/approve', ...T, async (req, res) => {
+    try {
+      await req.db.run('UPDATE knowledge_documents SET approved = 1 WHERE id = ?', [req.params.id]);
       res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Real AI generation grounded in a specific approved document — distinct
+  // from kit/generate below, which never calls Gemini and only samples the
+  // pre-approved exam bank. Results land as AI_DRAFT content-items, same
+  // review queue as everything else — never auto-approved.
+  app.post('/api/studio/lessons/:id/generate-from-document', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const lesson = await db.get('SELECT * FROM studio_lessons WHERE id = ?', [req.params.id]);
+      if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
+      const { documentId } = req.body;
+      const doc = await db.get('SELECT * FROM knowledge_documents WHERE id = ?', [documentId]);
+      if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+      if (!doc.approved) return res.status(400).json({ error: 'Tài liệu chưa được duyệt. Hãy duyệt tài liệu trước khi tạo nội dung.' });
+
+      const result = await generateContentFromDocument(db, { lessonId: lesson.id, documentId: doc.id, documentTitle: doc.title });
+      await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
+      res.json(result);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -219,9 +336,9 @@ export function mountStudioRoutes(app, authenticateToken) {
       const kit = await generateLessonKit(db, { topic, lessonTitle: lesson.title });
       const insertItem = (type, fields) => db.run(
         `INSERT INTO studio_content_items
-           (lesson_id, content_type, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_chunk_ids, source_title, source_version, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT')`,
-        [lesson.id, type, fields.questionText || null, JSON.stringify(fields.options || []), fields.correctOption ?? null,
+           (lesson_id, content_type, title, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_chunk_ids, source_title, source_version, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT')`,
+        [lesson.id, type, fields.title || null, fields.questionText || null, JSON.stringify(fields.options || []), fields.correctOption ?? null,
           fields.explanation || null, fields.difficulty || 'Trung bình', fields.cognitiveLevel || 'Hiểu',
           fields.front || null, fields.back || null, fields.keyword || null,
           JSON.stringify(fields.sourceChunkIds || []), fields.sourceTitle || 'Giáo trình MOF', fields.sourceVersion || '1.0']
@@ -232,6 +349,15 @@ export function mountStudioRoutes(app, authenticateToken) {
       for (const q of kit.hardQuestions) await insertItem('mcq', q);
       if (kit.scenario) await insertItem('scenario', kit.scenario);
       if (kit.checkpoint) await insertItem('checkpoint', kit.checkpoint);
+      // Previously the microLesson/memoryTips only ever appeared once in a
+      // transient Llama-bubble reaction and were never saved anywhere — a
+      // trainer had no way to see, edit, or approve them again after the
+      // fact. Persisting them as a real (reviewable, editable) knowledge
+      // item fixes that.
+      if (kit.microLesson) {
+        const body = [kit.microLesson, ...(kit.memoryTips || []).map((tip) => `• ${tip}`)].join('\n\n');
+        await insertItem('knowledge', { title: 'Kiến thức cốt lõi', questionText: body });
+      }
 
       await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
       res.json({ microLesson: kit.microLesson, memoryTips: kit.memoryTips, itemCount: kit.flashcards.length + kit.easyQuestions.length + kit.mediumQuestions.length + kit.hardQuestions.length + (kit.scenario ? 1 : 0) + (kit.checkpoint ? 1 : 0) });
@@ -253,19 +379,19 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const lesson = await db.get('SELECT id FROM studio_lessons WHERE id = ?', [req.params.id]);
       if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
-      const { contentType, front, back, keyword, questionText, options, correctOption, explanation, difficulty, cognitiveLevel } = req.body;
+      const { contentType, title, front, back, keyword, questionText, options, correctOption, explanation, difficulty, cognitiveLevel } = req.body;
       if (!contentType) return res.status(400).json({ error: 'Thiếu loại nội dung' });
       if (contentType === 'flashcard' && (!front?.trim() || !back?.trim())) {
         return res.status(400).json({ error: 'Flashcard cần có mặt trước và mặt sau.' });
       }
       if (contentType !== 'flashcard' && !questionText?.trim()) {
-        return res.status(400).json({ error: 'Cần nhập nội dung câu hỏi.' });
+        return res.status(400).json({ error: contentType === 'knowledge' ? 'Cần nhập nội dung kiến thức.' : 'Cần nhập nội dung câu hỏi.' });
       }
       const result = await db.run(
         `INSERT INTO studio_content_items
-           (lesson_id, content_type, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_title, source_version, status, ai_generated, trainer_edited)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED', 0, 1)`,
-        [lesson.id, contentType, questionText || null, JSON.stringify(options || []), correctOption ?? null,
+           (lesson_id, content_type, title, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_title, source_version, status, ai_generated, trainer_edited)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED', 0, 1)`,
+        [lesson.id, contentType, title || null, questionText || null, JSON.stringify(options || []), correctOption ?? null,
           explanation || null, difficulty || 'Trung bình', cognitiveLevel || 'Hiểu',
           front || null, back || null, keyword || null, 'Trainer tự tạo', '1.0']
       );
@@ -274,19 +400,59 @@ export function mountStudioRoutes(app, authenticateToken) {
   });
 
   app.put('/api/studio/content-items/:id', ...T, async (req, res) => {
-    const { action, questionText, explanation } = req.body; // action: approve | reject | edit
+    // action: approve | reject | edit | toggleCheckpoint
+    const { action, title, questionText, explanation, front, back, keyword, options, correctOption } = req.body;
     const db = req.db;
     try {
       const statusMap = { approve: 'APPROVED', reject: 'ARCHIVED', edit: 'TRAINER_EDITING' };
+
+      if (action === 'toggleCheckpoint') {
+        // Checkpoint is a designation on an mcq/scenario item, not a separate
+        // authored type — flip content_type between 'mcq' and 'checkpoint'
+        // rather than duplicating the mcq/scenario add-edit form for it.
+        const item = await db.get('SELECT content_type FROM studio_content_items WHERE id = ?', [req.params.id]);
+        if (!item) return res.status(404).json({ error: 'Không tìm thấy nội dung' });
+        const nextType = item.content_type === 'checkpoint' ? 'mcq' : 'checkpoint';
+        await db.run('UPDATE studio_content_items SET content_type = ? WHERE id = ?', [nextType, req.params.id]);
+        return res.json({ success: true, contentType: nextType });
+      }
+
       const newStatus = statusMap[action];
       if (!newStatus) return res.status(400).json({ error: 'Hành động không hợp lệ' });
 
       if (action === 'edit') {
-        await db.run('UPDATE studio_content_items SET question_text = COALESCE(?, question_text), explanation = COALESCE(?, explanation), status = ?, trainer_edited = 1 WHERE id = ?', [questionText, explanation, newStatus, req.params.id]);
+        await db.run(
+          `UPDATE studio_content_items SET
+             title = COALESCE(?, title), question_text = COALESCE(?, question_text), explanation = COALESCE(?, explanation),
+             front = COALESCE(?, front), back = COALESCE(?, back), keyword = COALESCE(?, keyword),
+             options = COALESCE(?, options), correct_option = COALESCE(?, correct_option),
+             status = ?, trainer_edited = 1
+           WHERE id = ?`,
+          [title, questionText, explanation, front, back, keyword,
+            options ? JSON.stringify(options) : null, correctOption ?? null, newStatus, req.params.id]
+        );
       } else {
         await db.run('UPDATE studio_content_items SET status = ? WHERE id = ?', [newStatus, req.params.id]);
       }
       await db.run('INSERT INTO studio_content_reviews (content_item_id, reviewer_id, action) VALUES (?, ?, ?)', [req.params.id, req.user.id, action]);
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Hard delete — distinct from Reject (which archives, keeping an audit
+  // trail for AI drafts a trainer decided not to use). Blocked once an item
+  // has been published into the real learner-facing tables (spec: don't
+  // silently pull content out from under a learner already practicing with
+  // it) — a trainer must edit/archive it there instead.
+  app.delete('/api/studio/content-items/:id', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const item = await db.get('SELECT published_question_id, published_flashcard_id FROM studio_content_items WHERE id = ?', [req.params.id]);
+      if (!item) return res.status(404).json({ error: 'Không tìm thấy nội dung' });
+      if (item.published_question_id || item.published_flashcard_id) {
+        return res.status(400).json({ error: 'Nội dung đã publish cho học viên, không thể xoá trực tiếp. Hãy sửa hoặc lưu trữ (archive) thay thế.' });
+      }
+      await db.run('DELETE FROM studio_content_items WHERE id = ?', [req.params.id]);
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
