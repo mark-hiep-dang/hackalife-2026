@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   getCourses, createCourse, getCourse, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
-  getCourseKnowledge, uploadCourseKnowledge, approveCourseKnowledge, generateContentFromDocument,
+  getCourseKnowledge, uploadCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
 import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
-import { Plus, ArrowLeft, Mountain, Sparkles, Upload, Check, Pencil, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Mountain, Sparkles, Upload, Pencil, Trash2 } from 'lucide-react';
 import { useT } from '../../translations';
 
 const CAMP_COLORS = ['bg-[#C7EFC4]', 'bg-[#B9E7EF]', 'bg-[#E3D9F5]', 'bg-[#FBE3B0]', 'bg-[#F5C9DA]'];
@@ -224,6 +224,93 @@ function MountainVisual({ courseId, camps, lessons, t, onChanged }) {
   );
 }
 
+function SourceMaterialsPanel({ courseId, docs, onDocsChanged, t }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const [title, setTitle] = useState('');
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true); setError(null);
+    try { await uploadCourseKnowledge(courseId, file, title); setTitle(''); await onDocsChanged(); }
+    catch (err) { setError(err.message); } finally { setUploading(false); e.target.value = ''; }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 mb-5 pb-5 border-b border-[#101A24]/10">
+      <div>
+        <p className="text-sm font-bold text-[#101A24]">{t.studioSourcesTitle}</p>
+        <p className="text-xs text-[#888]">{t.studioSourcesSubtitle}</p>
+      </div>
+      <div className="flex items-end gap-3 flex-wrap">
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="font-bold text-[#101A24]">{t.studioSourceTitleLabel}</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
+        </label>
+        <label className={`px-4 py-2.5 rounded-xl text-sm font-extrabold uppercase tracking-wide bg-white text-[#101A24] border border-[#101A24]/15 hover:bg-[#F5F6F8] flex items-center gap-2 w-fit ${uploading ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
+          <input type="file" accept=".pdf,.txt" onChange={handleUpload} className="hidden" disabled={uploading} />
+          <Upload size={16} /> {uploading ? t.studioAdding : t.studioUploadSourceBtn}
+        </label>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {docs !== null && (docs.length === 0 ? (
+        <p className="text-xs text-[#888]">{t.studioNoSourcesYet}</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {docs.map((d) => (
+            <div key={d.id} className="border border-[#101A24]/10 rounded-xl p-3 flex items-center justify-between gap-3 bg-white">
+              <p className="text-sm font-bold text-[#101A24]">{d.title}</p>
+              <p className="text-xs text-[#888] shrink-0">{d.chunkCount} đoạn · {d.sourceType}</p>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GenerateFromSourcePanel({ docs, lessons, t }) {
+  const [genLessonId, setGenLessonId] = useState('');
+  const [genDocId, setGenDocId] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [reaction, setReaction] = useState(null);
+
+  async function handleGenerate() {
+    if (!genLessonId || !genDocId) return;
+    setGenerating(true); setError(null);
+    try {
+      const result = await generateContentFromDocument(genLessonId, genDocId);
+      const lessonTitle = lessons.find((l) => String(l.id) === String(genLessonId))?.title || '';
+      setReaction({ event: 'LESSON_KIT_CREATED', context: { itemCount: result.itemCount, lessonTitle } });
+    } catch (err) { setError(err.message); } finally { setGenerating(false); }
+  }
+
+  if (!docs || docs.length === 0) return null;
+
+  return (
+    <Card>
+      <p className="text-sm font-extrabold text-[#101A24] mb-3">{t.studioGenerateFromSourceTitle}</p>
+      <div className="flex gap-3 flex-wrap">
+        <select value={genLessonId} onChange={(e) => setGenLessonId(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm">
+          <option value="">{t.studioChooseLessonPlaceholder}</option>
+          {lessons.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
+        </select>
+        <select value={genDocId} onChange={(e) => setGenDocId(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm">
+          <option value="">{t.studioChooseSourcePlaceholder}</option>
+          {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+        </select>
+        <Button onClick={handleGenerate} disabled={generating || !genLessonId || !genDocId} className="flex items-center gap-2">
+          <Sparkles size={16} /> {generating ? t.studioGenerating : t.studioGenerateFromSourceBtn}
+        </Button>
+      </div>
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+      {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} className="mt-3" />}
+    </Card>
+  );
+}
+
 function CourseDetail({ courseId, onBack }) {
   const t = useT();
   const [bundle, setBundle] = useState(null);
@@ -232,6 +319,7 @@ function CourseDetail({ courseId, onBack }) {
   const [reaction, setReaction] = useState(null);
   const [tab, setTab] = useState('architect');
   const [prompt, setPrompt] = useState('');
+  const [knowledgeDocs, setKnowledgeDocs] = useState(null);
 
   async function load() {
     const b = await getCourse(courseId);
@@ -239,7 +327,10 @@ function CourseDetail({ courseId, onBack }) {
     const q = await getQuality(courseId);
     setQuality(q);
   }
-  useEffect(() => { load(); }, [courseId]);
+  async function loadKnowledgeDocs() {
+    setKnowledgeDocs(await getCourseKnowledge(courseId));
+  }
+  useEffect(() => { load(); loadKnowledgeDocs(); }, [courseId]);
 
   async function handleGenerate() {
     setBusy(true);
@@ -281,35 +372,43 @@ function CourseDetail({ courseId, onBack }) {
 
       <div className="flex gap-2">
         <Button variant={tab === 'architect' ? 'primary' : 'secondary'} onClick={() => setTab('architect')}>{t.studioCourseArchitectTab}</Button>
-        <Button variant={tab === 'sources' ? 'primary' : 'secondary'} onClick={() => setTab('sources')}>{t.studioSourcesTab}</Button>
         <Button variant={tab === 'quality' ? 'primary' : 'secondary'} onClick={() => setTab('quality')}>{t.studioCourseQualityTab}</Button>
       </div>
 
       {tab === 'architect' && (() => {
         const hasApprovedContent = lessons.some((l) => l.status === 'APPROVED' || l.status === 'PUBLISHED');
         return (
-          <Card>
-            <SectionTitle subtitle={t.studioCurriculumSubtitle}>{t.studioCurriculumTitle}</SectionTitle>
-            {hasApprovedContent ? (
-              <p className="text-sm text-[#888] italic mb-4">{t.studioRegenerateBlockedMessage}</p>
-            ) : (
-              <div className="flex flex-col gap-3 mb-4">
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-bold text-[#101A24]">{t.studioCurriculumPromptLabel}</span>
-                  <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3}
-                    placeholder={t.studioCurriculumPromptPlaceholder} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm" />
-                </label>
-                <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2 w-fit">
-                  <Sparkles size={16} /> {camps.length ? t.studioRegenerateCurriculum : t.studioGenerateCurriculum}
-                </Button>
-              </div>
-            )}
-            {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
-          </Card>
+          <>
+            <Card>
+              <SectionTitle subtitle={t.studioCurriculumSubtitle}>{t.studioCurriculumTitle}</SectionTitle>
+              <SourceMaterialsPanel courseId={courseId} docs={knowledgeDocs} onDocsChanged={loadKnowledgeDocs} t={t} />
+              {hasApprovedContent ? (
+                <p className="text-sm text-[#888] italic mb-4">{t.studioRegenerateBlockedMessage}</p>
+              ) : (
+                <div className="flex flex-col gap-3 mb-4">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-bold text-[#101A24]">{t.studioCurriculumPromptLabel}</span>
+                    <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3}
+                      placeholder={t.studioCurriculumPromptPlaceholder} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm" />
+                  </label>
+                  {knowledgeDocs !== null && (
+                    <p className="text-xs text-[#888] italic">
+                      {knowledgeDocs.length > 0
+                        ? t.studioWillUseDocs.replace('{n}', knowledgeDocs.length)
+                        : prompt.trim() ? t.studioWillUseGoalOnly : t.studioWillUseBank}
+                    </p>
+                  )}
+                  <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2 w-fit">
+                    <Sparkles size={16} /> {camps.length ? t.studioRegenerateCurriculum : t.studioGenerateCurriculum}
+                  </Button>
+                </div>
+              )}
+              {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
+            </Card>
+            <GenerateFromSourcePanel docs={knowledgeDocs} lessons={lessons} t={t} />
+          </>
         );
       })()}
-
-      {tab === 'sources' && <SourcesTab courseId={courseId} lessons={lessons} t={t} />}
 
       {tab === 'quality' && (
         <Card>
@@ -334,99 +433,6 @@ function CourseDetail({ courseId, onBack }) {
         </Card>
       )}
     </div>
-  );
-}
-
-function SourcesTab({ courseId, lessons, t }) {
-  const [docs, setDocs] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState(null);
-  const [title, setTitle] = useState('');
-  const [genLessonId, setGenLessonId] = useState('');
-  const [genDocId, setGenDocId] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [reaction, setReaction] = useState(null);
-
-  async function load() { setDocs(await getCourseKnowledge(courseId)); }
-  useEffect(() => { load(); }, [courseId]);
-
-  async function handleUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true); setError(null);
-    try { await uploadCourseKnowledge(courseId, file, title); setTitle(''); await load(); }
-    catch (err) { setError(err.message); } finally { setUploading(false); e.target.value = ''; }
-  }
-
-  async function handleApprove(docId) {
-    await approveCourseKnowledge(docId);
-    await load();
-  }
-
-  async function handleGenerate() {
-    if (!genLessonId || !genDocId) return;
-    setGenerating(true);
-    try {
-      const result = await generateContentFromDocument(genLessonId, genDocId);
-      const lessonTitle = lessons.find((l) => String(l.id) === String(genLessonId))?.title || '';
-      setReaction({ event: 'LESSON_KIT_CREATED', context: { itemCount: result.itemCount, lessonTitle } });
-    } catch (err) { setError(err.message); } finally { setGenerating(false); }
-  }
-
-  const approvedDocs = (docs || []).filter((d) => d.approved);
-
-  return (
-    <Card>
-      <SectionTitle subtitle={t.studioSourcesSubtitle}>{t.studioSourcesTitle}</SectionTitle>
-
-      <form className="border border-[#101A24]/10 rounded-xl p-4 flex flex-col gap-3 bg-[#F5F6F8] mb-4">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-bold text-[#101A24]">{t.studioSourceTitleLabel}</span>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
-        </label>
-        <label className={`px-4 py-2.5 rounded-xl text-sm font-extrabold uppercase tracking-wide bg-white text-[#101A24] border border-[#101A24]/15 hover:bg-[#F5F6F8] flex items-center gap-2 w-fit ${uploading ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
-          <input type="file" accept=".pdf,.txt" onChange={handleUpload} className="hidden" disabled={uploading} />
-          <Upload size={16} /> {uploading ? t.studioAdding : t.studioUploadSourceBtn}
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </form>
-
-      {!docs ? <Spinner label={t.studioLoading} /> : docs.length === 0 ? <EmptyState>{t.studioNoSourcesYet}</EmptyState> : (
-        <div className="flex flex-col gap-2 mb-6">
-          {docs.map((d) => (
-            <div key={d.id} className="border border-[#101A24]/10 rounded-xl p-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-[#101A24]">{d.title}</p>
-                <p className="text-xs text-[#888]">{d.chunkCount} đoạn · {d.sourceType}</p>
-              </div>
-              {d.approved
-                ? <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-1 rounded bg-[#C7EFC4]">{t.studioApprove}</span>
-                : <Button variant="success" className="!px-3 !py-1.5 text-xs flex items-center gap-1" onClick={() => handleApprove(d.id)}><Check size={14} /> {t.studioApprove}</Button>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {approvedDocs.length > 0 && (
-        <div className="border-t border-[#101A24]/10 pt-4 flex flex-col gap-3">
-          <p className="text-sm font-extrabold text-[#101A24]">{t.studioGenerateFromSourceTitle}</p>
-          <div className="flex gap-3 flex-wrap">
-            <select value={genLessonId} onChange={(e) => setGenLessonId(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm">
-              <option value="">{t.studioChooseLessonPlaceholder}</option>
-              {lessons.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
-            </select>
-            <select value={genDocId} onChange={(e) => setGenDocId(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm">
-              <option value="">{t.studioChooseSourcePlaceholder}</option>
-              {approvedDocs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
-            </select>
-            <Button onClick={handleGenerate} disabled={generating || !genLessonId || !genDocId} className="flex items-center gap-2">
-              <Sparkles size={16} /> {generating ? t.studioGenerating : t.studioGenerateFromSourceBtn}
-            </Button>
-          </div>
-          {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} />}
-        </div>
-      )}
-    </Card>
   );
 }
 

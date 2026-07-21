@@ -23,6 +23,21 @@ export function validateCurriculumProposal(proposal, approvedChunkIds) {
   return { valid: errors.length === 0, errors };
 }
 
+/** Same shape checks as validateCurriculumProposal, minus the source-citation
+ * requirement — used when a trainer generates a curriculum purely from a goal
+ * prompt with no uploaded documents to cite. */
+export function validateGoalOnlyCurriculumProposal(proposal) {
+  const errors = [];
+  if (!proposal || typeof proposal.summary !== 'string') errors.push('missing summary');
+  if (!Array.isArray(proposal?.camps) || proposal.camps.length === 0) errors.push('missing camps');
+  if (!Array.isArray(proposal?.lessons) || proposal.lessons.length === 0) errors.push('missing lessons');
+  for (const lesson of proposal?.lessons || []) {
+    if (!lesson.title) errors.push('lesson missing title');
+    if (typeof lesson.estimatedMinutes !== 'number' || lesson.estimatedMinutes <= 0) errors.push(`"${lesson.title}": non-positive duration`);
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 /** A single generated MCQ/scenario/checkpoint question must have exactly 4
  * options and exactly one correct index. */
 export function validateGeneratedQuestion(q) {

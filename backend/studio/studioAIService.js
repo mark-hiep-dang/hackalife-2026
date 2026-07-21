@@ -8,10 +8,10 @@
 // "AI proposal" is genuinely grounded even when Gemini is unavailable.
 
 import { callGemini, matchesShape } from '../geminiClient.js';
-import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk, getApprovedChunksForCourse } from '../knowledgeBase.js';
+import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk, getCourseChunks } from '../knowledgeBase.js';
 import { assembleRescueTrail, getConceptPair } from '../engines/rescueTrail.js';
 import { AI_TASKS } from '../aiConfig.js';
-import { validateCurriculumProposal, validateInterventionProposal, validateGeneratedQuestion, validateGeneratedFlashcard, validateGeneratedKnowledge } from '../aiValidation.js';
+import { validateCurriculumProposal, validateGoalOnlyCurriculumProposal, validateInterventionProposal, validateGeneratedQuestion, validateGeneratedFlashcard, validateGeneratedKnowledge } from '../aiValidation.js';
 import { withGenerationCache, withCacheControl } from '../aiCache.js';
 
 function studioCallGemini(systemInstruction, userMessage, task, db, timeoutMs) {
@@ -134,18 +134,20 @@ async function buildCurriculumProposal(db, input = {}) {
 
 // ── Course-specific curriculum generation, grounded in the trainer's own
 // uploaded source material + stated goal — NOT the fixed 8-MOF-topic bank
-// above. Falls back to generateCurriculum (today's deterministic MOF-bank
-// path) when the course has no approved source documents yet, so an
-// MOF-standard course still works exactly as it does today with zero setup.
+// above. A source document isn't required: with no upload, Llama generates
+// straight from the trainer's goal prompt using its own domain knowledge
+// (generateCurriculumFromGoalOnly below); only when there's neither a
+// document nor a prompt does this fall back to the deterministic MOF bank,
+// so a course is never left with an empty roadmap.
 /**
  * @param {import('sqlite').Database} db
  * @param {{ courseId: number, prompt?: string, preferredCamps?: number }} input
- * @returns {Promise<{ summary: string, camps: object[], lessons: object[], usedSource: 'bank'|'document' }>}
+ * @returns {Promise<{ summary: string, camps: object[], lessons: object[], usedSource: 'bank'|'document'|'prompt' }>}
  */
 export async function generateCurriculumFromPrompt(db, { courseId, prompt = '', preferredCamps = 4 }) {
-  const chunks = await getApprovedChunksForCourse(db, courseId);
+  const chunks = await getCourseChunks(db, courseId);
   if (chunks.length === 0) {
-    return { ...(await generateCurriculum(db, { preferredCamps })), usedSource: 'bank' };
+    return generateCurriculumFromGoalOnly(db, { prompt, preferredCamps });
   }
 
   const sourceChunkIds = chunks.map((c) => c.id);
@@ -203,6 +205,67 @@ export async function generateCurriculumFromPrompt(db, { courseId, prompt = '', 
   if (!proposal) proposal = buildChunkBucketProposal(chunks, preferredCamps);
 
   return { ...proposal, usedSource: 'document' };
+}
+
+// No source document uploaded for this course — generate the roadmap from
+// the trainer's goal prompt alone, using Gemini's own insurance-domain
+// knowledge (no chunks to cite, so this is validated with the lighter
+// validateGoalOnlyCurriculumProposal instead of the citation-requiring one
+// above). Falls back to the deterministic MOF bank only if there's no usable
+// prompt either, or the AI call/response fails — never left empty.
+async function generateCurriculumFromGoalOnly(db, { prompt = '', preferredCamps = 4 }) {
+  if (!prompt?.trim()) {
+    return { ...(await generateCurriculum(db, { preferredCamps })), usedSource: 'bank' };
+  }
+
+  const raw = await studioCallGemini(
+    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"summary": string, "camps": [{"title": string}], "lessons": [{"title": string, "description": string, "campIndex": number, "estimatedMinutes": number, "difficulty": string, "learningOutcome": string}]}',
+    `Trainer chưa tải tài liệu nguồn nào cho khóa học này. Mục tiêu khóa học: "${prompt.trim()}"\n\nDựa vào kiến thức chuyên môn bảo hiểm của bạn và mục tiêu trên, đề xuất lộ trình gồm tối đa ${preferredCamps} camp (campIndex bắt đầu từ 0) và các chặng học (lesson) hợp lý trong mỗi camp. difficulty chỉ dùng "Dễ", "Trung bình" hoặc "Khó".`,
+    AI_TASKS.GENERATE_CURRICULUM, db, 15000
+  );
+
+  let proposal = null;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(stripJsonFence(raw));
+      if (matchesShape({ summary: 'string' }, parsed) && Array.isArray(parsed.camps) && Array.isArray(parsed.lessons)) {
+        const camps = parsed.camps.map((c, i) => ({ id: i + 1, title: c.title, orderIndex: i }));
+        const lessons = parsed.lessons.map((l, i) => {
+          const camp = camps[l.campIndex] || camps[0];
+          return {
+            id: i + 1,
+            title: l.title,
+            description: l.description || '',
+            campId: camp?.id,
+            learningOutcome: l.learningOutcome || `Học viên hiểu và vận dụng được kiến thức về ${(l.title || '').toLowerCase()}.`,
+            skillIds: camp ? [camp.id] : [],
+            prerequisiteLessonIds: [],
+            estimatedMinutes: typeof l.estimatedMinutes === 'number' && l.estimatedMinutes > 0 ? l.estimatedMinutes : 20,
+            difficulty: ['Dễ', 'Trung bình', 'Khó'].includes(l.difficulty) ? l.difficulty : 'Trung bình',
+            recommendedActivities: ['micro-lesson', 'flashcard', 'mcq'],
+            examWeight: parsed.lessons.length ? Math.round((1 / parsed.lessons.length) * 100) / 100 : 0.1,
+            sourceChunkIds: [],
+            sourceTitle: 'Do Llama đề xuất dựa trên mục tiêu khóa học (chưa có tài liệu nguồn)',
+            sourceVersion: '1.0',
+            status: 'AI_DRAFT'
+          };
+        });
+        proposal = { summary: parsed.summary, camps, lessons };
+      }
+    } catch (err) { /* falls through to the MOF-bank fallback below */ }
+  }
+
+  if (proposal) {
+    const check = validateGoalOnlyCurriculumProposal(proposal);
+    if (!check.valid) {
+      console.warn('generateCurriculumFromGoalOnly: AI proposal failed validation, using MOF-bank fallback:', check.errors);
+      proposal = null;
+    }
+  }
+
+  if (!proposal) return { ...(await generateCurriculum(db, { preferredCamps })), usedSource: 'bank' };
+
+  return { ...proposal, usedSource: 'prompt' };
 }
 
 // Zero-AI fallback for prompt+document generation — buckets the trainer's

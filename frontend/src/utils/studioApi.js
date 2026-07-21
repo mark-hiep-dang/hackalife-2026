@@ -37,7 +37,6 @@ export const ignoreQualityIssue = (issueId, reason) => req(`/quality-issues/${is
 export const generateLessonKit = (lessonId) => req(`/lessons/${lessonId}/kit/generate`, { method: 'POST' });
 export const generateContentFromDocument = (lessonId, documentId) => req(`/lessons/${lessonId}/generate-from-document`, { method: 'POST', body: { documentId } });
 export const getCourseKnowledge = (courseId) => req(`/courses/${courseId}/knowledge`);
-export const approveCourseKnowledge = (docId) => req(`/knowledge/${docId}/approve`, { method: 'PUT' });
 export async function uploadCourseKnowledge(courseId, file, title) {
   const token = localStorage.getItem('pang_chiu_token');
   const formData = new FormData();

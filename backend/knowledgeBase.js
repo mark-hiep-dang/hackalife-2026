@@ -36,7 +36,11 @@ export function buildFtsQuery(message) {
 
 // AI usage audit §8: only ever retrieve from documents the trainer has
 // approved — a chunk from an unapproved/draft upload must never reach a
-// generation prompt. (Previously this had no approved-flag check at all.)
+// generation prompt. Also excludes course-scoped uploads (course_id IS NOT
+// NULL): those are only ever used to ground that specific course's own
+// curriculum/content generation (see getCourseChunks below), never the
+// shared learner-facing "Hỏi Llama" chat or Trainer Copilot — otherwise a
+// syllabus uploaded for one course could leak into unrelated answers.
 export async function retrieveKnowledge(db, message, limit = 5) {
   const ftsQuery = buildFtsQuery(message);
   if (!ftsQuery) return [];
@@ -46,7 +50,7 @@ export async function retrieveKnowledge(db, message, limit = 5) {
               knowledge_chunks_fts.content as content, bm25(knowledge_chunks_fts) as score
        FROM knowledge_chunks_fts
        JOIN knowledge_documents d ON knowledge_chunks_fts.document_id = d.id
-       WHERE knowledge_chunks_fts MATCH ? AND d.approved = 1
+       WHERE knowledge_chunks_fts MATCH ? AND d.approved = 1 AND d.course_id IS NULL
        ORDER BY score LIMIT ?`,
       [ftsQuery, limit]
     );
@@ -56,14 +60,18 @@ export async function retrieveKnowledge(db, message, limit = 5) {
   }
 }
 
-// Full-course retrieval (not keyword-matched) — used when a trainer wants
-// AI to structure a curriculum from everything they've uploaded for THIS
-// course, rather than a keyword-relevant excerpt of it.
-export async function getApprovedChunksForCourse(db, courseId) {
+// Full-course retrieval (not keyword-matched) — used when a trainer wants AI
+// to structure a curriculum from everything they've uploaded for THIS
+// course. Scoped by course_id alone (not an "approved" gate): a document
+// uploaded to a course is only ever read back for that same course's own
+// generation, so the trainer's act of uploading it here already is the
+// review step — the generated camps/lessons still go through their own
+// AI_DRAFT → APPROVED → PUBLISHED review before reaching a learner.
+export async function getCourseChunks(db, courseId) {
   return db.all(
     `SELECT c.* FROM knowledge_chunks c
      JOIN knowledge_documents d ON c.document_id = d.id
-     WHERE d.course_id = ? AND d.approved = 1
+     WHERE d.course_id = ?
      ORDER BY c.document_id, c.chunk_index`,
     [courseId]
   );
