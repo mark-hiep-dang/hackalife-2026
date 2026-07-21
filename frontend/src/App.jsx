@@ -72,7 +72,7 @@ export default function App() {
   function handleQuizFinished() { markStudiedToday(); fetchUserDossier(); }
   function handleStudyTopic(topicKey) { setFlashcardTopic(topicKey); setActiveTab('flashcards'); }
   function handlePathChanged(masteryUpdate) { setPathUpdateInfo(masteryUpdate); }
-  function handleAskLlama(context) { setChatContext(context); setActiveTab('chat'); }
+  function handleAskLlama(context) { setChatContext(context); setExpeditionActive(false); setActiveTab('chat'); }
 
   const t = useT();
 
