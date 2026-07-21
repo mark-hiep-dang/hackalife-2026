@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getOverview } from '../../utils/studioApi';
 import { Card, Stat, Spinner, Button } from '../components/ui';
+import { TrendChart, GaugeChart } from '../components/charts';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import { useT } from '../../translations';
 
@@ -27,6 +28,25 @@ export default function Overview({ onNavigate }) {
         <Stat label={t.studioStatActiveLearners} value={data.activeLearners} />
         <Stat label={t.studioStatAvgScore} value={data.averageMockExamScore ?? '—'} />
         <Stat label={t.studioStatPassRate} value={data.estimatedPassRate != null ? `${data.estimatedPassRate}%` : '—'} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="md:col-span-2">
+          <h3 className="font-extrabold text-[#101A24] mb-4">{t.studioMockExamTrendTitle}</h3>
+          <TrendChart
+            data={data.mockExamTrend}
+            series={[
+              { key: 'averageScore', label: t.studioTrendSeriesAvgScore, color: '#1E9E5A' },
+              { key: 'passRate', label: t.studioTrendSeriesPassRate, color: '#2178C4' }
+            ]}
+            xKey="round"
+            formatX={(v) => t.studioRoundLabel.replace('{n}', v)}
+            emptyMessage={t.studioMockExamTrendEmpty}
+          />
+        </Card>
+        <Card className="flex items-center justify-center">
+          <GaugeChart value={data.estimatedPassRate} label={t.studioStatPassRate} />
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

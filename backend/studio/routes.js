@@ -93,15 +93,20 @@ export function mountStudioRoutes(app, authenticateToken) {
         : { c: 0 };
 
       let averageScore = null, averagePassRate = null;
+      let mockExamTrend = [];
       if (cohortIds.length) {
-        const latestExam = await db.get(
-          `SELECT id FROM studio_mock_exams WHERE cohort_id IN (${cohortIds.join(',')}) ORDER BY round_number DESC LIMIT 1`
+        const exams = await db.all(
+          `SELECT id, round_number FROM studio_mock_exams WHERE cohort_id IN (${cohortIds.join(',')}) ORDER BY round_number ASC`
         );
-        if (latestExam) {
-          const attempts = await db.all('SELECT * FROM studio_mock_exam_attempts WHERE mock_exam_id = ?', [latestExam.id]);
+        for (const exam of exams) {
+          const attempts = await db.all('SELECT * FROM studio_mock_exam_attempts WHERE mock_exam_id = ?', [exam.id]);
+          if (attempts.length === 0) continue;
           const overview = calculateCohortOverview(attempts.map((a) => ({ score: a.score, totalQuestions: a.total_questions, completionTimeSeconds: a.completion_time_seconds, summitReadinessBefore: a.summit_readiness_before })), 70);
-          averageScore = overview.averageScore;
-          averagePassRate = overview.passRate;
+          mockExamTrend.push({ round: exam.round_number, averageScore: overview.averageScore, passRate: overview.passRate });
+        }
+        if (mockExamTrend.length > 0) {
+          averageScore = mockExamTrend[mockExamTrend.length - 1].averageScore;
+          averagePassRate = mockExamTrend[mockExamTrend.length - 1].passRate;
         }
       }
 
@@ -115,6 +120,7 @@ export function mountStudioRoutes(app, authenticateToken) {
         activeLearners: learnerCountRow.c,
         averageMockExamScore: averageScore,
         estimatedPassRate: averagePassRate,
+        mockExamTrend,
         coursesNeedingReview,
         misconceptionClustersOpen: clustersOpen.c,
         courses: courses.map((c) => ({ id: c.id, title: c.title, status: c.status, healthScore: c.health_score }))
