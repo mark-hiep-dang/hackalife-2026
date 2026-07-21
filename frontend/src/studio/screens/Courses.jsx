@@ -4,12 +4,10 @@ import {
   getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
-import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat } from '../components/ui';
+import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat, CAMP_COLORS } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import { Plus, ArrowLeft, Mountain, Sparkles, Upload, Pencil, Trash2 } from 'lucide-react';
 import { useT } from '../../translations';
-
-const CAMP_COLORS = ['bg-[#C7EFC4]', 'bg-[#B9E7EF]', 'bg-[#E3D9F5]', 'bg-[#FBE3B0]', 'bg-[#F5C9DA]'];
 
 function CreateCourseForm({ onCreated, onCancel }) {
   const t = useT();

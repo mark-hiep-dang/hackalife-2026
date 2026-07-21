@@ -12,6 +12,7 @@ import { generateCurriculumFromPrompt, generateLessonKit, generateContentFromDoc
 import { checkCourseQuality } from './engines/courseQuality.js';
 import { calculateCohortOverview, calculateTopicPerformance, classifyTrend } from './engines/mockExamAnalytics.js';
 import { detectLearnerRisk } from './engines/learnerRisk.js';
+import { detectOutlierPatterns } from './engines/outlierPatterns.js';
 import { analyzeQuestionQuality } from './engines/questionQuality.js';
 import { clusterMisconceptions } from './engines/misconceptionCluster.js';
 import { calculateInterventionEffectiveness } from './engines/interventionEffectiveness.js';
@@ -798,7 +799,8 @@ export function mountStudioRoutes(app, authenticateToken) {
     const daysUntilExam = prefs?.exam_date ? Math.max(0, Math.round((new Date(prefs.exam_date) - new Date()) / 86400000)) : undefined;
     const summitReadiness = await computeSummitReadiness(db, learner.id);
     const answers = await db.all(
-      `SELECT ua.topic, ua.is_correct, ua.confidence, ua.mistake_type FROM user_quiz_answers ua JOIN user_quizzes q ON ua.quiz_id = q.id WHERE q.user_id = ?`,
+      `SELECT ua.id, ua.topic, ua.is_correct, ua.confidence, ua.mistake_type, ua.difficulty, ua.response_time_ms
+       FROM user_quiz_answers ua JOIN user_quizzes q ON ua.quiz_id = q.id WHERE q.user_id = ? ORDER BY ua.id ASC`,
       [learner.id]
     );
     const wrongAnswers = answers.filter((a) => !a.is_correct);
@@ -808,7 +810,31 @@ export function mountStudioRoutes(app, authenticateToken) {
     const commonMistakeType = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     const topicMastery = await db.all('SELECT topic, mastery_score FROM topic_mastery WHERE user_id = ? ORDER BY mastery_score ASC', [learner.id]);
     const weakestTopic = topicMastery[0]?.topic?.replace(/^\d+\.\s*/, '') ?? null;
-    return { quizzes, scores, prefs, daysUntilExam, summitReadiness, answers, highConfidenceMistakeCount, commonMistakeType, weakestTopic };
+
+    // Outlier-pattern detection inputs (spec: "học sinh cá biệt" — unusual
+    // behavior, not just low mastery, which detectLearnerRisk already covers).
+    const masteryHistoryRows = await db.all(
+      'SELECT topic, mastery_score, created_at FROM mastery_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 60',
+      [learner.id]
+    );
+    const masteryHistory = masteryHistoryRows.reverse().map((r) => ({ topic: r.topic, masteryScore: r.mastery_score, createdAt: r.created_at }));
+    const rescueTrailRows = await db.all('SELECT completed_at FROM rescue_trail_log WHERE user_id = ?', [learner.id]);
+    const qualifyingRescueOpportunityCount = wrongAnswers.filter(
+      (a) => a.mistake_type === 'concept_confusion' || a.mistake_type === 'memory_decay'
+    ).length;
+    const topicMasteryByTopic = Object.fromEntries(topicMastery.map((t) => [t.topic, t.mastery_score]));
+
+    const outlierPatterns = detectOutlierPatterns({
+      masteryHistory,
+      recentActivityCount: quizzes.length,
+      answersChronological: answers.map((a) => ({ isCorrect: !!a.is_correct, difficulty: a.difficulty, responseTimeMs: a.response_time_ms, topic: a.topic })),
+      topicMasteryByTopic,
+      quizTimestampsChronological: quizzes.map((q) => q.created_at),
+      qualifyingRescueOpportunityCount,
+      rescueTrailOpenedCount: rescueTrailRows.length
+    });
+
+    return { quizzes, scores, prefs, daysUntilExam, summitReadiness, answers, highConfidenceMistakeCount, commonMistakeType, weakestTopic, masteryHistory, outlierPatterns };
   }
 
   // All real, non-trainer accounts that have actually studied (at least one
@@ -837,7 +863,8 @@ export function mountStudioRoutes(app, authenticateToken) {
       results.push({
         id: learner.id, name: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
         scoreTrend: classifyTrend(summary.scores), status: risk.status, reasons: risk.reasons,
-        recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType
+        recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType,
+        outlierPatterns: summary.outlierPatterns
       });
     }
     return results;
@@ -863,10 +890,15 @@ export function mountStudioRoutes(app, authenticateToken) {
         trend: classifyTrend(summary.scores), weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType
       }, db);
 
+      const masteryTrend = Object.entries(
+        summary.masteryHistory.reduce((acc, m) => { (acc[m.topic] ||= []).push(m.masteryScore); return acc; }, {})
+      ).map(([topic, points]) => ({ topic, points: points.slice(-8) }));
+
       res.json({
         learner, mockExamHistory: summary.scores, latestScore: summary.scores[summary.scores.length - 1] ?? null,
         scoreTrend: classifyTrend(summary.scores), topicPerformance: topicPerf, commonMistakeType: summary.commonMistakeType,
-        interventions: [], insight: insight.summary
+        interventions: [], insight: insight.summary,
+        outlierPatterns: summary.outlierPatterns, masteryTrend
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });

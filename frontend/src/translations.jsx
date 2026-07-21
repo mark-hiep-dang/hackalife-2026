@@ -500,6 +500,13 @@ const vi = {
   studioTrendInconsistent: 'Không ổn định',
   studioTrendInsufficientData: 'Chưa đủ dữ liệu',
 
+  studioOutlierTabList: 'Danh sách',
+  studioOutlierTabMountain: 'Học sinh cá biệt',
+  studioOutlierMountainTitle: 'Bản đồ kiểu học tập',
+  studioOutlierSummitLabel: 'Ổn định',
+  studioOutlierSummitEmpty: 'Chưa có học viên nào ở đây.',
+  studioOutlierPatternEmpty: 'Chưa có học viên nào khớp kiểu này.',
+
   studioExamsTitle: 'Thi thử',
   studioExamsSubtitle: 'Phân tích kết quả thi thử theo nhóm học.',
   studioTabOverview: 'Tổng quan',
@@ -1076,6 +1083,13 @@ const en = {
   studioTrendDeclining: 'Declining',
   studioTrendInconsistent: 'Inconsistent',
   studioTrendInsufficientData: 'Not enough data',
+
+  studioOutlierTabList: 'List',
+  studioOutlierTabMountain: 'Outlier learners',
+  studioOutlierMountainTitle: 'Learning pattern map',
+  studioOutlierSummitLabel: 'Stable',
+  studioOutlierSummitEmpty: 'No learners here yet.',
+  studioOutlierPatternEmpty: 'No learners match this pattern yet.',
 
   studioExamsTitle: 'Mock Exams',
   studioExamsSubtitle: 'Analyze mock exam results by cohort.',

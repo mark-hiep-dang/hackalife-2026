@@ -1,3 +1,5 @@
+export const CAMP_COLORS = ['bg-[#C7EFC4]', 'bg-[#B9E7EF]', 'bg-[#E3D9F5]', 'bg-[#FBE3B0]', 'bg-[#F5C9DA]'];
+
 export function Card({ children, className = '' }) {
   return <div className={`bg-white rounded-3xl border-3 border-[#101A24]/10 shadow-sm p-6 ${className}`}>{children}</div>;
 }
@@ -40,6 +42,28 @@ const RISK_STYLE = {
 };
 export function RiskBadge({ status }) {
   return <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2 py-1 rounded-md ${RISK_STYLE[status] || RISK_STYLE['Chưa đủ dữ liệu']}`}>{status}</span>;
+}
+
+const PATTERN_STYLE = {
+  'Chăm nhưng chưa lên': 'bg-[#FBE3B0] text-[#101A24]',
+  'Lên xuống thất thường': 'bg-[#E3D9F5] text-[#101A24]',
+  'Nghi đoán may rủi': 'bg-[#F5C9DA] text-[#101A24]',
+  'Học rồi nghỉ, nghỉ rồi học lại': 'bg-[#B9E7EF] text-[#101A24]',
+  'Im lặng, ít tương tác hỗ trợ': 'bg-[#EEF0F3] text-[#101A24]'
+};
+export function PatternBadge({ type, title }) {
+  return <span title={title} className={`text-[10px] font-extrabold uppercase tracking-widest px-2 py-1 rounded-md ${PATTERN_STYLE[type] || PATTERN_STYLE['Im lặng, ít tương tác hỗ trợ']}`}>{type}</span>;
+}
+
+export function Sparkline({ points = [], width = 100, height = 28, className = '' }) {
+  if (points.length < 2) return <span className="text-xs text-[#888]">—</span>;
+  const stepX = width / (points.length - 1);
+  const coords = points.map((p, i) => `${i * stepX},${height - (Math.max(0, Math.min(100, p)) / 100) * height}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className={className}>
+      <polyline points={coords} fill="none" stroke="#101A24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
