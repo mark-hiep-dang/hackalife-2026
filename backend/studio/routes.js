@@ -7,7 +7,7 @@
 import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
 import { getDb } from '../db.js';
-import { storeDocument } from '../knowledgeBase.js';
+import { storeDocument, decodeUploadedFilename } from '../knowledgeBase.js';
 import { generateCurriculumFromPrompt, generateLessonKit, generateContentFromDocument, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
 import { checkCourseQuality } from './engines/courseQuality.js';
 import { calculateCohortOverview, calculateTopicPerformance, classifyTrend } from './engines/mockExamAnalytics.js';
@@ -363,7 +363,8 @@ export function mountStudioRoutes(app, authenticateToken) {
       if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
       if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file để tải lên' });
 
-      const { originalname, mimetype, buffer } = req.file;
+      const { mimetype, buffer } = req.file;
+      const originalname = decodeUploadedFilename(req.file.originalname);
       let text = '';
       let sourceType = 'txt';
       if (mimetype === 'application/pdf' || originalname.toLowerCase().endsWith('.pdf')) {
@@ -393,6 +394,26 @@ export function mountStudioRoutes(app, authenticateToken) {
         id: d.id, title: d.title, sourceType: d.source_type, approved: !!d.approved,
         chunkCount: d.chunk_count, createdAt: d.created_at
       })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Blocked once the document's own chunks are actually cited by an
+  // approved/published lesson (same "don't silently destroy confirmed work"
+  // rule as camp/lesson delete above) — otherwise cascades via FK to its chunks.
+  app.delete('/api/studio/knowledge/:id', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const doc = await db.get('SELECT id FROM knowledge_documents WHERE id = ?', [req.params.id]);
+      if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+      const blocked = await db.get(
+        `SELECT 1 FROM studio_lessons l, json_each(COALESCE(l.source_chunk_ids, '[]')) je
+         JOIN knowledge_chunks c ON c.id = je.value
+         WHERE c.document_id = ? AND l.status IN ('APPROVED', 'PUBLISHED') LIMIT 1`,
+        [req.params.id]
+      );
+      if (blocked) return res.status(400).json({ error: 'Tài liệu này đang được trích dẫn trong chặng học đã duyệt/publish, không thể xoá trực tiếp.' });
+      await db.run('DELETE FROM knowledge_documents WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
