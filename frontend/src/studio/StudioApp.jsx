@@ -1,29 +1,19 @@
 import { useState } from 'react';
-import { LayoutDashboard, GraduationCap, Library, Users2, UserCircle2, ClipboardList, Lightbulb, UploadCloud, LogOut, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, GraduationCap, Users2, LogOut, ArrowLeftRight } from 'lucide-react';
 import llamaLogo from '../assets/llama-logo.png';
 import { switchRole } from '../utils/studioApi';
 import { useT, useLanguage } from '../translations';
 
 import Overview from './screens/Overview';
 import Courses from './screens/Courses';
-import ContentLibrary from './screens/ContentLibrary';
-import Cohorts from './screens/Cohorts';
-import LearnersAtRisk from './screens/LearnersAtRisk';
-import MockExamAnalytics from './screens/MockExamAnalytics';
-import Insights from './screens/Insights';
-import PublishCenter from './screens/PublishCenter';
+import LearnersAndExams from './screens/LearnersAndExams';
 import TrainerCopilot from './components/TrainerCopilot';
 
 function getNav(t) {
   return [
     { id: 'overview', icon: LayoutDashboard, label: t.studioNavOverview },
     { id: 'courses', icon: GraduationCap, label: t.studioNavCourses },
-    { id: 'library', icon: Library, label: t.studioNavLibrary },
-    { id: 'cohorts', icon: Users2, label: t.studioNavCohorts },
-    { id: 'learners', icon: UserCircle2, label: t.studioNavLearners },
-    { id: 'exams', icon: ClipboardList, label: t.studioNavExams },
-    { id: 'insights', icon: Lightbulb, label: t.studioNavInsights },
-    { id: 'publish', icon: UploadCloud, label: t.studioNavPublish }
+    { id: 'learners-exams', icon: Users2, label: t.studioNavLearnersExams }
   ];
 }
 
@@ -118,12 +108,7 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
         <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-8 md:py-12">
           {tab === 'overview' && <Overview onNavigate={setTab} />}
           {tab === 'courses' && <Courses />}
-          {tab === 'library' && <ContentLibrary />}
-          {tab === 'cohorts' && <Cohorts onNavigate={setTab} />}
-          {tab === 'learners' && <LearnersAtRisk />}
-          {tab === 'exams' && <MockExamAnalytics />}
-          {tab === 'insights' && <Insights />}
-          {tab === 'publish' && <PublishCenter />}
+          {tab === 'learners-exams' && <LearnersAndExams />}
         </div>
       </main>
       <TrainerCopilot />

@@ -52,9 +52,11 @@ export default function LearnerProfile({ learnerId, onBack }) {
         </div>
       </Card>
 
-      {data.interventions.length > 0 && (
-        <Card>
-          <h3 className="font-extrabold text-[#101A24] mb-3">{t.studioAssignedInterventions}</h3>
+      <Card>
+        <h3 className="font-extrabold text-[#101A24] mb-3">{t.studioAssignedInterventions}</h3>
+        {data.interventions.length === 0 ? (
+          <p className="text-sm text-[#888]">{t.studioNoInterventionsYet}</p>
+        ) : (
           <div className="flex flex-col gap-2">
             {data.interventions.map((iv) => (
               <div key={iv.id} className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#101A24]/10 text-sm">
@@ -63,8 +65,8 @@ export default function LearnerProfile({ learnerId, onBack }) {
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
     </div>
   );
 }

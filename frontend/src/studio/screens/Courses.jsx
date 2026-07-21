@@ -6,6 +6,8 @@ import {
 } from '../../utils/studioApi';
 import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat, CAMP_COLORS } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
+import ContentLibrary from './ContentLibrary';
+import PublishCenter from './PublishCenter';
 import { Plus, ArrowLeft, Mountain, Sparkles, Upload, Pencil, Trash2 } from 'lucide-react';
 import { useT } from '../../translations';
 
@@ -380,9 +382,11 @@ function CourseDetail({ courseId, onBack }) {
 
       {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} />}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Button variant={tab === 'architect' ? 'primary' : 'secondary'} onClick={() => setTab('architect')}>{t.studioCourseArchitectTab}</Button>
         <Button variant={tab === 'quality' ? 'primary' : 'secondary'} onClick={() => setTab('quality')}>{t.studioCourseQualityTab}</Button>
+        <Button variant={tab === 'library' ? 'primary' : 'secondary'} onClick={() => setTab('library')}>{t.studioNavLibrary}</Button>
+        <Button variant={tab === 'publish' ? 'primary' : 'secondary'} onClick={() => setTab('publish')}>{t.studioNavPublish}</Button>
       </div>
 
       {tab === 'architect' && (() => {
@@ -442,6 +446,9 @@ function CourseDetail({ courseId, onBack }) {
           ) : <EmptyState>{t.studioNoQualityCheckYet}</EmptyState>}
         </Card>
       )}
+
+      {tab === 'library' && <ContentLibrary bundle={bundle} onChanged={load} />}
+      {tab === 'publish' && <PublishCenter courseId={courseId} bundle={bundle} quality={quality} onRunQualityCheck={handleQualityCheck} busy={busy} />}
     </div>
   );
 }

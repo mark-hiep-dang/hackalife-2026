@@ -118,7 +118,7 @@ export default function Overview({ onNavigate }) {
           <h3 className="font-comic font-extrabold text-base text-[#101A24] mb-1.5">{t.studioClustersOpenTitle}</h3>
           <p className="text-sm font-bold text-[#8A2F55] mb-4">{t.studioClustersOpenDesc.replace('{count}', data.misconceptionClustersOpen)}</p>
           <button
-            onClick={() => onNavigate('insights')}
+            onClick={() => onNavigate('learners-exams')}
             className="bg-[#101A24] text-white font-comic font-extrabold text-sm px-5 py-3 rounded-2xl"
             style={{ boxShadow: '0 4px 0 rgba(0,0,0,0.25)' }}
           >

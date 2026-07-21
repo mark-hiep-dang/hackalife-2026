@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getCourses, getCourse, generateLessonKit, reviewContentItem, rewriteContentItem, createContentItem, deleteContentItem } from '../../utils/studioApi';
-import { Card, SectionTitle, Button, Spinner, EmptyState } from '../components/ui';
+import { generateLessonKit, reviewContentItem, rewriteContentItem, createContentItem, deleteContentItem } from '../../utils/studioApi';
+import { Card, Button, Spinner, EmptyState } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import { Sparkles, Check, X, Pencil, RefreshCw, Plus, Trash2, Flag } from 'lucide-react';
 import { useT } from '../../translations';
@@ -268,55 +268,33 @@ function LessonPanel({ lesson, items, onChanged, t }) {
   );
 }
 
-export default function ContentLibrary() {
+// Rendered as a tab inside CourseDetail (Courses.jsx) — `bundle` (course +
+// camps + lessons + contentItems) and `onChanged` (re-fetch) are owned by the
+// parent so this never needs its own course-selection or bundle fetch.
+export default function ContentLibrary({ bundle, onChanged }) {
   const t = useT();
-  const [courses, setCourses] = useState(null);
-  const [courseId, setCourseId] = useState(null);
-  const [bundle, setBundle] = useState(null);
   const [lessonId, setLessonId] = useState(null);
 
-  useEffect(() => { getCourses().then((cs) => { setCourses(cs); if (cs.length) setCourseId(cs[0].id); }); }, []);
+  useEffect(() => { if (!lessonId && bundle?.lessons?.length) setLessonId(bundle.lessons[0].id); }, [bundle]);
 
-  async function loadBundle() {
-    if (!courseId) return;
-    const b = await getCourse(courseId);
-    setBundle(b);
-    if (!lessonId && b.lessons.length) setLessonId(b.lessons[0].id);
-  }
-  useEffect(() => { loadBundle(); }, [courseId]);
+  if (!bundle) return <Spinner label={t.studioLoading} />;
+  if (bundle.lessons.length === 0) return <EmptyState>{t.studioNoLessonsYet}</EmptyState>;
 
-  if (!courses) return <Spinner label={t.studioLoading} />;
-  if (courses.length === 0) return <EmptyState>{t.studioNoCoursesForLibrary}</EmptyState>;
-
-  const lesson = bundle?.lessons.find((l) => l.id === lessonId);
-  const items = bundle?.contentItems.filter((c) => c.lessonId === lessonId) || [];
+  const lesson = bundle.lessons.find((l) => l.id === lessonId);
+  const items = bundle.contentItems.filter((c) => c.lessonId === lessonId);
 
   return (
-    <div className="flex flex-col gap-6">
-      <SectionTitle subtitle={t.studioLibrarySubtitle}>{t.studioLibraryTitle}</SectionTitle>
-
-      <div className="flex gap-3 flex-wrap">
-        <select value={courseId || ''} onChange={(e) => { setCourseId(Number(e.target.value)); setLessonId(null); }} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm font-bold">
-          {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-        </select>
+    <div className="flex gap-6 flex-col md:flex-row">
+      <div className="md:w-64 shrink-0 flex flex-col gap-2">
+        {bundle.lessons.map((l) => (
+          <button key={l.id} onClick={() => setLessonId(l.id)}
+            className={`text-left px-4 py-2.5 rounded-xl text-sm font-bold border ${lessonId === l.id ? 'bg-[#E3D9F5] border-[#101A24]/10' : 'bg-white border-[#101A24]/10 hover:bg-[#F5F6F8]'}`}
+          >{l.title}</button>
+        ))}
       </div>
-
-      {!bundle ? <Spinner label={t.studioLoading} /> : bundle.lessons.length === 0 ? (
-        <EmptyState>{t.studioNoLessonsYet}</EmptyState>
-      ) : (
-        <div className="flex gap-6 flex-col md:flex-row">
-          <div className="md:w-64 shrink-0 flex flex-col gap-2">
-            {bundle.lessons.map((l) => (
-              <button key={l.id} onClick={() => setLessonId(l.id)}
-                className={`text-left px-4 py-2.5 rounded-xl text-sm font-bold border ${lessonId === l.id ? 'bg-[#E3D9F5] border-[#101A24]/10' : 'bg-white border-[#101A24]/10 hover:bg-[#F5F6F8]'}`}
-              >{l.title}</button>
-            ))}
-          </div>
-          <div className="flex-1">
-            {lesson && <LessonPanel lesson={lesson} items={items} onChanged={loadBundle} t={t} />}
-          </div>
-        </div>
-      )}
+      <div className="flex-1">
+        {lesson && <LessonPanel lesson={lesson} items={items} onChanged={onChanged} t={t} />}
+      </div>
     </div>
   );
 }

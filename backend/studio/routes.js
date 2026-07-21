@@ -78,6 +78,123 @@ function toLessonDTO(l) {
 
 const studioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
+async function getCohortMockExams(db, cohortId) {
+  return db.all('SELECT * FROM studio_mock_exams WHERE cohort_id = ? ORDER BY round_number', [cohortId]);
+}
+
+// Roster size for the "attempted N/M" KPI — attemptedCount (from
+// calculateCohortOverview) is only ever attempt-row count, never compared
+// against how many learners are actually enrolled in the cohort.
+export async function getCohortRosterSize(db, cohortId) {
+  const row = await db.get('SELECT COUNT(*) c FROM studio_cohort_learners WHERE cohort_id = ?', [cohortId]);
+  return row.c;
+}
+
+// Interventions assigned to a specific learner, across any cluster/cohort —
+// backs the learner-profile detail view's read-only "assigned interventions" card.
+export async function getLearnerInterventions(db, learnerId) {
+  return db.all(
+    `SELECT sia.intervention_id as id, si.title, sia.completed_at
+     FROM studio_intervention_assignments sia
+     JOIN studio_interventions si ON si.id = sia.intervention_id
+     WHERE sia.learner_id = ? ORDER BY sia.assigned_at DESC`,
+    [learnerId]
+  );
+}
+
+// Real learners (spec follow-up): reuses the same deterministic engines as
+// the cohort/mock-exam demo, but reads from the actual learner-app tables
+// (user_quizzes/user_quiz_answers/topic_mastery) instead of the seeded
+// studio_mock_exam_* demo data — this is the trainer's real student roster,
+// not the hackathon-demo cohort.
+async function computeRealLearnerSummary(db, learner) {
+  const quizzes = await db.all('SELECT score, total_questions, created_at FROM user_quizzes WHERE user_id = ? ORDER BY created_at', [learner.id]);
+  const scores = quizzes.map((q) => Math.round((q.score / q.total_questions) * 100));
+  const prefs = await db.get('SELECT target_score, exam_date FROM learner_preferences WHERE user_id = ?', [learner.id]);
+  const daysUntilExam = prefs?.exam_date ? Math.max(0, Math.round((new Date(prefs.exam_date) - new Date()) / 86400000)) : undefined;
+  const summitReadiness = await computeSummitReadiness(db, learner.id);
+  const answers = await db.all(
+    `SELECT ua.id, ua.topic, ua.is_correct, ua.confidence, ua.mistake_type, ua.difficulty, ua.response_time_ms
+     FROM user_quiz_answers ua JOIN user_quizzes q ON ua.quiz_id = q.id WHERE q.user_id = ? ORDER BY ua.id ASC`,
+    [learner.id]
+  );
+  const wrongAnswers = answers.filter((a) => !a.is_correct);
+  const highConfidenceMistakeCount = wrongAnswers.filter((a) => a.confidence === 'certain').length;
+  const mistakeCounts = {};
+  for (const a of wrongAnswers) if (a.mistake_type) mistakeCounts[a.mistake_type] = (mistakeCounts[a.mistake_type] || 0) + 1;
+  const commonMistakeType = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const topicMastery = await db.all('SELECT topic, mastery_score FROM topic_mastery WHERE user_id = ? ORDER BY mastery_score ASC', [learner.id]);
+  const weakestTopic = topicMastery[0]?.topic?.replace(/^\d+\.\s*/, '') ?? null;
+
+  // Outlier-pattern detection inputs (spec: "học sinh cá biệt" — unusual
+  // behavior, not just low mastery, which detectLearnerRisk already covers).
+  const masteryHistoryRows = await db.all(
+    'SELECT topic, mastery_score, created_at FROM mastery_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 60',
+    [learner.id]
+  );
+  const masteryHistory = masteryHistoryRows.reverse().map((r) => ({ topic: r.topic, masteryScore: r.mastery_score, createdAt: r.created_at }));
+  const rescueTrailRows = await db.all('SELECT completed_at FROM rescue_trail_log WHERE user_id = ?', [learner.id]);
+  const qualifyingRescueOpportunityCount = wrongAnswers.filter(
+    (a) => a.mistake_type === 'concept_confusion' || a.mistake_type === 'memory_decay'
+  ).length;
+  const topicMasteryByTopic = Object.fromEntries(topicMastery.map((t) => [t.topic, t.mastery_score]));
+
+  const outlierPatterns = detectOutlierPatterns({
+    masteryHistory,
+    recentActivityCount: quizzes.length,
+    answersChronological: answers.map((a) => ({ isCorrect: !!a.is_correct, difficulty: a.difficulty, responseTimeMs: a.response_time_ms, topic: a.topic })),
+    topicMasteryByTopic,
+    quizTimestampsChronological: quizzes.map((q) => q.created_at),
+    qualifyingRescueOpportunityCount,
+    rescueTrailOpenedCount: rescueTrailRows.length
+  });
+
+  return { quizzes, scores, prefs, daysUntilExam, summitReadiness, answers, highConfidenceMistakeCount, commonMistakeType, weakestTopic, masteryHistory, outlierPatterns };
+}
+
+// All real, non-trainer accounts that have actually studied (at least one
+// quiz/exam attempt) — the trainer's real student roster. Pass cohortId to
+// scope to that cohort's roster only (studio_cohort_learners) instead of
+// every real learner account system-wide. Exported for direct node:test
+// coverage of the cohort-scoping behavior.
+export async function getRealLearnerAccounts(db, cohortId) {
+  const learners = cohortId
+    ? await db.all(
+        `SELECT u.id, u.username FROM users u
+         JOIN studio_cohort_learners cl ON cl.learner_id = u.id
+         WHERE cl.cohort_id = ? AND (u.role IS NULL OR u.role != 'trainer')`,
+        [cohortId]
+      )
+    : await db.all("SELECT id, username FROM users WHERE role IS NULL OR role != 'trainer'");
+  const active = [];
+  for (const learner of learners) {
+    const hasActivity = await db.get('SELECT 1 FROM user_quizzes WHERE user_id = ? LIMIT 1', [learner.id]);
+    if (hasActivity) active.push(learner);
+  }
+  return active;
+}
+
+export async function getRealLearnersWithRisk(db, cohortId) {
+  const learners = await getRealLearnerAccounts(db, cohortId);
+  const results = [];
+  for (const learner of learners) {
+    const summary = await computeRealLearnerSummary(db, learner);
+    const risk = detectLearnerRisk({
+      recentScoresChronological: summary.scores, targetScore: summary.prefs?.target_score || 70,
+      summitReadiness: summary.summitReadiness, daysUntilExam: summary.daysUntilExam,
+      highConfidenceMistakeCount: summary.highConfidenceMistakeCount,
+      hasAttemptedAssigned: true, recentActivityCount: summary.quizzes.length
+    });
+    results.push({
+      id: learner.id, name: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
+      scoreHistory: summary.scores, scoreTrend: classifyTrend(summary.scores), status: risk.status, reasons: risk.reasons,
+      recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType,
+      outlierPatterns: summary.outlierPatterns
+    });
+  }
+  return results;
+}
+
 export function mountStudioRoutes(app, authenticateToken) {
   const T = [authenticateToken, requireTrainer];
 
@@ -678,17 +795,13 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
-      const learners = await getRealLearnerAccounts(db);
+      const learners = await getRealLearnerAccounts(db, cohort.id);
       const mockExams = await db.all('SELECT * FROM studio_mock_exams WHERE cohort_id = ? ORDER BY round_number', [cohort.id]);
       res.json({ cohort, learners, mockExams });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
   // ── Mock Exam Analytics ─────────────────────────────────────────────────
-  async function getCohortMockExams(db, cohortId) {
-    return db.all('SELECT * FROM studio_mock_exams WHERE cohort_id = ? ORDER BY round_number', [cohortId]);
-  }
-
   app.get('/api/studio/cohorts/:id/mock-exam-analytics', ...T, async (req, res) => {
     const db = req.db;
     try {
@@ -741,6 +854,8 @@ export function mountStudioRoutes(app, authenticateToken) {
         weakestTopic: topics[0]?.topic?.replace(/^\d+\.\s*/, ''), passRate: overview.passRate
       }, db);
 
+      overview.rosterSize = await getCohortRosterSize(db, cohort.id);
+
       res.json({ overview, topics, trend, cohortTrend, insight: insight.summary, latestExamId: latestExam.id });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -789,92 +904,9 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const cohort = await db.get('SELECT * FROM studio_cohorts WHERE id = ?', [req.params.id]);
       if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
-      res.json(await getRealLearnersWithRisk(db));
+      res.json(await getRealLearnersWithRisk(db, cohort.id));
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
-
-  // Real learners (spec follow-up): reuses the same deterministic engines as
-  // the cohort/mock-exam demo, but reads from the actual learner-app tables
-  // (user_quizzes/user_quiz_answers/topic_mastery) instead of the seeded
-  // studio_mock_exam_* demo data — this is the trainer's real student roster,
-  // not the hackathon-demo cohort.
-  async function computeRealLearnerSummary(db, learner) {
-    const quizzes = await db.all('SELECT score, total_questions, created_at FROM user_quizzes WHERE user_id = ? ORDER BY created_at', [learner.id]);
-    const scores = quizzes.map((q) => Math.round((q.score / q.total_questions) * 100));
-    const prefs = await db.get('SELECT target_score, exam_date FROM learner_preferences WHERE user_id = ?', [learner.id]);
-    const daysUntilExam = prefs?.exam_date ? Math.max(0, Math.round((new Date(prefs.exam_date) - new Date()) / 86400000)) : undefined;
-    const summitReadiness = await computeSummitReadiness(db, learner.id);
-    const answers = await db.all(
-      `SELECT ua.id, ua.topic, ua.is_correct, ua.confidence, ua.mistake_type, ua.difficulty, ua.response_time_ms
-       FROM user_quiz_answers ua JOIN user_quizzes q ON ua.quiz_id = q.id WHERE q.user_id = ? ORDER BY ua.id ASC`,
-      [learner.id]
-    );
-    const wrongAnswers = answers.filter((a) => !a.is_correct);
-    const highConfidenceMistakeCount = wrongAnswers.filter((a) => a.confidence === 'certain').length;
-    const mistakeCounts = {};
-    for (const a of wrongAnswers) if (a.mistake_type) mistakeCounts[a.mistake_type] = (mistakeCounts[a.mistake_type] || 0) + 1;
-    const commonMistakeType = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-    const topicMastery = await db.all('SELECT topic, mastery_score FROM topic_mastery WHERE user_id = ? ORDER BY mastery_score ASC', [learner.id]);
-    const weakestTopic = topicMastery[0]?.topic?.replace(/^\d+\.\s*/, '') ?? null;
-
-    // Outlier-pattern detection inputs (spec: "học sinh cá biệt" — unusual
-    // behavior, not just low mastery, which detectLearnerRisk already covers).
-    const masteryHistoryRows = await db.all(
-      'SELECT topic, mastery_score, created_at FROM mastery_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 60',
-      [learner.id]
-    );
-    const masteryHistory = masteryHistoryRows.reverse().map((r) => ({ topic: r.topic, masteryScore: r.mastery_score, createdAt: r.created_at }));
-    const rescueTrailRows = await db.all('SELECT completed_at FROM rescue_trail_log WHERE user_id = ?', [learner.id]);
-    const qualifyingRescueOpportunityCount = wrongAnswers.filter(
-      (a) => a.mistake_type === 'concept_confusion' || a.mistake_type === 'memory_decay'
-    ).length;
-    const topicMasteryByTopic = Object.fromEntries(topicMastery.map((t) => [t.topic, t.mastery_score]));
-
-    const outlierPatterns = detectOutlierPatterns({
-      masteryHistory,
-      recentActivityCount: quizzes.length,
-      answersChronological: answers.map((a) => ({ isCorrect: !!a.is_correct, difficulty: a.difficulty, responseTimeMs: a.response_time_ms, topic: a.topic })),
-      topicMasteryByTopic,
-      quizTimestampsChronological: quizzes.map((q) => q.created_at),
-      qualifyingRescueOpportunityCount,
-      rescueTrailOpenedCount: rescueTrailRows.length
-    });
-
-    return { quizzes, scores, prefs, daysUntilExam, summitReadiness, answers, highConfidenceMistakeCount, commonMistakeType, weakestTopic, masteryHistory, outlierPatterns };
-  }
-
-  // All real, non-trainer accounts that have actually studied (at least one
-  // quiz/exam attempt) — the trainer's real student roster.
-  async function getRealLearnerAccounts(db) {
-    const learners = await db.all("SELECT id, username FROM users WHERE role IS NULL OR role != 'trainer'");
-    const active = [];
-    for (const learner of learners) {
-      const hasActivity = await db.get('SELECT 1 FROM user_quizzes WHERE user_id = ? LIMIT 1', [learner.id]);
-      if (hasActivity) active.push(learner);
-    }
-    return active;
-  }
-
-  async function getRealLearnersWithRisk(db) {
-    const learners = await getRealLearnerAccounts(db);
-    const results = [];
-    for (const learner of learners) {
-      const summary = await computeRealLearnerSummary(db, learner);
-      const risk = detectLearnerRisk({
-        recentScoresChronological: summary.scores, targetScore: summary.prefs?.target_score || 70,
-        summitReadiness: summary.summitReadiness, daysUntilExam: summary.daysUntilExam,
-        highConfidenceMistakeCount: summary.highConfidenceMistakeCount,
-        hasAttemptedAssigned: true, recentActivityCount: summary.quizzes.length
-      });
-      results.push({
-        id: learner.id, name: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
-        scoreTrend: classifyTrend(summary.scores), status: risk.status, reasons: risk.reasons,
-        recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType,
-        outlierPatterns: summary.outlierPatterns
-      });
-    }
-    return results;
-  }
 
   app.get('/api/studio/learners', ...T, async (req, res) => {
     const db = req.db;
@@ -900,10 +932,12 @@ export function mountStudioRoutes(app, authenticateToken) {
         summary.masteryHistory.reduce((acc, m) => { (acc[m.topic] ||= []).push(m.masteryScore); return acc; }, {})
       ).map(([topic, points]) => ({ topic, points: points.slice(-8) }));
 
+      const interventions = await getLearnerInterventions(db, learner.id);
+
       res.json({
         learner, mockExamHistory: summary.scores, latestScore: summary.scores[summary.scores.length - 1] ?? null,
         scoreTrend: classifyTrend(summary.scores), topicPerformance: topicPerf, commonMistakeType: summary.commonMistakeType,
-        interventions: [], insight: insight.summary,
+        interventions, insight: insight.summary,
         outlierPatterns: summary.outlierPatterns, masteryTrend
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
