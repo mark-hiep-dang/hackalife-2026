@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getFlashcards, getFlashcardTopics, markFlashcardProgress } from '../utils/api';
+import { getFlashcards, getFlashcardTopics, markFlashcardProgress, completeFlashcardReview } from '../utils/api';
 import { playPang, playChiu } from '../utils/sound';
 import { pickFlashcardTip } from '../llamaResponses';
 import { useT, useLanguage } from '../translations';
@@ -19,7 +19,7 @@ const TOPIC_STYLES = [
   { bg: '#FBEAE6', color: '#C46A4F', subColor: '#E0977E' }
 ];
 
-export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack }) {
+export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack, initialTopics, activityContext, onActivityFinished }) {
   const t = useT();
   const { lang } = useLanguage();
   const [topics, setTopics] = useState([]);
@@ -53,13 +53,34 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTopic]);
 
-  async function openDeck(topic) {
-    setSelectedTopic(topic);
+  // Embedded Expedition activity (spec §8) — scopes the deck to the focus
+  // lesson's mapped topics instead of the free topic picker.
+  useEffect(() => {
+    if (initialTopics?.length) openDeck(initialTopics, activityContext?.count);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTopics]);
+
+  async function openDeck(topic, limit) {
+    setSelectedTopic(Array.isArray(topic) ? '__lesson' : topic);
     setLoading(true); setError(''); setIdx(0); setFlipped(false); setKnown(0); setUnknown(0); setDone(false);
-    try { setCards(await getFlashcards(topic === '__random' ? undefined : topic)); }
+    try {
+      const all = await getFlashcards(topic === '__random' ? undefined : topic);
+      // The Expedition allocates a lesson's flashcard review to a small,
+      // time-boxed count (e.g. "Ôn lại 2 flashcard") — the topic itself can
+      // hold far more cards than that, so only the deck picker's full-topic
+      // browsing should ever show every card.
+      setCards(limit ? all.slice(0, limit) : all);
+    }
     catch (e) { setError(e.message || t.fcCardsLoadError); }
     finally { setLoading(false); }
   }
+
+  useEffect(() => {
+    if (done && activityContext?.lessonId) {
+      completeFlashcardReview(activityContext.lessonId).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
 
   function backToTopics() {
     setSelectedTopic(null); setCards([]); setIdx(0); setFlipped(false); setError('');
@@ -170,14 +191,16 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
       {!loading && !error && !done && card && (
         <>
           <div className="flex items-center gap-3 mb-1">
-            <button
-              onClick={backToTopics}
-              className="border-none cursor-pointer bg-white rounded-2xl py-2 px-3.5 font-comic font-bold text-[13px] text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
-            >
-              {t.fcBackToTopics}
-            </button>
+            {!activityContext && (
+              <button
+                onClick={backToTopics}
+                className="border-none cursor-pointer bg-white rounded-2xl py-2 px-3.5 font-comic font-bold text-[13px] text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
+              >
+                {t.fcBackToTopics}
+              </button>
+            )}
             <h2 className="font-comic font-extrabold text-lg text-[#101A24] uppercase tracking-wide truncate">
-              {selectedTopic === '__random' ? `🔀 ${t.fcRandomMix}` : `📖 ${selectedTopic}`}
+              {selectedTopic === '__random' ? `🔀 ${t.fcRandomMix}` : selectedTopic === '__lesson' ? `🗂️ ${t.rescueTrailFlashcardLabel}` : `📖 ${selectedTopic}`}
             </h2>
           </div>
           <p className="text-sm font-bold text-[#8A8A8A] mb-4">{t.fcTapHint}</p>
@@ -290,20 +313,29 @@ export default function Flashcards({ initialTopic, onConsumeInitialTopic, onBack
               <div className="text-[11px] font-extrabold text-[#C46A4F] uppercase">{t.fcNotKnownLabel}</div>
             </div>
           </div>
-          <div className="flex gap-3">
+          {activityContext ? (
             <button
-              onClick={backToTopics}
-              className="flex-1 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-4 font-comic font-bold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
+              onClick={onActivityFinished}
+              className="w-full border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-[15px] text-[#20606E] shadow-[0_4px_14px_rgba(59,147,168,0.2)]"
             >
-              {t.fcAnotherTopicBtn}
+              {t.expeditionBackToPlayerBtn}
             </button>
-            <button
-              onClick={restartDeck}
-              className="flex-[2] border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-[15px] text-[#20606E] shadow-[0_4px_14px_rgba(59,147,168,0.2)]"
-            >
-              {t.fcRestartBtn}
-            </button>
-          </div>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={backToTopics}
+                className="flex-1 border-none cursor-pointer bg-[#EEF0F3] rounded-2xl py-4 font-comic font-bold text-sm text-[#101A24] shadow-[0_4px_14px_rgba(0,0,0,0.06)]"
+              >
+                {t.fcAnotherTopicBtn}
+              </button>
+              <button
+                onClick={restartDeck}
+                className="flex-[2] border-none cursor-pointer bg-[#B9E7EF] rounded-2xl py-4 font-comic font-extrabold text-[15px] text-[#20606E] shadow-[0_4px_14px_rgba(59,147,168,0.2)]"
+              >
+                {t.fcRestartBtn}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

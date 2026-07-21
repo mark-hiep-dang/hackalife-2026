@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useT } from '../translations';
-import { getDailyExpedition, completeDailyExpedition } from '../utils/api';
+import { getDailyExpedition } from '../utils/api';
+import { getCampInfo } from './LessonPath';
+import { ACTIVITY_ICON } from '../expeditionCopy';
 import { Compass, Sparkles } from 'lucide-react';
-
-const ACTIVITY_ICON = { warmup: '🔥', practice: '🎯', flashcard: '🗂️', rescue: '🧗', checkpoint: '🏁' };
 
 function stripTopicIndex(topic) {
   return topic ? topic.replace(/^\d+\.\s*/, '') : '';
 }
 
-export default function DailyExpedition({ onNavigate, onStartRescue }) {
+export default function DailyExpedition({ lessons, onOpenExpedition }) {
   const t = useT();
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,23 +20,10 @@ export default function DailyExpedition({ onNavigate, onStartRescue }) {
 
   if (loading || !plan) return null;
 
-  async function handleStart() {
-    const rescueActivity = plan.activities.find((a) => a.type === 'rescue');
-    if (rescueActivity && onStartRescue) {
-      onStartRescue({ topic: rescueActivity.topic, mistakeType: rescueActivity.mistakeType });
-      return;
-    }
-    onNavigate?.('quiz');
-  }
-
-  async function handleMarkDone() {
-    try {
-      await completeDailyExpedition();
-      setPlan((p) => ({ ...p, completed: true }));
-    } catch (err) {
-      console.error(err);
-    }
-  }
+  const doneCount = plan.activities.filter((a) => a.status === 'COMPLETED').length;
+  const focusIdx = lessons?.findIndex((l) => l.id === plan.focusLessonId) ?? -1;
+  const campInfo = focusIdx >= 0 ? getCampInfo(focusIdx, lessons.length, t) : null;
+  const focusLesson = focusIdx >= 0 ? lessons[focusIdx] : null;
 
   return (
     <div
@@ -50,18 +37,18 @@ export default function DailyExpedition({ onNavigate, onStartRescue }) {
         </span>
       </div>
 
-      {plan.focusTopic && (
+      {(campInfo || plan.focusTopic) && (
         <p className="text-sm font-bold text-[#101A24] mb-4">
           <span className="uppercase tracking-widest text-xs text-[#6B4FA8]">{t.expeditionGoalLabel}</span>{' '}
-          {stripTopicIndex(plan.focusTopic)}
+          {campInfo ? `${campInfo.label} · ${focusLesson?.title_vn || ''}` : stripTopicIndex(plan.focusTopic)}
         </p>
       )}
 
       <div className="flex flex-col gap-2 mb-5">
-        {plan.activities.map((a, i) => (
-          <div key={i} className="flex items-center gap-3 bg-white/70 rounded-xl px-4 py-2.5">
-            <span className="text-lg shrink-0">{ACTIVITY_ICON[a.type] || '📌'}</span>
-            <span className="flex-1 text-sm font-bold text-[#101A24]">{a.type === 'rescue' ? t.activity_rescue : a.label}</span>
+        {plan.activities.map((a) => (
+          <div key={a.activityId} className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${a.status === 'COMPLETED' ? 'bg-white/40' : 'bg-white/70'}`}>
+            <span className="text-lg shrink-0">{a.status === 'COMPLETED' ? '✅' : (ACTIVITY_ICON[a.type] || '📌')}</span>
+            <span className={`flex-1 text-sm font-bold ${a.status === 'COMPLETED' ? 'text-[#8A8A8A] line-through' : 'text-[#101A24]'}`}>{a.label}</span>
             <span className="text-xs font-extrabold text-[#8A6D1F] shrink-0">{t.expeditionMinutesShort.replace('{n}', a.minutes)}</span>
           </div>
         ))}
@@ -75,20 +62,13 @@ export default function DailyExpedition({ onNavigate, onStartRescue }) {
         </div>
       </div>
 
-      {plan.completed ? (
-        <div className="w-full text-center bg-white/70 rounded-2xl py-4 font-comic font-extrabold text-[#4F9A5A]">
-          {t.expeditionDoneBtn}
-        </div>
-      ) : (
-        <div className="flex gap-3">
-          <button onClick={handleStart} className="flex-1 btn-pro bg-[#101A24] text-white hover:bg-[#0A1119] py-4 text-lg">
-            {t.expeditionStartBtn}
-          </button>
-          <button onClick={handleMarkDone} className="btn-pro bg-white/70 text-[#101A24] py-4 px-5 text-sm">
-            ✓
-          </button>
-        </div>
-      )}
+      <button onClick={onOpenExpedition} className="w-full btn-pro bg-[#101A24] text-white hover:bg-[#0A1119] py-4 text-lg">
+        {plan.completed
+          ? t.expeditionViewResultsBtn
+          : doneCount === 0
+            ? t.expeditionStartBtn
+            : t.expeditionResumeProgress.replace('{done}', doneCount).replace('{total}', plan.activities.length)}
+      </button>
     </div>
   );
 }

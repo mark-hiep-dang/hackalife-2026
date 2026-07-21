@@ -26,7 +26,7 @@ const CONFIDENCE_OPTIONS = [
   { code: 'guessing', labelKey: 'confidence_guessing' }
 ];
 
-export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialRescue, onConsumeInitialRescue, onPathChanged, onAskLlama }) {
+export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialRescue, onConsumeInitialRescue, onPathChanged, onAskLlama, activityContext }) {
   const t = useT();
   const { lang } = useLanguage();
   const [topic, setTopic] = useState('all');
@@ -59,6 +59,17 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
   const [rescueNeeded, setRescueNeeded] = useState(null);
   const [pendingRescue, setPendingRescue] = useState(initialRescue || null);
 
+  // Embedded Expedition activity (spec §8): skip mode-select entirely and
+  // auto-start with the mode/topics/count the activity was built with.
+  useEffect(() => {
+    if (activityContext && !started && !finished) {
+      const activityMode = activityContext.mode || 'practice';
+      setMode(activityMode);
+      startQuiz(activityMode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activityContext]);
+
   useEffect(() => {
     if (started && mode === 'exam' && !finished) {
       timerRef.current = setInterval(() => {
@@ -79,7 +90,9 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
   async function startQuiz(selectedMode = mode) {
     setLoading(true); setError('');
     try {
-      const qs = await generateQuiz(topic, difficulty, selectedMode);
+      const qs = activityContext
+        ? await generateQuiz(null, difficulty, selectedMode, { topics: activityContext.topics, count: activityContext.count })
+        : await generateQuiz(topic, difficulty, selectedMode);
       if (qs.length === 0) throw new Error(t.quizNoQuestions);
       setQuestions(qs); setCidx(0); setScore(0); setCombo(0); setMaxCombo(0);
       setSelected(null); setAnswered(false); setTimeLeft(3600);
@@ -170,7 +183,9 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
       responseTimeMs: a.responseTimeMs
     })) : practiceAnswers;
     try {
-      const r = await submitQuizScore({ score: fs, totalQuestions: questions.length, topic: mode === 'exam' ? 'full_exam' : topic, type: mode, maxCombo, answers });
+      const submitTopic = activityContext ? (activityContext.topics?.[0] || topic) : (mode === 'exam' ? 'full_exam' : topic);
+      const expeditionContext = activityContext ? { lessonId: activityContext.lessonId, activityType: activityContext.activityType } : undefined;
+      const r = await submitQuizScore({ score: fs, totalQuestions: questions.length, topic: submitTopic, type: mode, maxCombo, answers, expeditionContext });
       setXpEarned(r.xp_earned); setNewBadges(r.newBadges || []); playPang();
 
       if (r.rescueNeeded) setRescueNeeded(r.rescueNeeded);
@@ -206,8 +221,13 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
     );
   }
 
+  /* ── Embedded Expedition activity: skip mode-select, just show a loader while it boots ─── */
+  if (activityContext && !started && !finished) {
+    return <div className="py-16 text-center text-[#101A24] font-comic font-extrabold uppercase tracking-widest">{t.quizPreparing}</div>;
+  }
+
   /* ── Setup: "Chọn chế độ chiến!" ─── */
-  if (!started && !finished) return (
+  if (!activityContext && !started && !finished) return (
     <div className="bg-white pop-in text-center max-w-xl mx-auto" style={{ borderRadius: '2rem', boxShadow: CARD_SHADOW, padding: '44px 40px' }}>
       {onBack && (
         <button
@@ -332,7 +352,7 @@ export default function Quiz({ onQuizFinished, onStudyTopic, onBack, initialResc
         )}
 
         <button onClick={backToModeSelect} className="btn-pro w-full text-xl bg-[#4C6FC4] hover:bg-[#3D5DAE] text-white py-4">
-          {t.backToDashboard}
+          {activityContext ? t.expeditionBackToPlayerBtn : t.backToDashboard}
         </button>
       </div>
     );

@@ -99,12 +99,26 @@ export async function getFlashcardTopics() {
 }
 
 export async function getFlashcards(topic) {
-  const query = topic ? `?topic=${encodeURIComponent(topic)}` : '';
+  let query = '';
+  if (Array.isArray(topic)) query = topic.length ? `?topics=${encodeURIComponent(topic.join(','))}` : '';
+  else if (topic) query = `?topic=${encodeURIComponent(topic)}`;
   const res = await fetch(`${API_BASE}/flashcards${query}`, {
     headers: getHeaders()
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to fetch flashcards');
+  return data;
+}
+
+// Marks a Daily Expedition flashcard-review activity done (spec §9 shared completion state).
+export async function completeFlashcardReview(lessonId) {
+  const res = await fetch(`${API_BASE}/flashcards/complete-review`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ lessonId })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to complete flashcard review');
   return data;
 }
 
@@ -119,10 +133,17 @@ export async function markFlashcardProgress(id, known) {
   return data;
 }
 
-export async function generateQuiz(topic, difficulty, type) {
+// `topics`/`count` (spec §8) scope generation to a Daily Expedition activity's
+// lesson instead of the free-standing topic dropdown — takes priority over
+// `topic` on the backend when both are present.
+export async function generateQuiz(topic, difficulty, type, { topics, count } = {}) {
   const ollamaUrl = localStorage.getItem('pang_chiu_ollama_url') || 'http://localhost:11434';
-  const query = new URLSearchParams({ topic, difficulty, type, ollamaUrl }).toString();
-  
+  const params = { difficulty, type, ollamaUrl };
+  if (topics?.length) params.topics = topics.join(',');
+  else params.topic = topic;
+  if (count) params.count = count;
+  const query = new URLSearchParams(params).toString();
+
   const res = await fetch(`${API_BASE}/quiz/generate?${query}`, {
     headers: getHeaders()
   });
@@ -131,11 +152,11 @@ export async function generateQuiz(topic, difficulty, type) {
   return data;
 }
 
-export async function submitQuizScore({ score, totalQuestions, topic, type, maxCombo, answers }) {
+export async function submitQuizScore({ score, totalQuestions, topic, type, maxCombo, answers, expeditionContext }) {
   const res = await fetch(`${API_BASE}/quiz/submit`, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ score, totalQuestions, topic, type, maxCombo, answers })
+    body: JSON.stringify({ score, totalQuestions, topic, type, maxCombo, answers, expeditionContext })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to submit quiz score');

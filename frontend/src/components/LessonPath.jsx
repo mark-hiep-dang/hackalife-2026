@@ -1,8 +1,9 @@
 // Duolingo-style winding path — Llama climbs alongside you, one lesson per camp, up to the MOF summit.
 import { useState, useEffect, useMemo } from 'react';
 import { useT, useLanguage } from '../translations';
-import { getMastery } from '../utils/api';
+import { getMastery, getDailyExpedition } from '../utils/api';
 import { getLlamaReaction } from '../llamaPersonality';
+import { getExpeditionCopy } from '../expeditionCopy';
 
 const VERTICAL_GAP = 132;
 const NODE_SIZE = 88;
@@ -32,7 +33,7 @@ function getOffsetX(index) {
   return Math.round(Math.sin(index * 1.15) * 80);
 }
 
-function getCampInfo(index, total, t) {
+export function getCampInfo(index, total, t) {
   const isBase = index === 0;
   const isSummit = index === total - 1;
 
@@ -53,6 +54,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
   const { lang } = useLanguage();
   const [preview, setPreview] = useState(null);
   const [masteryByTopic, setMasteryByTopic] = useState({});
+  const [plan, setPlan] = useState(null);
 
   useEffect(() => {
     getMastery().then((rows) => {
@@ -60,6 +62,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
       rows.forEach((r) => { map[r.topic] = r.mastery; });
       setMasteryByTopic(map);
     }).catch(() => {});
+    getDailyExpedition().then(setPlan).catch(() => {});
   }, []);
 
   const campMastery = useMemo(() => {
@@ -136,6 +139,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
           const icon = isSummit ? '⛰️' : (TOPIC_ICON[lesson.topic] || '🏕️');
           const mastery = campMastery[lesson.topic];
           const needsReinforcement = !isLocked && !isCompleted && typeof mastery === 'number' && mastery < 50;
+          const isTodaysPick = !!plan && lesson.id === plan.focusLessonId;
 
           let bg = '#EEF0F3', shadowColor = 'rgba(0,0,0,0.08)', opacity = 1;
           if (isCompleted) { bg = '#C7D7F7'; shadowColor = 'rgba(76,111,196,0.3)'; }
@@ -145,7 +149,11 @@ export default function LessonPath({ lessons, onSelectLesson }) {
 
           return (
             <div key={lesson.id} className="absolute text-center" style={{ left: `${x}px`, top: `${y}px`, transform: 'translate(-50%, -50%)' }}>
-              {isCurrent && (
+              {isTodaysPick ? (
+                <div className="absolute left-1/2 whitespace-nowrap bg-[#6B4FA8] text-white font-comic text-xs font-bold px-3.5 py-1.5 rounded-full pointer-events-none flex items-center gap-1" style={{ bottom: `${NODE_SIZE / 2 + 22}px`, transform: 'translateX(-50%)', boxShadow: '0 4px 14px rgba(107,79,168,0.35)' }}>
+                  🦙 {t.expeditionTodaysPickBadge}
+                </div>
+              ) : isCurrent && (
                 <div className="absolute left-1/2 whitespace-nowrap bg-[#8A6FC9] text-white font-comic text-xs font-bold px-3.5 py-1.5 rounded-full pointer-events-none" style={{ bottom: `${NODE_SIZE / 2 + 22}px`, transform: 'translateX(-50%)', boxShadow: '0 4px 14px rgba(138,111,201,0.3)' }}>
                   {t.campStartHere}
                 </div>
@@ -203,6 +211,7 @@ export default function LessonPath({ lessons, onSelectLesson }) {
             {preview.isLocked ? (
               <p className="text-sm font-bold text-[#3A3A3A] bg-[#EEF0F3] rounded-2xl p-4 mb-5 leading-relaxed">
                 {t.campLockedMessage}
+                <br /><span className="text-[#8A8A8A] font-medium">{getExpeditionCopy('CAMP_LOCKED', { lang }).message}</span>
               </p>
             ) : (
               <div className="text-left bg-[#EEF0F3] rounded-2xl p-4 mb-5">
