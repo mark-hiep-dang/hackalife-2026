@@ -4,6 +4,7 @@ import { Card, Spinner, CAMP_COLORS } from '../components/ui';
 import { TrendChart, CircularGauge } from '../components/charts';
 import { getStudioLlamaReaction } from '../../studioPersonality';
 import { useT } from '../../translations';
+import mascotIllustration from '../../assets/mascot-illustration.png';
 
 function healthTierStyle(score) {
   if (score == null) return { bg: 'bg-[#EEF0F3]', text: 'text-[#888]' };
@@ -54,7 +55,7 @@ export default function Overview({ onNavigate }) {
         style={{ background: 'linear-gradient(120deg, #2563EB 0%, #6D5DD3 55%, #8B7BAE 100%)', boxShadow: '0 10px 0 #17408F, 0 20px 40px -16px rgba(37,99,235,0.4)' }}
       >
         <span className="absolute top-2 right-36 text-3xl hidden md:inline" style={{ animation: 'sparkle 3.2s ease-in-out infinite' }}>✨</span>
-        <span className="absolute -bottom-5 right-6 text-8xl" style={{ animation: 'bob 3.4s ease-in-out infinite' }}>🦙</span>
+        <img src={mascotIllustration} alt="" className="absolute -bottom-3 right-6 w-28 md:w-36 object-contain" style={{ animation: 'bob 3.4s ease-in-out infinite' }} />
         <span className="absolute top-5 right-20 w-3.5 h-3.5 rounded-full bg-white/50 hidden md:inline-block" style={{ animation: 'floatCloud 4s ease-in-out infinite' }} />
         <div className="relative max-w-[62%]">
           <span className="inline-block bg-white/20 text-white font-comic font-bold text-[11px] uppercase tracking-widest px-3.5 py-1.5 rounded-full mb-3">

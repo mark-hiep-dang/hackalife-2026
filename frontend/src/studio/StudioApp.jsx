@@ -35,25 +35,23 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#E6F7EF] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F4F1FB] flex flex-col md:flex-row">
       <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white border-r-3 border-[#101A24]/10 sticky top-0 h-screen shrink-0">
-        <div className="p-6 border-b-3 border-[#101A24]/10">
-          <button onClick={() => setTab('overview')} className="flex items-center gap-2 font-comic font-extrabold text-2xl tracking-tight text-[#101A24]">
+        <div className="p-7 pb-0">
+          <button onClick={() => setTab('overview')} className="flex items-center gap-2 font-comic font-extrabold text-[21px] tracking-tight text-[#101A24]">
             <img src={llamaLogo} alt="" className="w-9 h-9 object-contain" />
-            <span>Llama Trainer</span>
+            <span>Tutor</span>
           </button>
-          <p className="mt-2 text-[11px] font-bold uppercase tracking-widest text-[#8B7BAE]">{t.studioTagline}</p>
+          <p className="mt-1.5 mb-7 text-[11px] font-extrabold uppercase tracking-widest text-[#8B7BAE]">{t.studioTagline}</p>
         </div>
 
-        <nav className="flex-1 px-4 py-6 flex flex-col gap-2 overflow-y-auto">
+        <nav className="flex-1 px-5 flex flex-col gap-1.5 overflow-y-auto">
           {NAV.map(({ id, icon: Icon, label }) => {
             const active = tab === id;
             return (
               <button key={id} onClick={() => setTab(id)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wide transition-all border text-left ${
-                  active
-                    ? 'bg-[#E3D9F5] border-[#101A24]/10 text-[#101A24] shadow-sm -translate-y-0.5 -translate-x-0.5'
-                    : 'bg-white border-transparent text-[#101A24] hover:border-[#101A24]/10 hover:shadow-sm'
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-2xl text-[13.5px] font-extrabold transition-all text-left ${
+                  active ? 'bg-[#E3D9F5] text-[#101A24] shadow-sm' : 'bg-white text-[#101A24] hover:bg-[#F9FAFB]'
                 }`}
               >
                 <Icon size={20} strokeWidth={active ? 2.75 : 2} /> {label}
@@ -62,21 +60,25 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
           })}
         </nav>
 
-        <div className="p-6 border-t-3 border-[#101A24]/10 bg-[#EEF0F3] flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{profile?.username} · {t.studioTrainerBadge}</span>
-            <div className="flex gap-1">
-              <button onClick={() => setLang('vi')} className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${lang === 'vi' ? 'bg-white text-[#101A24]' : 'text-[#888]'}`}>VI</button>
-              <button onClick={() => setLang('en')} className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${lang === 'en' ? 'bg-white text-[#101A24]' : 'text-[#888]'}`}>EN</button>
+        <div className="p-5 border-t-2 border-[#101A24]/10 flex flex-col gap-2.5 mt-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-[38px] h-[38px] rounded-full bg-[#E3D9F5] flex items-center justify-center text-lg shrink-0">👤</div>
+            <div className="min-w-0 flex-1">
+              <div className="font-comic font-extrabold text-[13px] text-[#101A24] truncate">{profile?.username}</div>
+              <div className="text-[10.5px] font-extrabold uppercase tracking-wide text-[#8B7BAE]">{t.studioTrainerBadge}</div>
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => setLang('vi')} className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${lang === 'vi' ? 'bg-[#EEF0F3] text-[#101A24]' : 'text-[#888]'}`}>VI</button>
+              <button onClick={() => setLang('en')} className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${lang === 'en' ? 'bg-[#EEF0F3] text-[#101A24]' : 'text-[#888]'}`}>EN</button>
             </div>
           </div>
           <button onClick={handleExit} disabled={switching}
-            className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center gap-2 text-[#101A24] hover:bg-[#B9E7EF] transition-colors font-extrabold text-xs uppercase tracking-widest disabled:opacity-50"
+            className="w-full py-2.5 rounded-2xl bg-[#F9FAFB] flex items-center justify-center gap-2 text-[#101A24] hover:-translate-y-0.5 transition-transform font-comic font-bold text-xs disabled:opacity-50"
           >
             <ArrowLeftRight size={16} strokeWidth={3} /> {t.studioExitToLearner}
           </button>
           <button onClick={onLogout}
-            className="w-full py-2 rounded-lg border border-[#101A24]/10 bg-white shadow-sm flex items-center justify-center gap-2 text-[#D9695F] hover:bg-[#F7D2CC] transition-colors font-extrabold text-xs uppercase tracking-widest"
+            className="w-full py-2.5 rounded-2xl bg-[#F9FAFB] flex items-center justify-center gap-2 text-[#D9695F] hover:-translate-y-0.5 transition-transform font-comic font-bold text-xs"
           >
             <LogOut size={16} strokeWidth={3} /> {t.logout}
           </button>
@@ -85,7 +87,7 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
 
       <header className="md:hidden bg-white border-b-3 border-[#101A24]/10 sticky top-0 z-50">
         <div className="px-4 h-16 flex items-center justify-between">
-          <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Trainer</span>
+          <span className="flex items-center gap-2 font-comic font-extrabold text-lg text-[#101A24]"><img src={llamaLogo} className="w-7 h-7" alt="" />Tutor</span>
           <div className="flex items-center gap-2">
             <button onClick={handleExit} className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg border border-[#101A24]/10 bg-white flex items-center gap-1">
               <ArrowLeftRight size={14} /> {t.modeLearner}

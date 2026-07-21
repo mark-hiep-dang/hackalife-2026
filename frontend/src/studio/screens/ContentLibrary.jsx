@@ -11,6 +11,24 @@ const TABS = [
   { key: 'quiz', types: ['mcq', 'scenario', 'checkpoint'] }
 ];
 
+const TYPE_BADGE = {
+  knowledge: { icon: '📖', bg: '#B9E7EF', color: '#0E6C82' },
+  flashcard: { icon: '🗂️', bg: '#FBE3B0', color: '#8A6414' },
+  mcq: { icon: '📝', bg: '#E3D9F5', color: '#5B3F94' },
+  scenario: { icon: '📝', bg: '#E3D9F5', color: '#5B3F94' },
+  checkpoint: { icon: '🚩', bg: '#E3D9F5', color: '#5B3F94' }
+};
+const STATUS_STYLE = {
+  AI_DRAFT: { bg: '#FBE3B0', color: '#8A6414' },
+  TRAINER_EDITING: { bg: '#FBE3B0', color: '#8A6414' },
+  READY_FOR_REVIEW: { bg: '#FBE3B0', color: '#8A6414' },
+  APPROVED: { bg: '#C7EFC4', color: '#3D7A2E' },
+  PUBLISHED: { bg: '#C7EFC4', color: '#3D7A2E' },
+  ARCHIVED: { bg: '#EEF0F3', color: '#8A8A8A' }
+};
+const CARD_BG = { knowledge: { bg: '#fff', shadow: 'rgba(16,26,36,0.06)' }, flashcard: { bg: '#FDF6E9', shadow: '#EBDCB8' } };
+function cardStyleFor(contentType) { return CARD_BG[contentType] || { bg: '#fff', shadow: 'rgba(16,26,36,0.06)' }; }
+
 function QuizFields({ value, onChange, t }) {
   const set = (patch) => onChange({ ...value, ...patch });
   return (
@@ -41,6 +59,9 @@ function ContentItemCard({ item, onChanged, t }) {
   const TYPE_LABEL = { flashcard: t.studioTypeFlashcard, mcq: t.studioTypeMcq, scenario: t.studioTypeScenario, checkpoint: t.studioTypeCheckpoint, knowledge: t.studioTypeKnowledge };
   const STATUS_LABEL = { AI_DRAFT: t.studioStatusAiDraft, TRAINER_EDITING: t.studioStatusTrainerEditing, READY_FOR_REVIEW: t.studioStatusReadyForReview, APPROVED: t.studioStatusApproved, PUBLISHED: t.studioStatusPublished, ARCHIVED: t.studioStatusArchived };
   const isQuiz = ['mcq', 'scenario', 'checkpoint'].includes(item.contentType);
+  const typeBadge = TYPE_BADGE[item.contentType] || TYPE_BADGE.knowledge;
+  const statusStyle = STATUS_STYLE[item.status] || STATUS_STYLE.AI_DRAFT;
+  const cardStyle = cardStyleFor(item.contentType);
   const isPublished = !!(item.publishedQuestionId || item.publishedFlashcardId);
 
   const [editing, setEditing] = useState(false);
@@ -73,15 +94,17 @@ function ContentItemCard({ item, onChanged, t }) {
   }
 
   return (
-    <div className="border border-[#101A24]/10 rounded-xl p-4 flex flex-col gap-2">
+    <div className="rounded-[24px] p-5 flex flex-col gap-3" style={{ background: cardStyle.bg, boxShadow: `0 5px 0 ${cardStyle.shadow}` }}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#888]">{TYPE_LABEL[item.contentType] || item.contentType}</span>
-          {item.contentType === 'checkpoint' && (
-            <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded bg-[#FBE3B0] flex items-center gap-1"><Flag size={10} /> {t.studioTypeCheckpoint}</span>
-          )}
-        </div>
-        <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-1 rounded bg-[#EEF0F3]">{STATUS_LABEL[item.status] || item.status}</span>
+        <span
+          className="text-[11px] font-extrabold uppercase tracking-wide px-3.5 py-1.5 rounded-xl flex items-center gap-1.5"
+          style={{ background: typeBadge.bg, color: typeBadge.color }}
+        >
+          {typeBadge.icon} {TYPE_LABEL[item.contentType] || item.contentType}
+        </span>
+        <span className="font-comic font-extrabold text-[11px] px-3.5 py-1.5 rounded-xl" style={{ background: statusStyle.bg, color: statusStyle.color }}>
+          {STATUS_LABEL[item.status] || item.status}
+        </span>
       </div>
 
       {editing ? (
@@ -103,16 +126,26 @@ function ContentItemCard({ item, onChanged, t }) {
         </div>
       ) : (
         <>
-          {item.contentType === 'knowledge' && item.title && <p className="text-sm font-extrabold text-[#101A24]">{item.title}</p>}
-          <p className="text-sm text-[#101A24] font-semibold whitespace-pre-wrap">{item.questionText || item.front || '(flashcard)'}</p>
+          {item.contentType === 'knowledge' && item.title && <p className="font-comic font-extrabold text-base text-[#101A24]">{item.title}</p>}
+          <p className="font-comic font-bold text-[15px] text-[#101A24] whitespace-pre-wrap leading-snug">{item.questionText || item.front || '(flashcard)'}</p>
           {item.contentType === 'flashcard' && item.back && <p className="text-xs text-[#666]">{item.back}</p>}
         </>
       )}
 
       {!editing && item.options?.length > 0 && (
-        <ul className="text-xs text-[#666] list-disc list-inside">
-          {item.options.map((o, i) => <li key={i} className={i === item.correctOption ? 'font-bold text-[#101A24]' : ''}>{o}</li>)}
-        </ul>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {item.options.map((o, i) => {
+            const correct = i === item.correctOption;
+            return (
+              <div key={i} className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl" style={{ background: correct ? '#EAF6DD' : '#F9FAFB', border: `2px solid ${correct ? '#9FE870' : '#EEF0F3'}` }}>
+                <span className="w-[22px] h-[22px] rounded-full bg-white flex items-center justify-center font-comic font-extrabold text-xs shrink-0" style={{ color: correct ? '#3D7A2E' : '#101A24' }}>
+                  {String.fromCharCode(65 + i)}
+                </span>
+                <span className="text-[13px] font-bold text-[#101A24]">{o}</span>
+              </div>
+            );
+          })}
+        </div>
       )}
       {rewrite && <p className="text-xs bg-[#F5F6F8] rounded-lg p-2 text-[#101A24]"><strong>{t.studioSuggestRewrite}</strong> {rewrite.rewrittenText || rewrite.suggestion}</p>}
 
@@ -228,21 +261,23 @@ function LessonPanel({ lesson, items, onChanged, t }) {
   const visibleItems = items.filter((i) => activeTypes.includes(i.contentType));
 
   return (
-    <Card>
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+    <Card className="!rounded-[28px] !p-6">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
-          <h3 className="font-extrabold text-[#101A24]">{lesson.title}</h3>
-          <p className="text-xs text-[#888]">{t.studioMinutesLabel.replace('{n}', lesson.estimatedMinutes)} · {lesson.difficulty} · {t.studioExamWeightLabel.replace('{n}', Math.round((lesson.examWeight || 0) * 100))}</p>
+          <h3 className="font-comic font-extrabold text-lg text-[#101A24]">{lesson.title}</h3>
+          <p className="text-xs font-bold text-[#8A8A8A] mt-0.5">{t.studioMinutesLabel.replace('{n}', lesson.estimatedMinutes)} · {lesson.difficulty} · {t.studioExamWeightLabel.replace('{n}', Math.round((lesson.examWeight || 0) * 100))}</p>
         </div>
-        <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2">
+        <button onClick={handleGenerate} disabled={busy}
+          className="flex items-center gap-2 font-comic font-extrabold text-[13px] text-white px-5 py-3 rounded-2xl bg-[#101A24] disabled:opacity-50"
+        >
           <Sparkles size={16} /> {items.length ? t.studioRegenerateKit : t.studioGenerateKit}
-        </Button>
+        </button>
       </div>
 
-      <div className="flex gap-2 mb-4 border-b border-[#101A24]/10 pb-2">
+      <div className="flex gap-2 mb-4">
         {TABS.map((tb) => (
           <button key={tb.key} onClick={() => { setActiveTab(tb.key); setShowAddForm(false); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold uppercase tracking-wide ${activeTab === tb.key ? 'bg-[#E3D9F5] text-[#101A24]' : 'text-[#888] hover:bg-[#F5F6F8]'}`}
+            className={`font-comic font-extrabold text-[12.5px] px-4.5 py-2.5 rounded-2xl transition-all ${activeTab === tb.key ? 'bg-[#101A24] text-white shadow-sm' : 'bg-[#F9FAFB] text-[#101A24] hover:shadow-sm'}`}
           >{TAB_LABEL[tb.key]}</button>
         ))}
       </div>
@@ -288,7 +323,10 @@ export default function ContentLibrary({ bundle, onChanged }) {
       <div className="md:w-64 shrink-0 flex flex-col gap-2">
         {bundle.lessons.map((l) => (
           <button key={l.id} onClick={() => setLessonId(l.id)}
-            className={`text-left px-4 py-2.5 rounded-xl text-sm font-bold border ${lessonId === l.id ? 'bg-[#E3D9F5] border-[#101A24]/10' : 'bg-white border-[#101A24]/10 hover:bg-[#F5F6F8]'}`}
+            className={`text-left px-4 py-3 rounded-2xl font-comic font-bold text-[12.5px] transition-all ${
+              lessonId === l.id ? 'bg-[#E3D9F5] text-[#101A24] shadow-sm' : 'bg-white text-[#101A24] hover:shadow-sm'
+            }`}
+            style={{ boxShadow: lessonId === l.id ? '0 3px 0 #C7B8E8' : '0 3px 0 rgba(16,26,36,0.06)' }}
           >{l.title}</button>
         ))}
       </div>

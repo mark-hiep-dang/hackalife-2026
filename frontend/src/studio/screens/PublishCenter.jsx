@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import { getCohorts, publishCourse } from '../../utils/studioApi';
-import { Card, SectionTitle, Button, Spinner } from '../components/ui';
+import { Card, Button, Spinner } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
-import { CheckCircle2, XCircle, UploadCloud } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
 import { useT } from '../../translations';
 
 function ChecklistItem({ ok, label }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      {ok ? <CheckCircle2 size={18} className="text-[#2E7D32]" /> : <XCircle size={18} className="text-[#C2185B]" />}
-      <span className={ok ? 'text-[#101A24]' : 'text-[#101A24] font-bold'}>{label}</span>
+    <div className="flex items-center gap-2.5">
+      <span
+        className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[13px] shrink-0"
+        style={{ background: ok ? '#C7EFC4' : '#FBE3B0' }}
+      >
+        {ok ? '✓' : '!'}
+      </span>
+      <span className="text-[13px] font-bold text-[#101A24]">{label}</span>
     </div>
   );
 }
@@ -45,10 +50,10 @@ export default function PublishCenter({ courseId, bundle, quality, onRunQualityC
   const canPublish = quality && !hasBlockers && hasLessons && cohortSelected;
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <SectionTitle>{t.studioChecklistTitle}</SectionTitle>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5 items-start">
+      <Card className="!rounded-[28px] !p-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h3 className="font-comic font-extrabold text-[15px] text-[#101A24]">✅ {t.studioChecklistTitle}</h3>
           <Button variant="secondary" onClick={onRunQualityCheck} disabled={busy}>{busy ? t.studioChecking : t.studioRunQualityCheck}</Button>
         </div>
         <div className="flex flex-col gap-3">
@@ -61,20 +66,30 @@ export default function PublishCenter({ courseId, bundle, quality, onRunQualityC
         </div>
       </Card>
 
-      <Card>
-        <SectionTitle>{t.studioChooseCohortTitle}</SectionTitle>
-        <select value={cohortId} onChange={(e) => setCohortId(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm font-bold w-fit mb-4">
-          <option value="">{t.studioChooseCohortPlaceholder}</option>
-          {availableCohorts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-        <div>
-          <Button onClick={handlePublish} disabled={!canPublish || busy} className="flex items-center gap-2">
-            <UploadCloud size={16} /> {busy ? t.studioPublishing : t.studioPublishCourseBtn}
-          </Button>
-        </div>
-        {published && <StudioLlamaBubble event="COURSE_PUBLISHED" className="mt-4" />}
-      </Card>
+      <div className="rounded-[28px] p-6 flex flex-col gap-4" style={{ background: 'linear-gradient(135deg,#9FE870,#6BAE2E)', boxShadow: '0 6px 0 #4B9A1E' }}>
+        <h3 className="font-comic font-extrabold text-[15px] text-[#101A24]">☁️ {t.studioChooseCohortTitle}</h3>
+        {availableCohorts.length === 0 ? (
+          <p className="text-sm font-bold text-[#101A24]/70">{t.studioChooseCohortPlaceholder}</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {availableCohorts.map((c) => (
+              <button key={c.id} onClick={() => setCohortId(String(c.id))}
+                className={`text-left px-4 py-3 rounded-2xl font-comic font-bold text-[13px] transition-all ${
+                  String(cohortId) === String(c.id) ? 'bg-[#101A24] text-white' : 'bg-white text-[#101A24] hover:-translate-y-0.5'
+                }`}
+              >{c.name}</button>
+            ))}
+          </div>
+        )}
+        {error && <p className="text-sm font-bold text-[#8A2F55] bg-white/70 rounded-lg p-2">{error}</p>}
+        <button onClick={handlePublish} disabled={!canPublish || busy}
+          className="mt-auto flex items-center justify-center gap-2 font-comic font-extrabold text-sm text-white px-5 py-4 rounded-2xl bg-[#101A24] disabled:opacity-40"
+          style={{ boxShadow: '0 4px 0 rgba(0,0,0,0.3)' }}
+        >
+          <UploadCloud size={16} /> {busy ? t.studioPublishing : t.studioPublishCourseBtn}
+        </button>
+        {published && <StudioLlamaBubble event="COURSE_PUBLISHED" />}
+      </div>
     </div>
   );
 }

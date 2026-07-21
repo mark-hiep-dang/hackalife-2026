@@ -1,15 +1,48 @@
 import { useEffect, useState } from 'react';
 import {
-  getCourses, createCourse, getCourse, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
+  getCourses, createCourse, getCourse, getCohorts, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
   getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
-import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge, Stat, CAMP_COLORS } from '../components/ui';
+import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import ContentLibrary from './ContentLibrary';
 import PublishCenter from './PublishCenter';
-import { Plus, ArrowLeft, Mountain, Sparkles, Upload, Pencil, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Sparkles, Upload, Pencil, Trash2 } from 'lucide-react';
 import { useT } from '../../translations';
+
+const COURSE_ICONS = ['🎓', '📈', '📑', '💡', '📚'];
+const COURSE_ICON_BG = ['bg-brand-green', 'bg-brand-cyan', 'bg-brand-lavender', 'bg-brand-gold', 'bg-brand-coral'];
+const CAMP_BG = ['#C7EFC4', '#B9E7EF', '#E3D9F5', '#FBE3B0', '#F5C9DA'];
+const CAMP_LABEL_COLOR = ['#3D7A2E', '#0E6C82', '#5B3F94', '#8A6414', '#8A2F55'];
+const LESSON_STATUS_COLOR = { AI_DRAFT: '#8A6414', TRAINER_EDITING: '#8A6414', READY_FOR_REVIEW: '#0E6C82', APPROVED: '#0E6C82', PUBLISHED: '#3D7A2E' };
+
+function courseIcon(id) { return COURSE_ICONS[id % COURSE_ICONS.length]; }
+function courseIconBg(id) { return COURSE_ICON_BG[id % COURSE_ICON_BG.length]; }
+function healthColor(health) {
+  if (health == null) return '#D9DEE3';
+  if (health < 50) return '#D14343';
+  if (health < 75) return '#E8A23A';
+  return '#9FE870';
+}
+
+function HealthRing({ health, size = 44 }) {
+  const radius = size / 2 - 2.5;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = health == null ? null : Math.max(0, Math.min(100, health));
+  const dash = clamped != null ? (clamped / 100) * circumference : 0;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(16,26,36,0.08)" strokeWidth="5" />
+        {clamped != null && (
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={healthColor(clamped)} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${dash} ${circumference}`} />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center font-comic font-extrabold text-[11px] text-[#101A24]">{health ?? '—'}</div>
+    </div>
+  );
+}
 
 function CreateCourseForm({ onCreated, onCancel }) {
   const t = useT();
@@ -99,7 +132,7 @@ function LessonRow({ lesson, t, onChanged }) {
 
   if (editing) {
     return (
-      <div className="bg-white/90 rounded-lg p-2.5 flex flex-col gap-2">
+      <div className="bg-white rounded-xl p-2.5 flex flex-col gap-2">
         <input value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} className="px-2 py-1 rounded border border-[#101A24]/15 text-xs bg-white" />
         <textarea value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} rows={2}
           placeholder={t.studioLessonDescriptionLabel} className="px-2 py-1 rounded border border-[#101A24]/15 text-xs bg-white" />
@@ -121,10 +154,10 @@ function LessonRow({ lesson, t, onChanged }) {
   }
 
   return (
-    <div className="bg-white/80 rounded-lg px-3 py-2 text-xs font-bold text-[#101A24] flex items-center justify-between gap-2">
+    <div className="bg-white/70 rounded-xl px-3 py-2 text-xs font-bold text-[#101A24] flex items-center justify-between gap-2">
       <span className="truncate">{lesson.title}</span>
       <div className="flex items-center gap-1.5 shrink-0">
-        <span className="opacity-60">{lesson.status}</span>
+        <span className="text-[10px] font-extrabold" style={{ color: LESSON_STATUS_COLOR[lesson.status] || '#8A8A8A' }}>{lesson.status}</span>
         <button onClick={() => setEditing(true)} className="text-[#101A24]/60 hover:text-[#101A24]"><Pencil size={12} /></button>
         <button onClick={handleDelete} disabled={busy || isPublished} title={isPublished ? t.studioDeleteLessonBlockedPublished : undefined}
           className="text-[#101A24]/60 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/60"><Trash2 size={12} /></button>
@@ -152,17 +185,17 @@ function CampCard({ camp, index, lessons, t, onChanged }) {
   }
 
   return (
-    <div className={`min-w-[240px] rounded-2xl border border-[#101A24]/10 p-4 ${CAMP_COLORS[index % CAMP_COLORS.length]}`}>
+    <div className="min-w-[230px] rounded-[22px] p-4.5 shrink-0" style={{ background: CAMP_BG[index % CAMP_BG.length] }}>
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-extrabold uppercase tracking-widest text-[#101A24]/70">{t.studioCampLabel.replace('{n}', index + 1)}</div>
+        <div className="text-[10.5px] font-extrabold uppercase tracking-widest" style={{ color: CAMP_LABEL_COLOR[index % CAMP_LABEL_COLOR.length] }}>{t.studioCampLabel.replace('{n}', index + 1)}</div>
         <div className="flex gap-1.5">
-          <button onClick={() => setEditingTitle(true)} className="text-[#101A24]/60 hover:text-[#101A24]"><Pencil size={13} /></button>
+          <button onClick={() => setEditingTitle(true)} className="text-[#101A24]/50 hover:text-[#101A24]"><Pencil size={13} /></button>
           <button onClick={handleDeleteCamp} disabled={busy || hasPublished} title={hasPublished ? t.studioDeleteCampBlockedPublished : undefined}
-            className="text-[#101A24]/60 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/60"><Trash2 size={13} /></button>
+            className="text-[#101A24]/50 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/50"><Trash2 size={13} /></button>
         </div>
       </div>
       {editingTitle ? (
-        <div className="flex flex-col gap-2 mb-3">
+        <div className="flex flex-col gap-2 mb-3.5">
           <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="px-2 py-1.5 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
           <div className="flex gap-2">
             <Button variant="success" className="!px-2 !py-1 text-xs" onClick={saveTitle} disabled={busy}>{t.studioSave}</Button>
@@ -170,15 +203,17 @@ function CampCard({ camp, index, lessons, t, onChanged }) {
           </div>
         </div>
       ) : (
-        <div className="font-extrabold text-[#101A24] mb-3">{camp.title}</div>
+        <div className="font-comic font-extrabold text-[14.5px] text-[#101A24] mb-3.5">{camp.title}</div>
       )}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         {campLessons.map((l) => <LessonRow key={l.id} lesson={l} t={t} onChanged={onChanged} />)}
       </div>
       {addingLesson ? (
         <AddLessonForm campId={camp.id} t={t} onCancel={() => setAddingLesson(false)} onAdded={() => { setAddingLesson(false); onChanged(); }} />
       ) : (
-        <button onClick={() => setAddingLesson(true)} className="mt-2.5 text-xs font-extrabold text-[#101A24]/70 hover:text-[#101A24] flex items-center gap-1">
+        <button onClick={() => setAddingLesson(true)}
+          className="w-full mt-2.5 py-2 rounded-xl bg-white/85 text-[11px] font-comic font-bold text-[#101A24]/80 hover:text-[#101A24] flex items-center justify-center gap-1.5"
+        >
           <Plus size={12} /> {t.studioAddLesson}
         </button>
       )}
@@ -198,27 +233,25 @@ function MountainVisual({ courseId, camps, lessons, t, onChanged }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 text-[#101A24] font-extrabold"><Mountain size={20} /> {t.studioMountainTitle}</div>
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {camps.map((camp, i) => <CampCard key={camp.id} camp={camp} index={i} lessons={lessons} t={t} onChanged={onChanged} />)}
-        <div className="min-w-[160px] rounded-2xl border border-[#101A24]/10 p-4 bg-[#101A24] text-white flex flex-col items-center justify-center gap-3">
-          <span className="font-extrabold text-center">🏔️ {t.studioSummitLabel}</span>
-          {addingCamp ? (
-            <form onSubmit={handleAddCamp} className="flex flex-col gap-2 w-full">
-              <input value={newCampTitle} onChange={(e) => setNewCampTitle(e.target.value)} required autoFocus
-                placeholder={t.studioCampTitleLabel} className="px-2 py-1 rounded text-xs text-[#101A24]" />
-              <div className="flex gap-1">
-                <Button type="submit" variant="success" className="!px-2 !py-1 text-[10px]" disabled={saving}>{t.studioSave}</Button>
-                <Button type="button" variant="secondary" className="!px-2 !py-1 text-[10px]" onClick={() => setAddingCamp(false)}>{t.studioCancel}</Button>
-              </div>
-            </form>
-          ) : (
-            <button onClick={() => setAddingCamp(true)} className="text-xs font-extrabold text-white/80 hover:text-white flex items-center gap-1">
-              <Plus size={12} /> {t.studioAddCamp}
-            </button>
-          )}
-        </div>
+    <div className="flex gap-4 overflow-x-auto pb-2">
+      {camps.map((camp, i) => <CampCard key={camp.id} camp={camp} index={i} lessons={lessons} t={t} onChanged={onChanged} />)}
+      <div className="min-w-[150px] rounded-[22px] p-4.5 bg-[#101A24] text-white flex flex-col items-center justify-center gap-2.5 shrink-0">
+        <span className="text-[28px]" style={{ animation: 'bob 2.6s ease-in-out infinite' }}>🦙</span>
+        <span className="font-comic font-extrabold text-xs text-center">{t.studioSummitLabel} 🏁</span>
+        {addingCamp ? (
+          <form onSubmit={handleAddCamp} className="flex flex-col gap-2 w-full">
+            <input value={newCampTitle} onChange={(e) => setNewCampTitle(e.target.value)} required autoFocus
+              placeholder={t.studioCampTitleLabel} className="px-2 py-1 rounded text-xs text-[#101A24]" />
+            <div className="flex gap-1">
+              <Button type="submit" variant="success" className="!px-2 !py-1 text-[10px]" disabled={saving}>{t.studioSave}</Button>
+              <Button type="button" variant="secondary" className="!px-2 !py-1 text-[10px]" onClick={() => setAddingCamp(false)}>{t.studioCancel}</Button>
+            </div>
+          </form>
+        ) : (
+          <button onClick={() => setAddingCamp(true)} className="text-xs font-comic font-bold text-white/80 hover:text-white flex items-center gap-1">
+            <Plus size={12} /> {t.studioAddCamp}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -323,6 +356,34 @@ function GenerateFromSourcePanel({ docs, lessons, t }) {
   );
 }
 
+function QualityGauge({ score, size = 140 }) {
+  const radius = size / 2 - 13;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = score == null ? null : Math.max(0, Math.min(100, score));
+  const dash = clamped != null ? (clamped / 100) * circumference : 0;
+  return (
+    <div className="relative shrink-0" style={{ width: size, maxWidth: '100%' }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block', maxWidth: '100%', height: 'auto', transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="13" />
+        {clamped != null && (
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={healthColor(clamped)} strokeWidth="13" strokeLinecap="round" strokeDasharray={`${dash} ${circumference}`} />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-comic font-extrabold text-2xl text-white">{clamped ?? '—'}</span>
+        <span className="text-[10px] font-extrabold text-white/60 uppercase">/ 100</span>
+      </div>
+    </div>
+  );
+}
+
+const DETAIL_TABS = [
+  { key: 'architect', icon: '🏔️' },
+  { key: 'quality', icon: '✅' },
+  { key: 'library', icon: '📚' },
+  { key: 'publish', icon: '☁️' }
+];
+
 function CourseDetail({ courseId, onBack }) {
   const t = useT();
   const [bundle, setBundle] = useState(null);
@@ -366,36 +427,54 @@ function CourseDetail({ courseId, onBack }) {
 
   if (!bundle) return <Spinner label={t.studioLoading} />;
   const { course, camps, lessons } = bundle;
+  const TAB_LABEL = { architect: t.studioCourseArchitectTab, quality: t.studioCourseQualityTab, library: t.studioNavLibrary, publish: t.studioNavPublish };
+  const STATUS_LABEL = { AI_DRAFT: t.studioStatusAiDraft, PUBLISHED: t.studioStatusPublished };
 
   return (
-    <div className="flex flex-col gap-6">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#101A24]"><ArrowLeft size={16} /> {t.studioBackToCourses}</button>
-      <Card>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h2 className="text-xl font-extrabold text-[#101A24]">{course.title}</h2>
-            <p className="text-sm text-[#666]">{course.target_group} · {t.studioWeeksShort.replace('{n}', course.duration_weeks)} · {t.studioFieldTargetScore} {course.target_score}</p>
-          </div>
-          <span className="text-xs font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#EEF0F3]">{course.status}</span>
+    <div className="flex flex-col gap-5">
+      <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#101A24] w-fit"><ArrowLeft size={16} /> {t.studioBackToCourses}</button>
+
+      <div
+        className="flex items-center gap-4 rounded-[28px] p-6 md:p-7"
+        style={{ background: 'linear-gradient(120deg, #2563EB 0%, #6D5DD3 100%)', boxShadow: '0 8px 0 #17408F' }}
+      >
+        <span className="w-[54px] h-[54px] rounded-2xl bg-white/20 flex items-center justify-center text-2xl shrink-0">{courseIcon(course.id)}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-comic font-extrabold text-lg md:text-[19px] text-white truncate">{course.title}</div>
+          <div className="text-[12.5px] font-bold text-white/90 mt-1">{course.target_group} · {t.studioWeeksShort.replace('{n}', course.duration_weeks)} · {t.studioFieldTargetScore} {course.target_score}</div>
         </div>
-      </Card>
+        <span className="font-comic font-extrabold text-[11px] text-[#101A24] bg-white px-4 py-2 rounded-2xl shrink-0">{STATUS_LABEL[course.status] || course.status}</span>
+      </div>
 
       {reaction && <StudioLlamaBubble event={reaction.event} context={reaction.context} />}
 
       <div className="flex gap-2 flex-wrap">
-        <Button variant={tab === 'architect' ? 'primary' : 'secondary'} onClick={() => setTab('architect')}>{t.studioCourseArchitectTab}</Button>
-        <Button variant={tab === 'quality' ? 'primary' : 'secondary'} onClick={() => setTab('quality')}>{t.studioCourseQualityTab}</Button>
-        <Button variant={tab === 'library' ? 'primary' : 'secondary'} onClick={() => setTab('library')}>{t.studioNavLibrary}</Button>
-        <Button variant={tab === 'publish' ? 'primary' : 'secondary'} onClick={() => setTab('publish')}>{t.studioNavPublish}</Button>
+        {DETAIL_TABS.map((tb) => (
+          <button key={tb.key} onClick={() => setTab(tb.key)}
+            className={`flex items-center gap-2 font-comic font-extrabold text-[13px] px-5 py-3 rounded-2xl transition-all ${
+              tab === tb.key ? 'bg-[#101A24] text-white shadow-sm' : 'bg-white text-[#101A24] hover:shadow-sm'
+            }`}
+          >
+            <span>{tb.icon}</span>{TAB_LABEL[tb.key]}
+          </button>
+        ))}
       </div>
 
       {tab === 'architect' && (() => {
         const hasApprovedContent = lessons.some((l) => l.status === 'APPROVED' || l.status === 'PUBLISHED');
         return (
           <>
-            <Card>
-              <SectionTitle subtitle={t.studioCurriculumSubtitle}>{t.studioCurriculumTitle}</SectionTitle>
+            <Card className="!rounded-[28px] !p-6">
               <SourceMaterialsPanel courseId={courseId} docs={knowledgeDocs} onDocsChanged={loadKnowledgeDocs} t={t} />
+              <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+                <div>
+                  <div className="font-comic font-extrabold text-[15.5px] text-[#101A24] mb-1">🏔️ {t.studioMountainTitle}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 bg-[#F4F1FB] rounded-2xl px-4.5 py-3.5 mb-5">
+                <span className="text-xl shrink-0">🦙</span>
+                <div className="text-xs font-bold text-[#5B3F94] leading-snug">{t.studioCurriculumSubtitle}</div>
+              </div>
               {hasApprovedContent ? (
                 <p className="text-sm text-[#888] italic mb-4">{t.studioRegenerateBlockedMessage}</p>
               ) : (
@@ -412,9 +491,12 @@ function CourseDetail({ courseId, onBack }) {
                         : prompt.trim() ? t.studioWillUseGoalOnly : t.studioWillUseBank}
                     </p>
                   )}
-                  <Button onClick={handleGenerate} disabled={busy} className="flex items-center gap-2 w-fit">
+                  <button onClick={handleGenerate} disabled={busy}
+                    className="w-fit flex items-center gap-2 font-comic font-extrabold text-[12.5px] text-white px-5 py-3 rounded-2xl"
+                    style={{ background: 'linear-gradient(135deg,#8B7BAE,#6D5DD3)', boxShadow: '0 4px 0 #4A3D82' }}
+                  >
                     <Sparkles size={16} /> {camps.length ? t.studioRegenerateCurriculum : t.studioGenerateCurriculum}
-                  </Button>
+                  </button>
                 </div>
               )}
               {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
@@ -425,26 +507,32 @@ function CourseDetail({ courseId, onBack }) {
       })()}
 
       {tab === 'quality' && (
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <SectionTitle>{t.studioQualityCheckTitle}</SectionTitle>
-            <Button onClick={handleQualityCheck} disabled={busy}>{busy ? t.studioChecking : t.studioRunCheck}</Button>
-          </div>
-          {quality ? (
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Stat label={t.studioHealthScoreLabel} value={`${quality.healthScore}/100`} />
-                <Stat label={t.studioCanPublishLabel} value={quality.canPublish ? t.studioYes : t.studioNo} />
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4.5">
+          <div
+            className="rounded-[28px] p-6 flex flex-col items-center justify-center gap-3.5 self-start"
+            style={{ background: 'linear-gradient(160deg,#101A24,#2B3A4A)', boxShadow: '0 6px 0 rgba(16,26,36,0.2)' }}
+          >
+            <QualityGauge score={quality?.healthScore} />
+            {quality && (
+              <div className="font-comic font-extrabold text-[13px]" style={{ color: quality.canPublish ? '#9FE870' : '#F5C9DA' }}>
+                {quality.canPublish ? `✅ ${t.studioCanPublishLabel}: ${t.studioYes}` : `⛔ ${t.studioCanPublishLabel}: ${t.studioNo}`}
               </div>
-              <div className="flex flex-col gap-2">
+            )}
+            <Button onClick={handleQualityCheck} disabled={busy} variant="secondary" className="!bg-white/10 !text-white !border-0">{busy ? t.studioChecking : t.studioRunCheck}</Button>
+          </div>
+
+          <Card className="!rounded-[28px] !p-6">
+            <div className="font-comic font-extrabold text-[15px] text-[#101A24] mb-3.5">🔍 {t.studioQualityCheckTitle}</div>
+            {quality ? (
+              <div className="flex flex-col gap-2.5">
                 {quality.issues.map((issue) => (
                   <IssueRow key={issue.id} issue={issue} onChanged={handleQualityCheck} />
                 ))}
                 {quality.issues.length === 0 && <EmptyState>{t.studioNoIssues}</EmptyState>}
               </div>
-            </div>
-          ) : <EmptyState>{t.studioNoQualityCheckYet}</EmptyState>}
-        </Card>
+            ) : <EmptyState>{t.studioNoQualityCheckYet}</EmptyState>}
+          </Card>
+        </div>
       )}
 
       {tab === 'library' && <ContentLibrary bundle={bundle} onChanged={load} />}
@@ -468,11 +556,11 @@ function IssueRow({ issue, onChanged }) {
   }
 
   return (
-    <div className="border border-[#101A24]/10 rounded-xl p-3 flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-3">
+    <div className="rounded-2xl bg-[#F9FAFB] p-3.5 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <SeverityBadge severity={issue.severity} />
-          <span className="text-xs font-bold text-[#888] uppercase">{issue.category}</span>
+          <span className="text-xs font-bold text-[#8A8A8A] uppercase">{issue.category}</span>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={handleSuggest} disabled={loading}>{t.studioSuggestFix}</Button>
@@ -480,7 +568,7 @@ function IssueRow({ issue, onChanged }) {
         </div>
       </div>
       <p className="text-sm text-[#101A24]">{issue.message}</p>
-      {fix && <p className="text-sm bg-[#F5F6F8] rounded-lg p-2 text-[#101A24]"><strong>{t.studioSuggestionLabel}</strong> {fix.suggestion}</p>}
+      {fix && <p className="text-sm bg-white rounded-lg p-2 text-[#101A24]"><strong>{t.studioSuggestionLabel}</strong> {fix.suggestion}</p>}
     </div>
   );
 }
@@ -488,10 +576,18 @@ function IssueRow({ issue, onChanged }) {
 export default function Courses() {
   const t = useT();
   const [courses, setCourses] = useState(null);
+  const [learnerCounts, setLearnerCounts] = useState({});
   const [view, setView] = useState('list');
   const [selected, setSelected] = useState(null);
 
-  function refresh() { getCourses().then(setCourses); }
+  function refresh() {
+    getCourses().then(setCourses);
+    getCohorts().then((cohorts) => {
+      const counts = {};
+      for (const c of cohorts) counts[c.course_id] = (counts[c.course_id] || 0) + (c.learnerCount || 0);
+      setLearnerCounts(counts);
+    });
+  }
   useEffect(() => { refresh(); }, []);
 
   if (view === 'create') return <CreateCourseForm onCreated={(id) => { setSelected(id); setView('detail'); refresh(); }} onCancel={() => setView('list')} />;
@@ -499,28 +595,48 @@ export default function Courses() {
 
   if (!courses) return <Spinner label={t.studioLoading} />;
 
+  const STATUS_STYLE = {
+    AI_DRAFT: { label: t.studioStatusAiDraft, color: '#8A6414', bg: '#FBE3B0' },
+    PUBLISHED: { label: t.studioStatusPublished, color: '#3D7A2E', bg: '#C7EFC4' }
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <SectionTitle subtitle={t.studioCoursesSubtitle}>{t.studioCoursesTitle}</SectionTitle>
-        <Button onClick={() => setView('create')} className="flex items-center gap-2"><Plus size={16} /> {t.studioNewCourse}</Button>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <SectionTitle subtitle={t.studioCoursesSubtitle}>🎓 {t.studioCoursesTitle}</SectionTitle>
+        <button onClick={() => setView('create')}
+          className="flex items-center gap-2 font-comic font-extrabold text-[13.5px] text-white px-5 py-3.5 rounded-2xl bg-[#101A24]"
+          style={{ boxShadow: '0 4px 0 rgba(0,0,0,0.3)' }}
+        >
+          <Plus size={16} /> {t.studioNewCourse}
+        </button>
       </div>
       {courses.length === 0 ? (
         <EmptyState>{t.studioNoCoursesYet}</EmptyState>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {courses.map((c) => (
-            <Card key={c.id} className="cursor-pointer hover:shadow-md transition-shadow" >
-              <button onClick={() => { setSelected(c.id); setView('detail'); }} className="text-left w-full">
-                <h3 className="font-extrabold text-[#101A24]">{c.title}</h3>
-                <p className="text-sm text-[#666] mt-1">{c.target_group}</p>
-                <div className="flex items-center gap-3 mt-3 text-xs font-bold text-[#888]">
-                  <span className="px-2 py-1 rounded bg-[#EEF0F3]">{c.status}</span>
-                  <span>{t.studioHealthLabel.replace('{score}', c.health_score ?? '—')}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
+          {courses.map((c) => {
+            const status = STATUS_STYLE[c.status] || { label: c.status, color: '#8A8A8A', bg: '#EEF0F3' };
+            return (
+              <button key={c.id} onClick={() => { setSelected(c.id); setView('detail'); }}
+                className="text-left bg-white rounded-[26px] p-5.5 flex flex-col gap-3.5 hover:-translate-y-0.5 transition-transform"
+                style={{ boxShadow: '0 6px 0 rgba(16,26,36,0.06)' }}
+              >
+                <div className="flex items-start justify-between gap-2.5">
+                  <span className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center text-xl shrink-0 ${courseIconBg(c.id)}`}>{courseIcon(c.id)}</span>
+                  <HealthRing health={c.health_score} />
+                </div>
+                <div>
+                  <div className="font-comic font-extrabold text-[15.5px] text-[#101A24] mb-1 truncate">{c.title}</div>
+                  <div className="text-xs font-bold text-[#8A8A8A] truncate">{c.target_group}</div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-comic font-extrabold text-[10.5px] px-3 py-1.5 rounded-xl" style={{ color: status.color, background: status.bg }}>{status.label}</span>
+                  <span className="text-[11.5px] font-bold text-[#8A8A8A]">{t.studioLearnerCountShort.replace('{n}', learnerCounts[c.id] || 0)}</span>
                 </div>
               </button>
-            </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
