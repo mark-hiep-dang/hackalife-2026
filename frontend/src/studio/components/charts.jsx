@@ -143,9 +143,17 @@ export function CircularGauge({ value, label, size = 150 }) {
   const color = bandColorForValue(clamped);
 
   return (
-    <div className="flex flex-col items-center w-full">
-      <div className="relative w-full" style={{ maxWidth: size, aspectRatio: '1 / 1' }}>
-        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+    <div className="flex flex-col items-center w-full min-w-0">
+      <div className="relative shrink-0" style={{ width: size, maxWidth: '100%' }}>
+        {/* Classic responsive-SVG pattern: intrinsic width/height attributes give
+            it a real aspect ratio, `max-width:100%; height:auto` lets it shrink
+            with the container — deliberately not using the CSS `aspect-ratio`
+            property here, since that depends on how the parent flex/grid resolves
+            the box's width first and produced a runaway height in some layouts. */}
+        <svg
+          width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+          style={{ display: 'block', maxWidth: '100%', height: 'auto', transform: 'rotate(-90deg)' }}
+        >
           <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="14" />
           {clamped != null && (
             <circle

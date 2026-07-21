@@ -92,7 +92,7 @@ export default function Overview({ onNavigate }) {
           />
         </Card>
         <div
-          className="rounded-[28px] p-6 flex items-center justify-center overflow-hidden"
+          className="rounded-[28px] p-6 flex items-center justify-center overflow-hidden min-h-0"
           style={{ background: 'linear-gradient(160deg, #101A24 0%, #2B3A4A 100%)', boxShadow: '0 6px 0 rgba(16,26,36,0.2)' }}
         >
           <CircularGauge value={data.estimatedPassRate} label={t.studioStatPassRate} />
