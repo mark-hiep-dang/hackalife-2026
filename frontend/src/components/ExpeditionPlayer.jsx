@@ -131,7 +131,7 @@ export default function ExpeditionPlayer({ lessons, onExit, onProgress, onPathCh
 
         <div className="bg-white/60 rounded-2xl p-4 mt-4 mb-2">
           <p className="text-xs font-extrabold text-[#6B4FA8] uppercase tracking-widest mb-1">{t.expeditionWhyLabel}</p>
-          <p className="text-sm font-bold text-[#101A24] leading-relaxed">{plan.explanation}</p>
+          <p className="text-sm font-bold text-[#101A24] leading-relaxed">{plan.explanation[lang]}</p>
         </div>
       </div>
 
@@ -154,8 +154,8 @@ export default function ExpeditionPlayer({ lessons, onExit, onProgress, onPathCh
             >
               <span className="text-2xl shrink-0">{isDone ? '✅' : isLocked ? '🔒' : (ACTIVITY_ICON[a.type] || '📌')}</span>
               <div className="flex-1 min-w-0">
-                <div className={`font-comic font-extrabold text-[15px] ${isDone ? 'text-[#8A8A8A] line-through' : 'text-[#101A24]'}`}>{a.label}</div>
-                <div className="text-xs font-bold text-[#8A8A8A] truncate">{a.subtitle}</div>
+                <div className={`font-comic font-extrabold text-[15px] ${isDone ? 'text-[#8A8A8A] line-through' : 'text-[#101A24]'}`}>{a.label[lang]}</div>
+                <div className="text-xs font-bold text-[#8A8A8A] truncate">{a.subtitle[lang]}</div>
               </div>
               <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#8A6D1F] shrink-0">
                 {isDone ? t.expeditionStatusCompleted : isLocked ? t.expeditionStatusLocked : t.expeditionMinutesShort.replace('{n}', a.minutes)}
@@ -170,7 +170,7 @@ export default function ExpeditionPlayer({ lessons, onExit, onProgress, onPathCh
           onClick={() => setActiveActivity(nextAvailable)}
           className="btn-pro w-full bg-[#101A24] text-white hover:bg-[#0A1119] py-4 text-lg"
         >
-          {nextAvailable.label}
+          {nextAvailable.label[lang]}
         </button>
       )}
     </div>

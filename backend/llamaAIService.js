@@ -23,15 +23,20 @@ Quy tắc bắt buộc:
 
 /**
  * Rewrites the deterministic priority-engine explanation in Llama's voice.
- * @param {{ focusTopicLabel: string, deterministicExplanation: string, dailyMinutes: number }} input
+ * PERSONALITY_RULES is Vietnamese-only by design, so only the Vietnamese
+ * variant goes through the LLM — the English variant is already a correct,
+ * complete sentence from the deterministic engine and is passed through
+ * unchanged rather than spending a second AI call giving it the same
+ * treatment in a different language.
+ * @param {{ focusTopicLabel: string, deterministicExplanation: {vi: string, en: string}, dailyMinutes: number }} input
  */
 export async function explainExpedition({ focusTopicLabel, deterministicExplanation, dailyMinutes }, db) {
   const raw = await callGemini(
     PERSONALITY_RULES,
-    `Viết lại câu giải thích sau bằng giọng Llama, giữ nguyên toàn bộ sự kiện/con số, không thêm thông tin mới. Ngữ cảnh: chặng học hôm nay dài ${dailyMinutes} phút, tập trung vào "${focusTopicLabel}".\n\nCâu gốc: "${deterministicExplanation}"\n\nChỉ trả về câu đã viết lại, không giải thích thêm.`,
+    `Viết lại câu giải thích sau bằng giọng Llama, giữ nguyên toàn bộ sự kiện/con số, không thêm thông tin mới. Ngữ cảnh: chặng học hôm nay dài ${dailyMinutes} phút, tập trung vào "${focusTopicLabel}".\n\nCâu gốc: "${deterministicExplanation.vi}"\n\nChỉ trả về câu đã viết lại, không giải thích thêm.`,
     AI_TASKS.EXPLAIN_METRIC, db
   );
-  const message = raw?.trim() || deterministicExplanation;
+  const message = { vi: raw?.trim() || deterministicExplanation.vi, en: deterministicExplanation.en };
   return { message, mood: 'thinking' };
 }
 
