@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  getCourses, createCourse, getCourse, getCohorts, createCohort, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
+  getCourses, createCourse, getCourse, getCohorts, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
   getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
@@ -47,9 +47,8 @@ function HealthRing({ health, size = 44 }) {
 const WIZARD_STEP_META = [
   { n: 1, key: 'studioWizardStepSetup', icon: '📤' },
   { n: 2, key: 'studioWizardStepProcessing', icon: '🤖' },
-  { n: 3, key: 'studioWizardStepPreview', icon: '👀' },
-  { n: 4, key: 'studioWizardStepReview', icon: '✅' },
-  { n: 5, key: 'studioWizardStepPublish', icon: '🚀' }
+  { n: 3, key: 'studioWizardStepReview', icon: '✅' },
+  { n: 4, key: 'studioWizardStepPublish', icon: '🚀' }
 ];
 
 function WizardStepper({ step, t }) {
@@ -79,40 +78,6 @@ function WizardStepper({ step, t }) {
   );
 }
 
-function CreateCohortInline({ courseId, t, onCreated }) {
-  const [cohorts, setCohorts] = useState(null);
-  const [name, setName] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => { getCohorts().then((all) => setCohorts(all.filter((c) => c.course_id === courseId))); }, [courseId]);
-
-  async function submit(e) {
-    e.preventDefault();
-    setSaving(true); setError(null);
-    try {
-      await createCohort({ courseId, name });
-      setName('');
-      setCohorts((await getCohorts()).filter((c) => c.course_id === courseId));
-      onCreated();
-    } catch (err) { setError(err.message); } finally { setSaving(false); }
-  }
-
-  if (!cohorts || cohorts.length > 0) return null;
-
-  return (
-    <div className="rounded-[22px] p-5 max-w-[960px]" style={{ background: '#F4F1FB', boxShadow: '0 4px 0 #C7B8E8' }}>
-      <p className="font-comic font-extrabold text-[13px] text-[#5B3F94] mb-3">👥 {t.studioWizardNoCohortsYet}</p>
-      <form onSubmit={submit} className="flex flex-wrap gap-2.5">
-        <input value={name} onChange={(e) => setName(e.target.value)} required placeholder={t.studioCohortNameLabel}
-          className="flex-1 min-w-[200px] px-4 py-2.5 rounded-xl border-2 border-white text-sm font-bold text-[#101A24] bg-white" />
-        <Button type="submit" disabled={saving}>{saving ? t.studioSaving : t.studioCreateCohortBtn}</Button>
-      </form>
-      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
-    </div>
-  );
-}
-
 const TARGET_GROUP_OPTIONS = ['Tất cả học viên', 'Đại lý mới', 'Đại lý tái tục', 'Đại lý cao cấp'];
 const UPLOAD_ACCEPT = '.pdf,.txt,.docx,.pptx,.xlsx,.xls';
 
@@ -132,7 +97,7 @@ function ToggleSwitch({ label, checked, onChange }) {
 function CreateCourseWizard({ onCreated, onCancel }) {
   const t = useT();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title: '', description: '', targetGroup: '', durationWeeks: 4, examDate: '', learningGoal: '', targetScore: 70, preferredCamps: 4 });
+  const [form, setForm] = useState({ title: '', description: '', targetGroup: '', durationWeeks: 4, examDate: '', targetScore: 70, preferredCamps: 4 });
   const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState([]);
   const [genFlashcards, setGenFlashcards] = useState(true);
@@ -141,9 +106,13 @@ function CreateCourseWizard({ onCreated, onCancel }) {
   const [courseId, setCourseId] = useState(null);
   const [bundle, setBundle] = useState(null);
   const [quality, setQuality] = useState(null);
-  const [cohortsVersion, setCohortsVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // The task list itself is derived from what this course actually needs
+  // (a document-analysis item only appears when files were uploaded) rather
+  // than a fixed list — see handleStartProcessing, which is the single source
+  // of truth for what each key here really does.
+  const [processingTasks, setProcessingTasks] = useState([]);
 
   const field = (key, label, type = 'text') => (
     <label className="flex flex-col gap-1.5 text-sm">
@@ -165,17 +134,38 @@ function CreateCourseWizard({ onCreated, onCancel }) {
   }
 
   useEffect(() => {
-    if (step === 5 && courseId && !quality) handleQualityCheck();
+    if (step === 4 && courseId && !quality) handleQualityCheck();
   }, [step, courseId]);
+
+  function markTask(key, status) {
+    setProcessingTasks((tasks) => tasks.map((task) => (task.key === key ? { ...task, status } : task)));
+  }
 
   async function handleStartProcessing(e) {
     e.preventDefault();
+    const tasks = [
+      { key: 'create', label: t.studioWizardStepCreateCourse, icon: '🚀', status: 'pending' },
+      ...(files.length > 0 ? [{ key: 'upload', label: t.studioWizardStepAnalyzeDocs, icon: '📖', status: 'pending' }] : []),
+      { key: 'curriculum', label: t.studioWizardStepBuildCurriculum, icon: '🏔️', status: 'pending' }
+    ];
+    setProcessingTasks(tasks);
     setStep(2); setBusy(true); setError(null);
     try {
+      markTask('create', 'active');
       const { id } = await createCourse({ ...form, genFlashcards, genQuiz, randomizeQuestions });
       setCourseId(id);
-      for (const file of files) await uploadCourseKnowledge(id, file);
+      markTask('create', 'done');
+
+      if (files.length > 0) {
+        markTask('upload', 'active');
+        for (const file of files) await uploadCourseKnowledge(id, file);
+        markTask('upload', 'done');
+      }
+
+      markTask('curriculum', 'active');
       await generateCourseCurriculum(id, prompt);
+      markTask('curriculum', 'done');
+
       setBundle(await getCourse(id));
       setStep(3);
     } catch (err) {
@@ -228,7 +218,6 @@ function CreateCourseWizard({ onCreated, onCancel }) {
               <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2}
                 className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" />
             </label>
-            {field('learningGoal', t.studioFieldLearningGoal)}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {field('durationWeeks', t.studioFieldDurationWeeks, 'number')}
               {field('targetScore', t.studioFieldTargetScore, 'number')}
@@ -290,16 +279,11 @@ function CreateCourseWizard({ onCreated, onCancel }) {
           <div className="font-comic font-extrabold text-[17px] text-white mb-1.5">{t.studioWizardProcessingTitle}</div>
           <div className="text-[12.5px] font-bold text-white/65 mb-7">{t.studioWizardProcessingSubtitle}</div>
           <div className="flex flex-col gap-3 text-left">
-            {[
-              [t.studioWizardProcessingStep1, '📖'],
-              [t.studioWizardProcessingStep2, '🏔️'],
-              [t.studioWizardProcessingStep3, '📝'],
-              [t.studioWizardProcessingStep4, '🗂️']
-            ].map(([label, icon]) => (
-              <div key={label} className="flex items-center gap-3.5 bg-white/[0.06] rounded-2xl px-4.5 py-3.5">
-                <span className="w-8 h-8 rounded-full bg-[#E3D9F5] flex items-center justify-center text-sm shrink-0">{icon}</span>
-                <span className="font-comic font-bold text-[13px] text-white flex-1">{label}</span>
-                <span className="text-sm shrink-0">{error ? '⛔' : '⏳'}</span>
+            {processingTasks.map((task) => (
+              <div key={task.key} className="flex items-center gap-3.5 bg-white/[0.06] rounded-2xl px-4.5 py-3.5">
+                <span className="w-8 h-8 rounded-full bg-[#E3D9F5] flex items-center justify-center text-sm shrink-0">{task.icon}</span>
+                <span className="font-comic font-bold text-[13px] text-white flex-1">{task.label}</span>
+                <span className="text-sm shrink-0">{task.status === 'done' ? '✅' : task.status === 'active' ? '⏳' : '·'}</span>
               </div>
             ))}
           </div>
@@ -336,24 +320,9 @@ function CreateCourseWizard({ onCreated, onCancel }) {
             <div className="font-comic font-extrabold text-[15px] text-[#101A24] mb-3.5">🏔️ {t.studioMountainTitle}</div>
             {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
           </Card>
-          <div className="flex gap-3 max-w-[960px]">
-            <button onClick={() => setStep(4)}
-              className="flex-1 font-comic font-extrabold text-[14.5px] text-[#101A24] px-5 py-4 rounded-2xl"
-              style={{ background: '#00B4D8', boxShadow: '0 4px 0 #0E7C99' }}
-            >{t.studioWizardContinueToReview}</button>
-          </div>
-        </>
-      )}
-
-      {step === 4 && bundle && (
-        <>
           <ContentLibrary bundle={bundle} onChanged={load} />
           <div className="flex gap-3 max-w-[960px]">
-            <button onClick={() => setStep(3)}
-              className="font-comic font-bold text-[13.5px] text-[#101A24] px-5.5 py-4 rounded-2xl"
-              style={{ background: '#F9FAFB', boxShadow: '0 4px 0 rgba(16,26,36,0.08)' }}
-            >{t.studioWizardBackToPreview}</button>
-            <button onClick={() => setStep(5)}
+            <button onClick={() => setStep(4)}
               className="flex-1 font-comic font-extrabold text-[14.5px] text-[#101A24] px-5 py-4 rounded-2xl"
               style={{ background: '#00B4D8', boxShadow: '0 4px 0 #0E7C99' }}
             >{t.studioWizardContinueToPublish}</button>
@@ -361,12 +330,11 @@ function CreateCourseWizard({ onCreated, onCancel }) {
         </>
       )}
 
-      {step === 5 && bundle && (
+      {step === 4 && bundle && (
         <>
-          <CreateCohortInline courseId={courseId} t={t} onCreated={() => setCohortsVersion((v) => v + 1)} />
-          <PublishCenter key={cohortsVersion} courseId={courseId} bundle={bundle} quality={quality} onRunQualityCheck={handleQualityCheck} busy={busy} />
+          <PublishCenter courseId={courseId} bundle={bundle} quality={quality} onRunQualityCheck={handleQualityCheck} busy={busy} />
           <div className="flex gap-3 max-w-[960px]">
-            <button onClick={() => setStep(4)}
+            <button onClick={() => setStep(3)}
               className="font-comic font-bold text-[13.5px] text-[#101A24] px-5.5 py-4 rounded-2xl"
               style={{ background: '#F9FAFB', boxShadow: '0 4px 0 rgba(16,26,36,0.08)' }}
             >{t.studioWizardBackToReview}</button>

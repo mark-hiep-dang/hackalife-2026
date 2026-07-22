@@ -501,14 +501,15 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       const bundle = await loadCourseBundle(db, req.params.id);
       if (!bundle) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
-      const { cohortId } = req.body;
 
       const latestCheck = await db.get('SELECT * FROM studio_quality_checks WHERE course_id = ? ORDER BY id DESC LIMIT 1', [bundle.course.id]);
       const blockers = latestCheck ? await db.get(`SELECT COUNT(*) c FROM studio_quality_issues WHERE quality_check_id = ? AND severity = 'BLOCKER' AND status = 'open'`, [latestCheck.id]) : { c: 1 };
       if (!latestCheck || blockers.c > 0) {
         return res.status(400).json({ error: 'Vẫn còn vấn đề chặn publish. Hãy chạy Course Quality Check và xử lý các blocker trước.' });
       }
-      if (!cohortId) return res.status(400).json({ error: 'Cần chọn nhóm học để publish.' });
+      // Publishing makes approved content live course-wide; which cohorts get
+      // access is managed separately (Học viên & Thi thử's roster tools), not
+      // chosen at publish time — a course can serve more than one cohort.
 
       await db.run("UPDATE studio_courses SET status = 'PUBLISHED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [bundle.course.id]);
       await db.run(`UPDATE studio_lessons SET status = 'PUBLISHED' WHERE camp_id IN (SELECT id FROM studio_camps WHERE course_id = ?) AND status = 'APPROVED'`, [bundle.course.id]);

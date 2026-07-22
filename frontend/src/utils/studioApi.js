@@ -28,7 +28,7 @@ export const deleteCamp = (campId) => req(`/camps/${campId}`, { method: 'DELETE'
 export const createLesson = (campId, fields) => req(`/camps/${campId}/lessons`, { method: 'POST', body: fields });
 export const updateLesson = (lessonId, fields) => req(`/lessons/${lessonId}`, { method: 'PUT', body: fields });
 export const deleteLesson = (lessonId) => req(`/lessons/${lessonId}`, { method: 'DELETE' });
-export const publishCourse = (id, cohortId) => req(`/courses/${id}/publish`, { method: 'POST', body: { cohortId } });
+export const publishCourse = (id) => req(`/courses/${id}/publish`, { method: 'POST' });
 export const runQualityCheck = (id) => req(`/courses/${id}/quality-check`, { method: 'POST' });
 export const getQuality = (id) => req(`/courses/${id}/quality`);
 export const suggestQualityFix = (issueId) => req(`/quality-issues/${issueId}/suggest-fix`, { method: 'POST' });
