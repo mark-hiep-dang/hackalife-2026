@@ -14,6 +14,7 @@ function makeFakeGemini({ calls = [] } = {}) {
     if (task === AI_TASKS.GENERATE_KNOWLEDGE_SUMMARY) {
       return JSON.stringify({
         title: 'Nguyên tắc bồi thường',
+        introduction: 'Bồi thường là nguyên tắc cốt lõi trong bảo hiểm phi nhân thọ.',
         sections: [
           { heading: 'Khái niệm', body: 'Bồi thường là việc chi trả tổn thất thực tế cho người được bảo hiểm.' },
           { heading: 'Nguyên tắc', body: 'Số tiền bồi thường không vượt quá giá trị tổn thất thực tế.' }
@@ -53,6 +54,10 @@ function makeFakeGemini({ calls = [] } = {}) {
 }
 
 async function seedLesson(db, { genFlashcards = true, genQuiz = true, quizCountPerLesson = 3, flashcardCountPerLesson = 2, withSourceChunks = true, suffix }) {
+  // Guards against a previously-failed run of this same test leaving its
+  // trainer row behind (a UNIQUE constraint on username would otherwise
+  // break every subsequent run until manually cleaned up).
+  await db.run('DELETE FROM users WHERE username = ?', [`lc_trainer_${suffix}`]);
   const trainer = await db.run('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', [`lc_trainer_${suffix}`, 'x', 'trainer']);
   const course = await db.run(
     `INSERT INTO studio_courses (trainer_id, title, gen_flashcards, gen_quiz, quiz_count_per_lesson, flashcard_count_per_lesson)
@@ -263,6 +268,50 @@ test('generateContentForCourse: covers every lesson across every camp in the cou
 
   const itemsInCamp2Lesson = await db.all(`SELECT * FROM studio_content_items WHERE lesson_id = ?`, [lessonInCamp2.lastID]);
   assert.ok(itemsInCamp2Lesson.length > 0, 'the second camp\'s lesson must have received generated content too');
+
+  await cleanup(db, trainerId);
+});
+
+test('generateContentForLesson: retrying/regenerating a single lesson never touches another lesson\'s content (no full-course regeneration)', async () => {
+  await initDb();
+  const db = await getDb();
+  const { trainerId, campId, lessonId: lessonAId } = await seedLesson(db, { flashcardCountPerLesson: 2, suffix: 'scope_a' });
+  const lessonB = await db.run('INSERT INTO studio_lessons (camp_id, title, order_index) VALUES (?, ?, 1)', [campId, 'Lesson B untouched']);
+
+  await generateContentForLesson(db, { lessonId: lessonB.lastID, contentType: 'flashcard', callGeminiFn: makeFakeGemini() });
+  const bBefore = await db.all(`SELECT * FROM studio_content_items WHERE lesson_id = ?`, [lessonB.lastID]);
+  assert.ok(bBefore.length > 0);
+
+  // Regenerate lesson A only (e.g. a trainer retrying just this one lesson).
+  await generateContentForLesson(db, { lessonId: lessonAId, contentType: 'flashcard', callGeminiFn: makeFakeGemini() });
+
+  const bAfter = await db.all(`SELECT * FROM studio_content_items WHERE lesson_id = ?`, [lessonB.lastID]);
+  assert.deepEqual(bAfter.map((i) => i.id), bBefore.map((i) => i.id), 'regenerating lesson A must not touch lesson B\'s content at all');
+
+  await cleanup(db, trainerId);
+});
+
+test('generateContentForLesson: existing trainer-edited content is never overwritten by a later regeneration', async () => {
+  await initDb();
+  const db = await getDb();
+  const { trainerId, lessonId } = await seedLesson(db, { suffix: 'trainer_edited' });
+
+  await generateContentForLesson(db, { lessonId, contentType: 'knowledge', callGeminiFn: makeFakeGemini() });
+  const draft = await db.get(`SELECT * FROM studio_content_items WHERE lesson_id = ? AND content_type = 'knowledge'`, [lessonId]);
+  assert.ok(draft);
+
+  // Trainer edits the AI draft — mirrors the PUT /content-items/:id?action=edit
+  // route, which moves the item to TRAINER_EDITING and sets trainer_edited=1
+  // precisely so a later regenerate can never clobber it.
+  const editedText = 'Nội dung trainer đã tự chỉnh sửa lại hoàn toàn.';
+  await db.run(`UPDATE studio_content_items SET question_text = ?, status = 'TRAINER_EDITING', trainer_edited = 1 WHERE id = ?`, [editedText, draft.id]);
+
+  await generateContentForLesson(db, { lessonId, contentType: 'knowledge', callGeminiFn: makeFakeGemini() });
+
+  const stillThere = await db.get('SELECT * FROM studio_content_items WHERE id = ?', [draft.id]);
+  assert.ok(stillThere, 'the trainer-edited row itself must still exist');
+  assert.equal(stillThere.question_text, editedText, 'its content must be unchanged');
+  assert.equal(stillThere.status, 'TRAINER_EDITING', 'its status must be unchanged');
 
   await cleanup(db, trainerId);
 });

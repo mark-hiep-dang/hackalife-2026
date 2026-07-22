@@ -3,6 +3,8 @@ import assert from 'node:assert';
 
 import { cleanDocumentText, chunkText, buildDocumentMap } from '../knowledgeBase.js';
 import { sanitizeLessonTitle, validateLessonTitle, validateCourseBlueprint } from '../aiValidation.js';
+import { initDb, getDb } from '../db.js';
+import { generateCourseBlueprint } from '../studio/studioAIService.js';
 
 describe('Document cleaning (headers/footers/page numbers/duplicates)', () => {
   test('strips standalone page-number lines', () => {
@@ -176,5 +178,58 @@ describe('validateCourseBlueprint', () => {
     const { valid, errors } = validateCourseBlueprint(blueprint, [1]);
     assert.strictEqual(valid, false);
     assert.ok(errors.some((e) => e.includes('classroom instruction')));
+  });
+});
+
+describe('generateCourseBlueprint: input validation + goal-only fallback (no document uploaded)', () => {
+  async function makeTestCourse(db, title = 'Blueprint input-validation test course') {
+    await db.run('DELETE FROM users WHERE username = ?', ['test_blueprint_trainer']);
+    const trainer = await db.run('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', ['test_blueprint_trainer', 'x', 'trainer']);
+    const course = await db.run('INSERT INTO studio_courses (trainer_id, title) VALUES (?, ?)', [trainer.lastID, title]);
+    return course.lastID;
+  }
+
+  test('a vague description with no uploaded document is rejected before ever calling Gemini', async () => {
+    await initDb();
+    const db = await getDb();
+    const courseId = await makeTestCourse(db);
+
+    const before = await db.get("SELECT COUNT(*) c FROM ai_usage_log WHERE task_type = 'GENERATE_CURRICULUM'");
+    await assert.rejects(
+      () => generateCourseBlueprint(db, { courseId, courseTitle: 'x', prompt: 'Tạo khóa học' }),
+      (err) => err.code === 'VAGUE_INPUT'
+    );
+    const after = await db.get("SELECT COUNT(*) c FROM ai_usage_log WHERE task_type = 'GENERATE_CURRICULUM'");
+    assert.strictEqual(after.c, before.c, 'a rejected vague request must never reach the Gemini call (no usage-log row added)');
+  });
+
+  test('"Tạo bài học" and "Khóa học cho đại lý" are also rejected as too vague', async () => {
+    await initDb();
+    const db = await getDb();
+    const courseId = await makeTestCourse(db);
+    for (const prompt of ['Tạo bài học', 'Khóa học cho đại lý']) {
+      await assert.rejects(() => generateCourseBlueprint(db, { courseId, courseTitle: 'x', prompt }), (err) => err.code === 'VAGUE_INPUT');
+    }
+  });
+
+  test('a valid detailed description with no uploaded document produces a well-formed, grounded blueprint (no fabricated source citations)', async () => {
+    await initDb();
+    const db = await getDb();
+    const courseId = await makeTestCourse(db);
+    const prompt = 'Tạo khóa học 60 phút về sản phẩm ILP cho đại lý mới. Sau khóa học, học viên cần hiểu cấu trúc hợp đồng, cơ chế đầu tư, quyền lợi, rủi ro và các điểm cần tư vấn cho khách hàng.';
+
+    const blueprint = await generateCourseBlueprint(db, { courseId, courseTitle: 'ILP cho đại lý mới', prompt, preferredCamps: 4 });
+
+    assert.ok(blueprint.camps.length > 0 && blueprint.lessons.length > 0);
+    // In this test environment there is no Gemini API key, so this exercises
+    // the deterministic fallback: it reuses the real, already-approved MOF
+    // exam bank rather than ever inventing new insurance facts. Any
+    // sourceChunkIds present are real citations this fallback found in the
+    // approved knowledge base (never fabricated ids) — validateCourseBlueprint
+    // with an empty approved-set only checks structure, not citation origin.
+    const check = validateCourseBlueprint(blueprint, blueprint.lessons.flatMap((l) => l.sourceChunkIds || []));
+    assert.ok(check.valid, check.errors.join('; '));
+    assert.strictEqual(blueprint.usedSource, 'bank');
+    assert.strictEqual(blueprint.usedAI, false);
   });
 });

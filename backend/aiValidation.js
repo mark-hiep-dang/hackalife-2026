@@ -86,7 +86,12 @@ export function validateGeneratedKnowledge(k) {
 // failure mode of the old curriculum generator — the model would lift
 // whatever imperative sentence happened to sit in the source chunk it was
 // grounding on, rather than naming the topic that sentence belongs to.
-const CLASSROOM_INSTRUCTION_RE = /^(yêu cầu|hoạt động|hãy\s|thực hành|thảo luận|bài tập|làm bài|lưu ý\b|ghi nhớ\b|ví dụ\b|câu hỏi\b|tình huống[:\s]|activity[:\s]|exercise[:\s]|note[:\s]|please\s|discuss\s|instructions?[:\s])/i;
+// "tình huống" (scenario/situational) is deliberately narrower than the rest
+// — it's also a common, legitimate topic name on its own (e.g. the real MOF
+// exam topic "Tình huống tổng hợp"), so only the colon-led instructional form
+// ("Tình huống: hãy tính...") counts, not every title that happens to start
+// with the word.
+const CLASSROOM_INSTRUCTION_RE = /^(yêu cầu|hoạt động|hãy\s|thực hành|thảo luận|bài tập|làm bài|lưu ý\b|ghi nhớ\b|ví dụ\b|câu hỏi\b|tình huống\s*:|activity[:\s]|exercise[:\s]|note[:\s]|please\s|discuss\s|instructions?[:\s])/i;
 
 /** Deterministic cleanup applied to every AI-proposed lesson title before it's
  * validated or shown to a trainer: trims quotes/whitespace, drops a trailing
