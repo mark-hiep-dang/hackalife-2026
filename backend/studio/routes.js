@@ -387,8 +387,24 @@ export function mountStudioRoutes(app, authenticateToken) {
         return res.status(400).json({ error: 'Khóa học đã có nội dung được duyệt hoặc publish. Hãy dùng chức năng thêm/sửa/xoá camp và chặng học thủ công thay vì tạo lại toàn bộ, để tránh mất nội dung đã duyệt.' });
       }
 
+      // Fold every input the trainer already gave (course row, set at
+      // creation) into the generation prompt, not just whatever's passed in
+      // this request body — title/cohort/duration/target score/exam date/
+      // description all shape what camps & lessons Gemini proposes. An
+      // explicit req.body.prompt (e.g. CourseDetail's manual "regenerate"
+      // flow) is appended on top rather than replacing this context.
+      const contextLines = [
+        `Tên khóa học: ${course.title}`,
+        course.target_group && `Nhóm học viên (cohort): ${course.target_group}`,
+        `Thời lượng: ${course.duration_weeks || 4} tuần`,
+        course.target_score && `Điểm mục tiêu: ${course.target_score}`,
+        course.exam_date && `Ngày thi: ${course.exam_date}`,
+        course.description && `Mục tiêu / mô tả khóa học: ${course.description}`
+      ].filter(Boolean).join('\n');
+      const combinedPrompt = [contextLines, req.body.prompt?.trim()].filter(Boolean).join('\n\n');
+
       const curriculum = await generateCurriculumFromPrompt(db, {
-        courseId: course.id, prompt: req.body.prompt || '', preferredCamps: course.preferred_camps || 4
+        courseId: course.id, prompt: combinedPrompt, preferredCamps: course.preferred_camps || 4
       });
 
       // Persist as AI_DRAFT.

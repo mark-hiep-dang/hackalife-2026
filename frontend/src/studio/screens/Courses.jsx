@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  getCourses, createCourse, getCourse, getCohorts, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
+  getCourses, createCourse, getCourse, getCohorts, createCohort, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
   getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
@@ -78,7 +78,6 @@ function WizardStepper({ step, t }) {
   );
 }
 
-const TARGET_GROUP_OPTIONS = ['Tất cả học viên', 'Đại lý mới', 'Đại lý tái tục', 'Đại lý cao cấp'];
 const UPLOAD_ACCEPT = '.pdf,.txt,.docx,.pptx,.xlsx,.xls';
 
 function ToggleSwitch({ label, checked, onChange }) {
@@ -97,7 +96,7 @@ function ToggleSwitch({ label, checked, onChange }) {
 function CreateCourseWizard({ onCreated, onCancel }) {
   const t = useT();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title: '', description: '', targetGroup: '', durationWeeks: 4, examDate: '', targetScore: 70, preferredCamps: 4 });
+  const [form, setForm] = useState({ title: '', cohortName: '', durationWeeks: 4, examDate: '', targetScore: 70, preferredCamps: 4 });
   const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState([]);
   const [genFlashcards, setGenFlashcards] = useState(true);
@@ -118,7 +117,7 @@ function CreateCourseWizard({ onCreated, onCancel }) {
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{label}</span>
       <input type={type} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
-        className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" required={key === 'title'} />
+        className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" required={key === 'title' || key === 'cohortName'} />
     </label>
   );
 
@@ -145,6 +144,7 @@ function CreateCourseWizard({ onCreated, onCancel }) {
     e.preventDefault();
     const tasks = [
       { key: 'create', label: t.studioWizardStepCreateCourse, icon: '🚀', status: 'pending' },
+      { key: 'cohort', label: t.studioWizardStepCreateCohort, icon: '👥', status: 'pending' },
       ...(files.length > 0 ? [{ key: 'upload', label: t.studioWizardStepAnalyzeDocs, icon: '📖', status: 'pending' }] : []),
       { key: 'curriculum', label: t.studioWizardStepBuildCurriculum, icon: '🏔️', status: 'pending' }
     ];
@@ -152,9 +152,16 @@ function CreateCourseWizard({ onCreated, onCancel }) {
     setStep(2); setBusy(true); setError(null);
     try {
       markTask('create', 'active');
-      const { id } = await createCourse({ ...form, genFlashcards, genQuiz, randomizeQuestions });
+      // A course and its cohort are 1:1 — the cohort name doubles as the
+      // course's target-group display text (course cards/hero already show
+      // that field), so no separate "target group" input is needed.
+      const { id } = await createCourse({ ...form, targetGroup: form.cohortName, description: prompt, genFlashcards, genQuiz, randomizeQuestions });
       setCourseId(id);
       markTask('create', 'done');
+
+      markTask('cohort', 'active');
+      await createCohort({ courseId: id, name: form.cohortName });
+      markTask('cohort', 'done');
 
       if (files.length > 0) {
         markTask('upload', 'active');
@@ -162,8 +169,12 @@ function CreateCourseWizard({ onCreated, onCancel }) {
         markTask('upload', 'done');
       }
 
+      // No separate prompt to pass — the backend builds the generation
+      // prompt from everything just stored on the course row above
+      // (title/cohort/description/duration/score/exam date) plus any
+      // uploaded source documents.
       markTask('curriculum', 'active');
-      await generateCourseCurriculum(id, prompt);
+      await generateCourseCurriculum(id);
       markTask('curriculum', 'done');
 
       setBundle(await getCourse(id));
@@ -204,20 +215,12 @@ function CreateCourseWizard({ onCreated, onCancel }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {field('title', t.studioFieldCourseTitle)}
               <label className="flex flex-col gap-1.5 text-sm">
-                <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{t.studioFieldTargetGroup}</span>
-                <select value={form.targetGroup} onChange={(e) => setForm((f) => ({ ...f, targetGroup: e.target.value }))}
-                  className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] bg-white focus:outline-none focus:border-[#C7B8E8]"
-                >
-                  <option value="">{t.studioChooseTargetGroupPlaceholder}</option>
-                  {TARGET_GROUP_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
+                <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{t.studioCohortNameLabel}</span>
+                <input value={form.cohortName} onChange={(e) => setForm((f) => ({ ...f, cohortName: e.target.value }))} required
+                  placeholder={t.studioCohortNamePlaceholder}
+                  className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" />
               </label>
             </div>
-            <label className="flex flex-col gap-1.5 text-sm">
-              <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{t.studioFieldDescription}</span>
-              <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2}
-                className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" />
-            </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {field('durationWeeks', t.studioFieldDurationWeeks, 'number')}
               {field('targetScore', t.studioFieldTargetScore, 'number')}
