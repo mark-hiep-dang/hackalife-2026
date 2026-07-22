@@ -36,12 +36,71 @@ export function cleanDocumentText(rawText) {
   return stripRunningHeadersFooters(withoutPageMarkers, 3).join('\n');
 }
 
+// ── Document section classification (Lesson extraction/generation only) ────
+// A trainer's uploaded giáo án mixes teachable material with things that
+// must never become a Lesson on their own: instructions aimed at the
+// trainer, group/class activities, exercises, illustrative examples, and
+// administrative boilerplate (cover page, TOC, program objectives). Only
+// LESSON_HEADING/CORE_KNOWLEDGE/SUBTOPIC content may define a Lesson.
+export const SECTION_TYPES = {
+  LESSON_HEADING: 'LESSON_HEADING',
+  CORE_KNOWLEDGE: 'CORE_KNOWLEDGE',
+  SUBTOPIC: 'SUBTOPIC',
+  EXAMPLE: 'EXAMPLE',
+  TRAINER_INSTRUCTION: 'TRAINER_INSTRUCTION',
+  CLASS_ACTIVITY: 'CLASS_ACTIVITY',
+  EXERCISE: 'EXERCISE',
+  ADMINISTRATIVE: 'ADMINISTRATIVE'
+};
+
+export const LESSON_ELIGIBLE_TYPES = new Set([SECTION_TYPES.LESSON_HEADING, SECTION_TYPES.CORE_KNOWLEDGE, SECTION_TYPES.SUBTOPIC]);
+
+// A document that already numbers its own lessons ("Bài 1", "Chương 2",
+// "Module 3"...) has effectively already done the Lesson-extraction work —
+// Mode A reuses that structure instead of asking Gemini to invent a new one.
+export const LESSON_HEADING_RE = /^(bài|chủ đề|lesson|module|chương)\s*\d+/i;
+const TRAINER_INSTRUCTION_RE = /(yêu cầu học viên|trainer cần|giảng viên (?:cần|hướng dẫn)|hướng dẫn giảng viên|học viên thực hiện|mỗi nhóm)/i;
+const CLASS_ACTIVITY_RE = /(hoạt động lớp học|thảo luận nhóm|chia nhóm|làm việc nhóm|hoạt động nhóm)/i;
+const EXERCISE_RE = /(^|\s)(bài tập|thực hành[:\s]|câu hỏi thực hành|luyện tập)/i;
+const EXAMPLE_RE = /(ví dụ[:\s]|ví dụ minh họa)/i;
+const ADMINISTRATIVE_RE = /(giáo án đào tạo|mục tiêu chương trình|mục lục|table of contents|phiên bản tài liệu|đơn vị biên soạn|^©|bản quyền)/i;
+
+/** Classifies one paragraph/chunk-preview of an uploaded document into one
+ * of SECTION_TYPES. Heuristic and deterministic (no AI call) — used to
+ * decide what may ground a Lesson (LESSON_ELIGIBLE_TYPES) and what must be
+ * kept out of Gemini's blueprint prompt entirely (instructions/activities/
+ * exercises/examples/admin content). */
+export function classifyDocSection(text) {
+  const t = (text || '').trim();
+  if (!t) return SECTION_TYPES.ADMINISTRATIVE;
+  if (LESSON_HEADING_RE.test(t)) return SECTION_TYPES.LESSON_HEADING;
+  if (ADMINISTRATIVE_RE.test(t)) return SECTION_TYPES.ADMINISTRATIVE;
+  if (TRAINER_INSTRUCTION_RE.test(t)) return SECTION_TYPES.TRAINER_INSTRUCTION;
+  if (CLASS_ACTIVITY_RE.test(t)) return SECTION_TYPES.CLASS_ACTIVITY;
+  if (EXERCISE_RE.test(t)) return SECTION_TYPES.EXERCISE;
+  if (EXAMPLE_RE.test(t)) return SECTION_TYPES.EXAMPLE;
+  // A very short fragment with no sentence-like structure reads as a
+  // leftover table-of-contents/administrative line, not real content.
+  if (t.length < 12) return SECTION_TYPES.ADMINISTRATIVE;
+  return SECTION_TYPES.CORE_KNOWLEDGE;
+}
+
+/** Entries (chunkId/preview pairs, e.g. from buildDocumentMap) whose preview
+ * starts with an explicit Lesson heading ("Bài 1", "Chương 2"...) — signals
+ * the document already defines its own Lesson structure (Mode A). */
+export function detectLessonHeadings(entries) {
+  return entries.filter((e) => LESSON_HEADING_RE.test((e.preview || '').trim()));
+}
+
 export function chunkText(text, maxLen = 700) {
   const cleaned = cleanDocumentText(text);
   const paragraphs = cleaned
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\s+/g, ' ').trim())
-    .filter((p) => p.length > 30);
+    // A real Lesson heading ("Bài 1: Tổng quan ILP") is often short enough
+    // to fall under the general noise-filter length — always keep it
+    // through so Mode-A heading detection has something to find.
+    .filter((p) => p.length > 30 || LESSON_HEADING_RE.test(p));
 
   // Exact-duplicate paragraphs (a disclaimer, a boilerplate notice, a
   // classroom instruction repeated per topic) waste chunk budget and can
