@@ -91,7 +91,15 @@ export function validateGeneratedKnowledge(k) {
 // exam topic "Tình huống tổng hợp"), so only the colon-led instructional form
 // ("Tình huống: hãy tính...") counts, not every title that happens to start
 // with the word.
-const CLASSROOM_INSTRUCTION_RE = /^(yêu cầu|hoạt động|hãy\s|thực hành|thảo luận|bài tập|làm bài|lưu ý\b|ghi nhớ\b|ví dụ\b|câu hỏi\b|tình huống\s*:|activity[:\s]|exercise[:\s]|note[:\s]|please\s|discuss\s|instructions?[:\s])/i;
+const CLASSROOM_INSTRUCTION_RE = /^(yêu cầu|hoạt động|hãy\s|thực hành|thảo luận|bài tập|làm bài|lưu ý\b|ghi nhớ\b|ví dụ\b|câu hỏi\b|tình huống\s*:|mỗi nhóm|trainer cần|giáo án|mục tiêu chương trình|học viên thực hiện|activity[:\s]|exercise[:\s]|note[:\s]|please\s|discuss\s|instructions?[:\s])/i;
+
+// A bare numbered-section label ("Phần 1", "Part 2", "Chương 3") is not a
+// topic name — it's page furniture that survived cleanup. Distinct from
+// CLASSROOM_INSTRUCTION_RE: this rejects titles that are ONLY a section
+// label with nothing else, not titles that merely start with one of these
+// words (e.g. "Chương trình đào tạo đại lý" is a real phrase, "Chương 3" alone
+// is not).
+const GENERIC_SECTION_LABEL_RE = /^(phần|part|section|chương|mục|module)\s*\d+$/i;
 
 /** Deterministic cleanup applied to every AI-proposed lesson title before it's
  * validated or shown to a trainer: trims quotes/whitespace, drops a trailing
@@ -125,6 +133,7 @@ export function validateLessonTitle(title, sourceText = '') {
   if (t.length > 80) errors.push('longer than 80 characters');
   if (/[.…]$/.test(t)) errors.push('ends with an ellipsis');
   if (words.length < 2) errors.push('too short to be a coherent topic');
+  if (GENERIC_SECTION_LABEL_RE.test(t)) errors.push('generic section label, not a real topic name');
   if (CLASSROOM_INSTRUCTION_RE.test(t)) errors.push('reads like a classroom instruction, not a topic');
   if (sourceText && t.length >= 25) {
     const norm = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim();

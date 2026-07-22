@@ -8,7 +8,10 @@
 // "AI proposal" is genuinely grounded even when Gemini is unavailable.
 
 import { callGemini, matchesShape } from '../geminiClient.js';
-import { retrieveKnowledge, getChunkSource, pickBestMatchingChunk, getCourseChunks, getCourseDocumentMap, getChunksByIds } from '../knowledgeBase.js';
+import {
+  retrieveKnowledge, getChunkSource, pickBestMatchingChunk, getCourseChunks, getCourseDocumentMap, getChunksByIds,
+  classifyDocSection, detectLessonHeadings, LESSON_ELIGIBLE_TYPES, SECTION_TYPES
+} from '../knowledgeBase.js';
 import { assembleRescueTrail, getConceptPair } from '../engines/rescueTrail.js';
 import { AI_TASKS } from '../aiConfig.js';
 import {
@@ -135,6 +138,105 @@ async function buildCurriculumProposal(db, input = {}) {
   return withCacheControl(proposal, !!raw);
 }
 
+// ── Document → Lesson grounding (classify, filter, detect existing structure) ──
+// Only LESSON_HEADING/CORE_KNOWLEDGE/SUBTOPIC content may ever ground or
+// name a Lesson — trainer instructions, class activities, exercises,
+// examples, and administrative content must never become a Lesson on their
+// own. Runs once per blueprint-generation call and feeds both the Gemini
+// prompt (which chunks it's even shown) and the deterministic fallback, so
+// neither path can turn an excluded fragment into a Lesson.
+export function buildLessonGrounding(docMap) {
+  const classified = docMap.map((e) => ({ ...e, sectionType: classifyDocSection(e.preview) }));
+  const eligibleEntries = classified.filter((e) => LESSON_ELIGIBLE_TYPES.has(e.sectionType));
+  const excludedEntries = classified.filter((e) => !LESSON_ELIGIBLE_TYPES.has(e.sectionType));
+  // If classification excluded literally everything (a very short or unusual
+  // upload), ground on the full map rather than sending Gemini nothing.
+  const usableEntries = eligibleEntries.length > 0 ? eligibleEntries : classified;
+  const detectedHeadings = detectLessonHeadings(usableEntries);
+
+  const mapText = usableEntries
+    .map((e) => `[chunk ${e.chunkId}]${e.sectionType === SECTION_TYPES.LESSON_HEADING ? ' (đề mục Lesson có sẵn)' : ''} ${e.preview}`)
+    .join('\n');
+
+  // Mode A signal: the document already numbers its own Lessons ("Bài 1",
+  // "Chương 2"...) — tell Gemini to reuse that structure rather than invent
+  // a new one from scratch.
+  const headingHintLine = detectedHeadings.length >= 2
+    ? `\n\nTài liệu đã có cấu trúc Lesson rõ ràng theo các đề mục sau (dùng làm khung Lesson chính, chỉ làm gọn tên nếu cần, KHÔNG tự bịa cấu trúc khác):\n${detectedHeadings.map((e) => `- [chunk ${e.chunkId}] ${e.preview}`).join('\n')}`
+    : '';
+
+  return { eligibleEntries: usableEntries, excludedEntries, eligibleChunkIds: new Set(usableEntries.map((e) => e.chunkId)), detectedHeadings, mapText, headingHintLine };
+}
+
+// Always included whenever a real document grounds this generation, so the
+// model never fills gaps with trainer instructions/exercises/activities/
+// examples/administrative content or unrelated exam-bank material.
+const DOCUMENT_GROUNDING_GUARDRAIL = 'CHỈ tạo Lesson từ các chủ đề KIẾN THỨC CHÍNH có trong tài liệu nguồn bên trên. Bỏ qua hoàn toàn hướng dẫn giảng viên, bài tập, hoạt động lớp học, ví dụ minh hoạ và nội dung hành chính — KHÔNG biến bất kỳ nội dung nào trong số đó thành một Lesson riêng. KHÔNG tạo nội dung liên quan đề thi MOF trừ khi tài liệu THỰC SỰ đề cập đến MOF và trainer yêu cầu.';
+
+// Tries the AI-proposed title first; if that fails validation, tries a title
+// derived from the lesson's own summary/learningOutcome (still real content
+// the model wrote, just not what it chose as the title); only if BOTH fail
+// does this fall back to an honest, obviously-a-placeholder label — never a
+// bare "Phần N" passed off as if it were a real topic name.
+export function repairLessonTitle(rawTitle, fallbackText, placeholderContext, placeholderIndex) {
+  const title = sanitizeLessonTitle(rawTitle);
+  if (validateLessonTitle(title).valid) return title;
+  const altTitle = sanitizeLessonTitle(fallbackText || '');
+  if (altTitle && validateLessonTitle(altTitle).valid) return altTitle;
+  return `${placeholderContext || 'Camp'} – Chủ đề ${placeholderIndex} (cần đặt tên)`;
+}
+
+// Drops lessons whose title normalizes to one already kept (case/whitespace
+// insensitive) — a document repeating the same heading/topic under two
+// phrasings shouldn't produce duplicate Lessons. Remaps prerequisiteIndexes
+// (array-position references) so they stay correct once lessons are removed.
+export function dedupeLessonsPreservingPrereqs(lessons) {
+  const seenTitles = new Set();
+  const keep = lessons.map((l) => {
+    const key = (l.title || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!key || seenTitles.has(key)) return false;
+    seenTitles.add(key);
+    return true;
+  });
+  const oldToNew = new Map();
+  let next = 0;
+  lessons.forEach((_, i) => { if (keep[i]) oldToNew.set(i, next++); });
+  return lessons.filter((_, i) => keep[i]).map((l) => ({
+    ...l,
+    prerequisiteIndexes: (l.prerequisiteIndexes || []).filter((p) => oldToNew.has(p)).map((p) => oldToNew.get(p))
+  }));
+}
+
+// Real topic name for a fallback camp: the first eligible entry's cleaned
+// preview (heading numbering stripped), falling back to a neutral "Camp N"
+// only when nothing usable is found — never a bare "Phần N" (spec: don't use
+// generic Camp names like "Phần 1"/"Phần 2" when a real topic can be found).
+export function deriveCampTitle(entries, index) {
+  for (const e of entries) {
+    const withoutHeadingPrefix = (e.preview || '').replace(/^(bài|chủ đề|lesson|module|chương)\s*\d+[:.\-–]?\s*/i, '');
+    const cleaned = sanitizeLessonTitle(withoutHeadingPrefix.replace(/…$/, ''));
+    if (cleaned && validateLessonTitle(cleaned).valid) return cleaned;
+  }
+  return `Camp ${index + 1}`;
+}
+
+// Deduping detected Lesson-heading entries by topic (heading numbering
+// stripped) BEFORE they're bucketed into camps — deduping the final lesson
+// list afterward instead would remove a whole camp's only lesson and leave
+// an empty camp behind, e.g. a document with a heading repeated verbatim
+// twice (spec: remove repeated headings).
+function dedupeHeadingEntriesByTopic(entries) {
+  const seen = new Set();
+  return entries.filter((e) => {
+    const key = (e.preview || '')
+      .replace(/^(bài|chủ đề|lesson|module|chương)\s*\d+[:.\-–]?\s*/i, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ── Course Blueprint generation — structure only, one Gemini call ──────────
 // Replaces the old generateCurriculumFromPrompt/GoalOnly + per-lesson-per-
 // chunk bucketing. That pipeline resent every chunk's full text on every
@@ -176,7 +278,11 @@ export async function generateCourseBlueprint(db, { courseId, courseTitle = '', 
 
   if (docMap.length === 0) return generateBlueprintFromGoalOnly(db, { courseTitle, prompt, preferredCamps: cappedCamps });
 
-  const mapText = docMap.map((e) => `[chunk ${e.chunkId}] ${e.preview}`).join('\n');
+  // Classify every doc-map entry and strip anything that must never ground
+  // or name a Lesson (trainer instructions, class activities, exercises,
+  // examples, administrative content) before Gemini — or the deterministic
+  // fallback below — ever sees it.
+  const grounding = buildLessonGrounding(docMap);
   const goalLine = prompt?.trim()
     ? `Mục tiêu khóa học của trainer: "${prompt.trim()}"`
     : 'Trainer chưa mô tả mục tiêu cụ thể — hãy tự đề xuất một lộ trình hợp lý bao trùm toàn bộ tài liệu.';
@@ -187,15 +293,15 @@ export async function generateCourseBlueprint(db, { courseId, courseTitle = '', 
     async () => {
       const raw = await studioCallGemini(
         STUDIO_PERSONALITY_RULES + '\n' + BLUEPRINT_JSON_SHAPE,
-        `Đây là bản đồ rút gọn tài liệu khóa học (mỗi dòng một đoạn, đánh số [chunk N]):\n${mapText}\n\n${goalLine}\n\n${BLUEPRINT_INSTRUCTIONS(cappedCamps)}`,
+        `Đây là bản đồ rút gọn tài liệu khóa học, đã lọc bỏ hướng dẫn/hoạt động/bài tập/nội dung hành chính (mỗi dòng một đoạn, đánh số [chunk N]):\n${grounding.mapText}${grounding.headingHintLine}\n\n${goalLine}\n\n${BLUEPRINT_INSTRUCTIONS(cappedCamps)}\n${DOCUMENT_GROUNDING_GUARDRAIL}`,
         AI_TASKS.GENERATE_CURRICULUM, db, 45000
       );
-      const blueprint = parseAndRepairBlueprint(raw, courseTitle, approvedChunkIds);
+      const blueprint = parseAndRepairBlueprint(raw, courseTitle, approvedChunkIds, grounding.eligibleChunkIds);
       return withCacheControl({ blueprint, usedAI: !!blueprint }, !!blueprint);
     }
   );
 
-  const blueprint = result.blueprint || buildBlueprintBucketFallback(courseTitle, docMap, cappedCamps);
+  const blueprint = result.blueprint || buildBlueprintBucketFallback(courseTitle, grounding, cappedCamps);
   return { ...blueprint, usedSource: 'document', usedAI: result.usedAI };
 }
 
@@ -239,8 +345,11 @@ ${LESSON_RULES_TEXT}
 // repairs the two structural issues worth auto-fixing (too many camps; a
 // lesson pointing past MAX_BLUEPRINT_CAMPS) before running the full
 // validator. Returns null (never throws) on anything unrecoverable, so the
-// caller always has a deterministic fallback to reach for.
-function parseAndRepairBlueprint(raw, courseTitle, approvedChunkIds) {
+// caller always has a deterministic fallback to reach for. `eligibleChunkIds`
+// (Set|null) is the classified CORE_KNOWLEDGE/SUBTOPIC/LESSON_HEADING chunk
+// set for this course's document, if any — used to scrub citations to
+// excluded content and drop Lessons grounded only in it.
+export function parseAndRepairBlueprint(raw, courseTitle, approvedChunkIds, eligibleChunkIds = null) {
   if (!raw) return null;
   let parsed;
   try { parsed = JSON.parse(stripJsonFence(raw)); } catch { return null; }
@@ -250,13 +359,27 @@ function parseAndRepairBlueprint(raw, courseTitle, approvedChunkIds) {
   if (camps.length > MAX_BLUEPRINT_CAMPS) camps = camps.slice(0, MAX_BLUEPRINT_CAMPS);
 
   const lessonCountByCamp = new Map();
-  const lessons = (parsed.lessons || []).map((l) => {
+  let lessons = (parsed.lessons || []).map((l) => {
     const campIndex = Math.max(0, Math.min(typeof l.campIndex === 'number' ? l.campIndex : 0, camps.length - 1));
     const n = (lessonCountByCamp.get(campIndex) || 0) + 1;
     lessonCountByCamp.set(campIndex, n);
 
-    let title = sanitizeLessonTitle(l.title);
-    if (!validateLessonTitle(title).valid) title = `${camps[campIndex]?.title || 'Camp'} – Phần ${n}`;
+    const title = repairLessonTitle(l.title, l.summary || l.learningOutcome, camps[campIndex]?.title, n);
+
+    // With no uploaded document there are no real chunks to cite — force
+    // empty rather than trust whatever chunk numbers the model invented, so
+    // a goal-only course never carries a fabricated source citation.
+    const rawSourceIds = approvedChunkIds.length === 0
+      ? []
+      : (Array.isArray(l.sourceChunkIds) ? l.sourceChunkIds.filter((id) => typeof id === 'number') : []);
+    // A citation to a chunk classified as an instruction/activity/exercise/
+    // example/admin fragment is never legitimate lesson grounding — drop it
+    // silently (the lesson may still have other, real citations).
+    const sourceChunkIds = eligibleChunkIds ? rawSourceIds.filter((id) => eligibleChunkIds.has(id)) : rawSourceIds;
+    // ...unless EVERY citation the model gave was excluded-type — that
+    // lesson was grounded only in non-knowledge content and must be dropped
+    // entirely, not kept with an empty citation list.
+    const groundedOnlyInExcluded = !!eligibleChunkIds && eligibleChunkIds.size > 0 && rawSourceIds.length > 0 && sourceChunkIds.length === 0;
 
     return {
       title,
@@ -266,14 +389,13 @@ function parseAndRepairBlueprint(raw, courseTitle, approvedChunkIds) {
       estimatedMinutes: typeof l.estimatedMinutes === 'number' && l.estimatedMinutes > 0 ? l.estimatedMinutes : 20,
       difficulty: ['Dễ', 'Trung bình', 'Khó'].includes(l.difficulty) ? l.difficulty : 'Trung bình',
       prerequisiteIndexes: Array.isArray(l.prerequisiteIndexes) ? l.prerequisiteIndexes.filter((n2) => typeof n2 === 'number') : [],
-      // With no uploaded document there are no real chunks to cite — force
-      // empty rather than trust whatever chunk numbers the model invented,
-      // so a goal-only course never carries a fabricated source citation.
-      sourceChunkIds: approvedChunkIds.length === 0
-        ? []
-        : (Array.isArray(l.sourceChunkIds) ? l.sourceChunkIds.filter((id) => typeof id === 'number') : [])
+      sourceChunkIds,
+      _groundedOnlyInExcluded: groundedOnlyInExcluded
     };
   });
+
+  lessons = lessons.filter((l) => !l._groundedOnlyInExcluded).map(({ _groundedOnlyInExcluded, ...rest }) => rest);
+  lessons = dedupeLessonsPreservingPrereqs(lessons);
 
   const blueprint = {
     title: (parsed.title || courseTitle || '').trim() || 'Khóa học mới',
@@ -323,24 +445,29 @@ function splitIntoBuckets(arr, bucketCount) {
   return buckets;
 }
 
-function buildBlueprintBucketFallback(courseTitle, docMap, preferredCamps) {
-  const campCount = Math.max(1, Math.min(preferredCamps, MAX_BLUEPRINT_CAMPS, docMap.length || 1));
-  const campBuckets = splitIntoBuckets(docMap, campCount);
-  const camps = campBuckets.map((_, i) => ({ title: `Phần ${i + 1}` }));
-  const lessons = [];
+// `grounding` is buildLessonGrounding's result — already excludes anything
+// that must never define a Lesson, and already knows whether the document
+// has its own explicit Lesson headings (Mode A) to reuse as-is.
+export function buildBlueprintBucketFallback(courseTitle, grounding, preferredCamps) {
+  const { eligibleEntries, detectedHeadings } = grounding;
+  // Mode A even without AI: when the document numbers its own Lessons, use
+  // those headings directly as the Lesson seeds instead of naive bucket-
+  // splitting by chunk order.
+  const lessonSeeds = detectedHeadings.length >= 2 ? dedupeHeadingEntriesByTopic(detectedHeadings) : eligibleEntries;
+
+  const campCount = Math.max(1, Math.min(preferredCamps, MAX_BLUEPRINT_CAMPS, lessonSeeds.length || 1));
+  const campBuckets = splitIntoBuckets(lessonSeeds, campCount);
+  const camps = campBuckets.map((entries, i) => ({ title: deriveCampTitle(entries, i) }));
+  let lessons = [];
   campBuckets.forEach((entries, campIndex) => {
     const lessonCount = Math.max(2, Math.min(5, entries.length || 2));
     for (const bucket of splitIntoBuckets(entries, lessonCount)) {
-      // A raw chunk preview is often a mid-sentence fragment or classroom
-      // instruction, not a topic name — same title-quality bar as the AI
-      // path applies here too, falling back to a clean generic label
-      // instead of ever shipping a fragment as a lesson title.
-      let stub = sanitizeLessonTitle(bucket[0].preview.replace(/…$/, ''));
-      if (!stub || !validateLessonTitle(stub).valid) stub = `${camps[campIndex].title} – Phần ${lessons.length + 1}`;
+      const headingless = bucket[0].preview.replace(/^(bài|chủ đề|lesson|module|chương)\s*\d+[:.\-–]?\s*/i, '').replace(/…$/, '');
+      const title = repairLessonTitle(headingless, bucket.map((e) => e.preview).join(' '), camps[campIndex].title, lessons.length + 1);
       lessons.push({
-        title: stub,
+        title,
         summary: bucket.map((e) => e.preview).join(' ').slice(0, 200),
-        learningOutcome: `Học viên nắm được nội dung: ${stub}`,
+        learningOutcome: `Học viên nắm được nội dung: ${title}`,
         campIndex,
         estimatedMinutes: 15,
         difficulty: 'Trung bình',
@@ -349,6 +476,7 @@ function buildBlueprintBucketFallback(courseTitle, docMap, preferredCamps) {
       });
     }
   });
+  lessons = dedupeLessonsPreservingPrereqs(lessons);
   return {
     title: courseTitle || 'Khóa học mới',
     outcomes: [`Học viên nắm được các nội dung chính trong tài liệu đã tải lên.`],
@@ -369,12 +497,16 @@ function buildBlueprintBucketFallback(courseTitle, docMap, preferredCamps) {
 export async function regenerateCampLessons(db, { courseId, campTitle, prompt = '' }) {
   const docMap = await getCourseDocumentMap(db, courseId);
   const approvedChunkIds = docMap.map((e) => e.chunkId);
-  const mapText = docMap.length ? `Bản đồ rút gọn tài liệu khóa học:\n${docMap.map((e) => `[chunk ${e.chunkId}] ${e.preview}`).join('\n')}` : 'Khóa học này chưa có tài liệu nguồn — dùng kiến thức chuyên môn bảo hiểm của bạn.';
+  const grounding = docMap.length ? buildLessonGrounding(docMap) : null;
+  const mapText = grounding
+    ? `Bản đồ rút gọn tài liệu khóa học, đã lọc bỏ hướng dẫn/hoạt động/bài tập/nội dung hành chính:\n${grounding.mapText}${grounding.headingHintLine}`
+    : 'Khóa học này chưa có tài liệu nguồn — dùng kiến thức chuyên môn bảo hiểm của bạn.';
   const noteLine = prompt?.trim() ? `Ghi chú thêm từ trainer: "${prompt.trim()}"` : '';
+  const guardrailLine = grounding ? `\n${DOCUMENT_GROUNDING_GUARDRAIL}` : '';
 
   const raw = await studioCallGemini(
     STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"lessons": [{"title": string, "summary": string, "learningOutcome": string, "estimatedMinutes": number, "difficulty": string, "sourceChunkIds": [number]}]}',
-    `${mapText}\n\nCamp hiện tại: "${campTitle}".\n${noteLine}\n\nĐề xuất lại 2-5 chặng học (lesson) MỚI cho RIÊNG camp này (không đụng đến các camp khác):\n${LESSON_RULES_TEXT}`,
+    `${mapText}\n\nCamp hiện tại: "${campTitle}".\n${noteLine}\n\nĐề xuất lại 2-5 chặng học (lesson) MỚI cho RIÊNG camp này (không đụng đến các camp khác):\n${LESSON_RULES_TEXT}${guardrailLine}`,
     AI_TASKS.GENERATE_CURRICULUM, db, 45000
   );
 
@@ -384,17 +516,18 @@ export async function regenerateCampLessons(db, { courseId, campTitle, prompt = 
       const parsed = JSON.parse(stripJsonFence(raw));
       if (Array.isArray(parsed?.lessons) && parsed.lessons.length > 0) {
         lessons = parsed.lessons.map((l) => {
-          let title = sanitizeLessonTitle(l.title);
-          if (!validateLessonTitle(title).valid) title = `${campTitle} – ${sanitizeLessonTitle(l.summary || l.title || 'Chặng học')}`;
+          const title = repairLessonTitle(l.title, l.summary || l.learningOutcome, campTitle, 1);
+          const rawSourceIds = Array.isArray(l.sourceChunkIds) ? l.sourceChunkIds.filter((id) => approvedChunkIds.length === 0 || approvedChunkIds.includes(id)) : [];
           return {
             title,
             summary: (l.summary || '').trim(),
             learningOutcome: l.learningOutcome || `Học viên hiểu và vận dụng được kiến thức về ${title.toLowerCase()}.`,
             estimatedMinutes: typeof l.estimatedMinutes === 'number' && l.estimatedMinutes > 0 ? l.estimatedMinutes : 20,
             difficulty: ['Dễ', 'Trung bình', 'Khó'].includes(l.difficulty) ? l.difficulty : 'Trung bình',
-            sourceChunkIds: Array.isArray(l.sourceChunkIds) ? l.sourceChunkIds.filter((id) => approvedChunkIds.length === 0 || approvedChunkIds.includes(id)) : []
+            sourceChunkIds: grounding ? rawSourceIds.filter((id) => grounding.eligibleChunkIds.has(id)) : rawSourceIds
           };
         });
+        lessons = dedupeLessonsPreservingPrereqs(lessons);
         if (lessons.length < 2 || lessons.length > 5) lessons = null; // out of range — fall back rather than silently violate the cap
       }
     } catch { /* falls through to the deterministic fallback below */ }
@@ -402,22 +535,25 @@ export async function regenerateCampLessons(db, { courseId, campTitle, prompt = 
 
   if (lessons) return { lessons, usedAI: true };
 
-  // Deterministic fallback: bucket the whole course's document map into 2-5
-  // stub lessons for this camp, same shape as buildBlueprintBucketFallback.
-  const lessonCount = Math.max(2, Math.min(5, docMap.length || 2));
-  const buckets = splitIntoBuckets(docMap, lessonCount);
-  const fallbackLessons = (buckets.length ? buckets : [[]]).map((bucket, i) => {
-    let stub = bucket.length ? sanitizeLessonTitle(bucket[0].preview.replace(/…$/, '')) : '';
-    if (!stub || !validateLessonTitle(stub).valid) stub = `${campTitle} – Phần ${i + 1}`;
+  // Deterministic fallback: bucket this camp's eligible document-map
+  // entries (or its own Lesson headings, if the document has them) into 2-5
+  // stub lessons, same approach as buildBlueprintBucketFallback.
+  const lessonSeeds = grounding ? (grounding.detectedHeadings.length >= 2 ? dedupeHeadingEntriesByTopic(grounding.detectedHeadings) : grounding.eligibleEntries) : docMap;
+  const lessonCount = Math.max(2, Math.min(5, lessonSeeds.length || 2));
+  const buckets = splitIntoBuckets(lessonSeeds, lessonCount);
+  let fallbackLessons = (buckets.length ? buckets : [[]]).map((bucket, i) => {
+    const headingless = bucket.length ? bucket[0].preview.replace(/^(bài|chủ đề|lesson|module|chương)\s*\d+[:.\-–]?\s*/i, '').replace(/…$/, '') : '';
+    const title = repairLessonTitle(headingless, bucket.map((e) => e.preview).join(' '), campTitle, i + 1);
     return {
-      title: stub,
+      title,
       summary: bucket.map((e) => e.preview).join(' ').slice(0, 200),
-      learningOutcome: `Học viên nắm được nội dung: ${stub}`,
+      learningOutcome: `Học viên nắm được nội dung: ${title}`,
       estimatedMinutes: 15,
       difficulty: 'Trung bình',
       sourceChunkIds: bucket.map((e) => e.chunkId)
     };
   });
+  fallbackLessons = dedupeLessonsPreservingPrereqs(fallbackLessons);
   return { lessons: fallbackLessons, usedAI: false };
 }
 
@@ -429,12 +565,16 @@ export async function regenerateCampLessons(db, { courseId, campTitle, prompt = 
 export async function regenerateLessonDetails(db, { courseId, lessonTitle, campTitle, prompt = '' }) {
   const docMap = await getCourseDocumentMap(db, courseId);
   const approvedChunkIds = docMap.map((e) => e.chunkId);
-  const mapText = docMap.length ? `Bản đồ rút gọn tài liệu khóa học:\n${docMap.map((e) => `[chunk ${e.chunkId}] ${e.preview}`).join('\n')}` : 'Khóa học này chưa có tài liệu nguồn — dùng kiến thức chuyên môn bảo hiểm của bạn.';
+  const grounding = docMap.length ? buildLessonGrounding(docMap) : null;
+  const mapText = grounding
+    ? `Bản đồ rút gọn tài liệu khóa học, đã lọc bỏ hướng dẫn/hoạt động/bài tập/nội dung hành chính:\n${grounding.mapText}`
+    : 'Khóa học này chưa có tài liệu nguồn — dùng kiến thức chuyên môn bảo hiểm của bạn.';
   const noteLine = prompt?.trim() ? `Ghi chú thêm từ trainer: "${prompt.trim()}"` : '';
+  const guardrailLine = grounding ? `\n${DOCUMENT_GROUNDING_GUARDRAIL}` : '';
 
   const raw = await studioCallGemini(
     STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"title": string, "summary": string, "learningOutcome": string, "estimatedMinutes": number, "difficulty": string, "sourceChunkIds": [number]}',
-    `${mapText}\n\nCamp: "${campTitle}". Chặng học hiện tại: "${lessonTitle}".\n${noteLine}\n\nĐề xuất lại MỘT chặng học thay thế cho riêng chặng này (không tạo thêm chặng khác):\n${LESSON_RULES_TEXT}`,
+    `${mapText}\n\nCamp: "${campTitle}". Chặng học hiện tại: "${lessonTitle}".\n${noteLine}\n\nĐề xuất lại MỘT chặng học thay thế cho riêng chặng này (không tạo thêm chặng khác):\n${LESSON_RULES_TEXT}${guardrailLine}`,
     AI_TASKS.GENERATE_CURRICULUM, db, 45000
   );
 
@@ -442,8 +582,15 @@ export async function regenerateLessonDetails(db, { courseId, lessonTitle, campT
     try {
       const parsed = JSON.parse(stripJsonFence(raw));
       if (matchesShape({ title: 'string' }, parsed)) {
+        // Unlike the blueprint/camp paths, a single-lesson regenerate always
+        // has a known-good existing title to fall back to — prefer that
+        // over ever showing a "needs a name" placeholder here.
         let title = sanitizeLessonTitle(parsed.title);
-        if (!validateLessonTitle(title).valid) title = lessonTitle; // keep the existing title rather than save a bad one
+        if (!validateLessonTitle(title).valid) {
+          const altTitle = sanitizeLessonTitle(parsed.summary || parsed.learningOutcome || '');
+          title = validateLessonTitle(altTitle).valid ? altTitle : lessonTitle;
+        }
+        const rawSourceIds = Array.isArray(parsed.sourceChunkIds) ? parsed.sourceChunkIds.filter((id) => approvedChunkIds.length === 0 || approvedChunkIds.includes(id)) : [];
         return {
           lesson: {
             title,
@@ -451,7 +598,7 @@ export async function regenerateLessonDetails(db, { courseId, lessonTitle, campT
             learningOutcome: parsed.learningOutcome || `Học viên hiểu và vận dụng được kiến thức về ${title.toLowerCase()}.`,
             estimatedMinutes: typeof parsed.estimatedMinutes === 'number' && parsed.estimatedMinutes > 0 ? parsed.estimatedMinutes : 20,
             difficulty: ['Dễ', 'Trung bình', 'Khó'].includes(parsed.difficulty) ? parsed.difficulty : 'Trung bình',
-            sourceChunkIds: Array.isArray(parsed.sourceChunkIds) ? parsed.sourceChunkIds.filter((id) => approvedChunkIds.length === 0 || approvedChunkIds.includes(id)) : []
+            sourceChunkIds: grounding ? rawSourceIds.filter((id) => grounding.eligibleChunkIds.has(id)) : rawSourceIds
           },
           usedAI: true
         };
