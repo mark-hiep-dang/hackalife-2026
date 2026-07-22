@@ -331,7 +331,12 @@ function buildBlueprintBucketFallback(courseTitle, docMap, preferredCamps) {
   campBuckets.forEach((entries, campIndex) => {
     const lessonCount = Math.max(2, Math.min(5, entries.length || 2));
     for (const bucket of splitIntoBuckets(entries, lessonCount)) {
-      const stub = sanitizeLessonTitle(bucket[0].preview.replace(/…$/, '')) || `${camps[campIndex].title} – Phần ${lessons.length + 1}`;
+      // A raw chunk preview is often a mid-sentence fragment or classroom
+      // instruction, not a topic name — same title-quality bar as the AI
+      // path applies here too, falling back to a clean generic label
+      // instead of ever shipping a fragment as a lesson title.
+      let stub = sanitizeLessonTitle(bucket[0].preview.replace(/…$/, ''));
+      if (!stub || !validateLessonTitle(stub).valid) stub = `${camps[campIndex].title} – Phần ${lessons.length + 1}`;
       lessons.push({
         title: stub,
         summary: bucket.map((e) => e.preview).join(' ').slice(0, 200),
@@ -402,9 +407,10 @@ export async function regenerateCampLessons(db, { courseId, campTitle, prompt = 
   const lessonCount = Math.max(2, Math.min(5, docMap.length || 2));
   const buckets = splitIntoBuckets(docMap, lessonCount);
   const fallbackLessons = (buckets.length ? buckets : [[]]).map((bucket, i) => {
-    const stub = bucket.length ? sanitizeLessonTitle(bucket[0].preview.replace(/…$/, '')) : `${campTitle} – Phần ${i + 1}`;
+    let stub = bucket.length ? sanitizeLessonTitle(bucket[0].preview.replace(/…$/, '')) : '';
+    if (!stub || !validateLessonTitle(stub).valid) stub = `${campTitle} – Phần ${i + 1}`;
     return {
-      title: stub || `${campTitle} – Phần ${i + 1}`,
+      title: stub,
       summary: bucket.map((e) => e.preview).join(' ').slice(0, 200),
       learningOutcome: `Học viên nắm được nội dung: ${stub}`,
       estimatedMinutes: 15,

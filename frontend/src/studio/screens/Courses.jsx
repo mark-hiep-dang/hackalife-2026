@@ -107,6 +107,13 @@ function BlueprintPreview({ blueprint, busy, onConfirm, onRegenerate, onCancel, 
       </div>
       <p className="text-[12.5px] font-bold text-[#8A8A8A] mb-4">{t.studioBlueprintPreviewSubtitle}</p>
 
+      {blueprint.usedAI === false && (
+        <div className="flex items-start gap-2.5 bg-[#FDF0DC] rounded-2xl px-4 py-3.5 mb-4">
+          <span className="text-lg shrink-0">⚠️</span>
+          <div className="text-[12.5px] font-bold text-[#8A6414] leading-snug">{t.studioBlueprintFallbackWarning}</div>
+        </div>
+      )}
+
       {blueprint.outcomes?.length > 0 && (
         <div className="bg-[#F4F1FB] rounded-2xl p-4 mb-4">
           <div className="font-comic font-extrabold text-[12.5px] text-[#101A24] mb-2">🎯 {t.studioBlueprintOutcomesLabel}</div>
@@ -307,11 +314,11 @@ function CreateCourseWizard({ onCreated, onCancel }) {
   return (
     <div className="flex flex-col gap-5">
       <button
-        onClick={() => (courseId ? onCreated(courseId) : onCancel())}
+        onClick={() => (step > 1 ? setStep((s) => s - 1) : (courseId ? onCreated(courseId) : onCancel()))}
         className="flex items-center gap-2 text-sm font-bold text-[#101A24] w-fit bg-white rounded-2xl px-4 py-2.5"
         style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}
       >
-        <ArrowLeft size={16} /> {courseId ? t.studioWizardCloseSavedBtn : t.studioWizardCancelBtn}
+        <ArrowLeft size={16} /> {step > 1 ? t.studioBack : (courseId ? t.studioWizardCloseSavedBtn : t.studioWizardCancelBtn)}
       </button>
 
       <WizardStepper step={step} t={t} />
@@ -454,7 +461,9 @@ function CreateCourseWizard({ onCreated, onCancel }) {
           </div>
           <Card className="!rounded-[28px] !p-6 max-w-[960px]">
             <div className="font-comic font-extrabold text-[15px] text-[#101A24] mb-3.5">🏔️ {t.studioMountainTitle}</div>
-            {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
+            {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : (
+              <MountainVisual courseId={courseId} camps={camps} lessons={lessons} contentItems={contentItems} course={bundle?.course} t={t} onChanged={load} />
+            )}
           </Card>
           <ContentLibrary bundle={bundle} onChanged={load} />
           <div className="flex gap-3 max-w-[960px]">
@@ -589,7 +598,7 @@ function LessonRow({ lesson, items, course, t, onChanged }) {
   );
 }
 
-function CampCard({ camp, index, lessons, t, onChanged }) {
+function CampCard({ camp, index, lessons, contentItems, course, t, onChanged }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(camp.title);
   const [addingLesson, setAddingLesson] = useState(false);
@@ -636,7 +645,9 @@ function CampCard({ camp, index, lessons, t, onChanged }) {
         <div className="font-comic font-extrabold text-[14.5px] text-[#101A24] mb-3.5">{camp.title}</div>
       )}
       <div className="flex flex-col gap-1.5">
-        {campLessons.map((l) => <LessonRow key={l.id} lesson={l} t={t} onChanged={onChanged} />)}
+        {campLessons.map((l) => (
+          <LessonRow key={l.id} lesson={l} items={contentItems.filter((i) => i.lessonId === l.id)} course={course} t={t} onChanged={onChanged} />
+        ))}
       </div>
       {addingLesson ? (
         <AddLessonForm campId={camp.id} t={t} onCancel={() => setAddingLesson(false)} onAdded={() => { setAddingLesson(false); onChanged(); }} />
@@ -651,7 +662,7 @@ function CampCard({ camp, index, lessons, t, onChanged }) {
   );
 }
 
-function MountainVisual({ courseId, camps, lessons, t, onChanged }) {
+function MountainVisual({ courseId, camps, lessons, contentItems = [], course, t, onChanged }) {
   const [addingCamp, setAddingCamp] = useState(false);
   const [newCampTitle, setNewCampTitle] = useState('');
   const [saving, setSaving] = useState(false);
@@ -664,7 +675,9 @@ function MountainVisual({ courseId, camps, lessons, t, onChanged }) {
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-2">
-      {camps.map((camp, i) => <CampCard key={camp.id} camp={camp} index={i} lessons={lessons} t={t} onChanged={onChanged} />)}
+      {camps.map((camp, i) => (
+        <CampCard key={camp.id} camp={camp} index={i} lessons={lessons} contentItems={contentItems} course={course} t={t} onChanged={onChanged} />
+      ))}
       <div className="min-w-[150px] rounded-[22px] p-4.5 bg-[#101A24] text-white flex flex-col items-center justify-center gap-2.5 shrink-0">
         <span className="text-[28px]" style={{ animation: 'bob 2.6s ease-in-out infinite' }}>🦙</span>
         <span className="font-comic font-extrabold text-xs text-center">{t.studioSummitLabel} 🏁</span>
@@ -874,7 +887,7 @@ function CourseDetail({ courseId, onBack }) {
   }
 
   if (!bundle) return <Spinner label={t.studioLoading} />;
-  const { course, camps, lessons } = bundle;
+  const { course, camps, lessons, contentItems } = bundle;
   const TAB_LABEL = { architect: t.studioCourseArchitectTab, quality: t.studioCourseQualityTab, library: t.studioNavLibrary, publish: t.studioNavPublish };
   const STATUS_LABEL = { AI_DRAFT: t.studioStatusAiDraft, PUBLISHED: t.studioStatusPublished };
 
@@ -955,7 +968,7 @@ function CourseDetail({ courseId, onBack }) {
                   onCancel={() => setBlueprint(null)}
                 />
               ) : camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : (
-                <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />
+                <MountainVisual courseId={courseId} camps={camps} lessons={lessons} contentItems={contentItems} course={course} t={t} onChanged={load} />
               )}
             </Card>
             {!blueprint && <GenerateFromSourcePanel docs={knowledgeDocs} lessons={lessons} t={t} />}
