@@ -21,6 +21,7 @@ export const getOverview = () => req('/overview');
 export const getCourses = () => req('/courses');
 export const createCourse = (course) => req('/courses', { method: 'POST', body: course });
 export const getCourse = (id) => req(`/courses/${id}`);
+export const deleteCourse = (id) => req(`/courses/${id}`, { method: 'DELETE' });
 export const generateCourseCurriculum = (id, prompt) => req(`/courses/${id}/curriculum/generate`, { method: 'POST', body: { prompt } });
 export const createCamp = (courseId, title) => req(`/courses/${courseId}/camps`, { method: 'POST', body: { title } });
 export const updateCamp = (campId, fields) => req(`/camps/${campId}`, { method: 'PUT', body: fields });

@@ -282,11 +282,19 @@ export default function LearnersAndExams() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <SectionTitle subtitle={t.studioLearnersExamsSubtitle}>👥 {t.studioLearnersExamsTitle}</SectionTitle>
         <div className="flex gap-2 flex-wrap items-center">
-          {cohorts.map((c) => (
-            <button key={c.id} onClick={() => setCohortId(c.id)}
-              className={`font-comic font-extrabold text-xs px-4 py-2.5 rounded-2xl transition-all ${cohortId === c.id ? 'bg-[#101A24] text-white shadow-sm' : 'bg-white text-[#101A24] border border-[#101A24]/10 hover:shadow-sm'}`}
-            >{c.name}</button>
-          ))}
+          {cohorts.length > 1 ? (
+            <select value={cohortId ?? ''} onChange={(e) => setCohortId(Number(e.target.value))}
+              className="font-comic font-extrabold text-xs px-4 py-2.5 rounded-2xl bg-white text-[#101A24] border border-[#101A24]/10 hover:shadow-sm focus:outline-none"
+            >
+              {cohorts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          ) : (
+            cohorts.map((c) => (
+              <button key={c.id} onClick={() => setCohortId(c.id)}
+                className={`font-comic font-extrabold text-xs px-4 py-2.5 rounded-2xl transition-all ${cohortId === c.id ? 'bg-[#101A24] text-white shadow-sm' : 'bg-white text-[#101A24] border border-[#101A24]/10 hover:shadow-sm'}`}
+              >{c.name}</button>
+            ))
+          )}
           <button onClick={() => setShowRosterModal(true)} disabled={!cohortId}
             className="flex items-center gap-1.5 font-comic font-extrabold text-xs px-4 py-2.5 rounded-2xl bg-white text-[#101A24] border border-[#101A24]/10 hover:shadow-sm disabled:opacity-40"
           >

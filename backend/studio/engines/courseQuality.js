@@ -5,7 +5,14 @@
 
 export const SEVERITY = { INFO: 'INFO', SUGGESTION: 'SUGGESTION', WARNING: 'WARNING', BLOCKER: 'BLOCKER' };
 
-const SEVERITY_PENALTY = { INFO: 1, SUGGESTION: 3, WARNING: 6, BLOCKER: 15 };
+// A real course with fully-approved content across every lesson still racks
+// up a couple dozen SUGGESTION/WARNING-tier issues (similar questions,
+// skills covered by more than one lesson, duration estimates being a bit
+// off) — none of those should be able to bottom the score out to 0 the way
+// {SUGGESTION:3, WARNING:6} did (20 suggestions alone = 60 points gone).
+// BLOCKER stays the dominant signal since it's the one thing that actually
+// gates publishing.
+const SEVERITY_PENALTY = { INFO: 1, SUGGESTION: 2, WARNING: 5, BLOCKER: 20 };
 
 function textTokens(text) {
   return new Set((text || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2));

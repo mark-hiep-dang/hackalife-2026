@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  getCourses, createCourse, getCourse, getCohorts, createCohort, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
+  getCourses, createCourse, getCourse, deleteCourse, getCohorts, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
   getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
@@ -53,7 +53,7 @@ const WIZARD_STEP_META = [
 
 function WizardStepper({ step, t }) {
   return (
-    <div className="flex items-start gap-1.5 max-w-[720px]">
+    <div className="flex items-start gap-1.5 max-w-[880px]">
       {WIZARD_STEP_META.map((s, i) => {
         const done = step > s.n;
         const active = step === s.n;
@@ -96,7 +96,7 @@ function ToggleSwitch({ label, checked, onChange }) {
 function CreateCourseWizard({ onCreated, onCancel }) {
   const t = useT();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title: '', cohortName: '', durationWeeks: 4, examDate: '', targetScore: 70, preferredCamps: 4 });
+  const [form, setForm] = useState({ title: '', durationWeeks: 4, examDate: '', targetScore: 70, preferredCamps: 4 });
   const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState([]);
   const [genFlashcards, setGenFlashcards] = useState(true);
@@ -117,7 +117,8 @@ function CreateCourseWizard({ onCreated, onCancel }) {
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{label}</span>
       <input type={type} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
-        className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" required={key === 'title' || key === 'cohortName'} />
+        className={`w-full px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8] ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
+        required={key === 'title'} />
     </label>
   );
 
@@ -144,7 +145,6 @@ function CreateCourseWizard({ onCreated, onCancel }) {
     e.preventDefault();
     const tasks = [
       { key: 'create', label: t.studioWizardStepCreateCourse, icon: '🚀', status: 'pending' },
-      { key: 'cohort', label: t.studioWizardStepCreateCohort, icon: '👥', status: 'pending' },
       ...(files.length > 0 ? [{ key: 'upload', label: t.studioWizardStepAnalyzeDocs, icon: '📖', status: 'pending' }] : []),
       { key: 'curriculum', label: t.studioWizardStepBuildCurriculum, icon: '🏔️', status: 'pending' }
     ];
@@ -152,16 +152,10 @@ function CreateCourseWizard({ onCreated, onCancel }) {
     setStep(2); setBusy(true); setError(null);
     try {
       markTask('create', 'active');
-      // A course and its cohort are 1:1 — the cohort name doubles as the
-      // course's target-group display text (course cards/hero already show
-      // that field), so no separate "target group" input is needed.
-      const { id } = await createCourse({ ...form, targetGroup: form.cohortName, description: prompt, genFlashcards, genQuiz, randomizeQuestions });
+      // Cohort assignment happens separately in Học viên & Thi thử, not here.
+      const { id } = await createCourse({ ...form, description: prompt, genFlashcards, genQuiz, randomizeQuestions });
       setCourseId(id);
       markTask('create', 'done');
-
-      markTask('cohort', 'active');
-      await createCohort({ courseId: id, name: form.cohortName });
-      markTask('cohort', 'done');
 
       if (files.length > 0) {
         markTask('upload', 'active');
@@ -209,18 +203,10 @@ function CreateCourseWizard({ onCreated, onCancel }) {
       <WizardStepper step={step} t={t} />
 
       {step === 1 && (
-        <Card className="!rounded-[28px] !p-8 max-w-[720px]">
+        <Card className="!rounded-[28px] !p-8 max-w-[880px]">
           <SectionTitle>{t.studioCreateCourseTitle}</SectionTitle>
           <form onSubmit={handleStartProcessing} className="flex flex-col gap-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {field('title', t.studioFieldCourseTitle)}
-              <label className="flex flex-col gap-1.5 text-sm">
-                <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{t.studioCohortNameLabel}</span>
-                <input value={form.cohortName} onChange={(e) => setForm((f) => ({ ...f, cohortName: e.target.value }))} required
-                  placeholder={t.studioCohortNamePlaceholder}
-                  className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" />
-              </label>
-            </div>
+            {field('title', t.studioFieldCourseTitle)}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {field('durationWeeks', t.studioFieldDurationWeeks, 'number')}
               {field('targetScore', t.studioFieldTargetScore, 'number')}
@@ -277,7 +263,7 @@ function CreateCourseWizard({ onCreated, onCancel }) {
       )}
 
       {step === 2 && (
-        <div className="rounded-[28px] p-9 max-w-[720px] text-center" style={{ background: 'linear-gradient(160deg,#101A24,#2B3A4A)', boxShadow: '0 6px 0 rgba(16,26,36,0.2)' }}>
+        <div className="rounded-[28px] p-9 max-w-[880px] text-center" style={{ background: 'linear-gradient(160deg,#101A24,#2B3A4A)', boxShadow: '0 6px 0 rgba(16,26,36,0.2)' }}>
           <div className="text-5xl mb-2" style={{ animation: 'bob 2.2s ease-in-out infinite' }}>🦙</div>
           <div className="font-comic font-extrabold text-[17px] text-white mb-1.5">{t.studioWizardProcessingTitle}</div>
           <div className="text-[12.5px] font-bold text-white/65 mb-7">{t.studioWizardProcessingSubtitle}</div>
@@ -842,6 +828,7 @@ export default function Courses() {
   const [learnerCounts, setLearnerCounts] = useState({});
   const [view, setView] = useState('list');
   const [selected, setSelected] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   function refresh() {
     getCourses().then(setCourses);
@@ -852,6 +839,14 @@ export default function Courses() {
     });
   }
   useEffect(() => { refresh(); }, []);
+
+  async function handleDelete(course) {
+    if (!window.confirm(t.studioDeleteCourseConfirm.replace('{title}', course.title))) return;
+    setDeletingId(course.id);
+    try { await deleteCourse(course.id); refresh(); }
+    catch (err) { window.alert(err.message); }
+    finally { setDeletingId(null); }
+  }
 
   if (view === 'create') return <CreateCourseWizard onCreated={(id) => { setSelected(id); setView('detail'); refresh(); }} onCancel={() => setView('list')} />;
   if (view === 'detail' && selected) return <CourseDetail courseId={selected} onBack={() => { setView('list'); refresh(); }} />;
@@ -881,23 +876,34 @@ export default function Courses() {
           {courses.map((c) => {
             const status = STATUS_STYLE[c.status] || { label: c.status, color: '#8A8A8A', bg: '#EEF0F3' };
             return (
-              <button key={c.id} onClick={() => { setSelected(c.id); setView('detail'); }}
-                className="text-left bg-white rounded-[26px] p-5.5 flex flex-col gap-3.5 hover:-translate-y-0.5 transition-transform"
-                style={{ boxShadow: '0 6px 0 rgba(16,26,36,0.06)' }}
-              >
-                <div className="flex items-start justify-between gap-2.5">
-                  <span className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center text-xl shrink-0 ${courseIconBg(c.id)}`}>{courseIcon(c.id)}</span>
-                  <HealthRing health={c.health_score} />
-                </div>
-                <div>
-                  <div className="font-comic font-extrabold text-[15.5px] text-[#101A24] mb-1 truncate">{c.title}</div>
-                  <div className="text-xs font-bold text-[#8A8A8A] truncate">{c.target_group}</div>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-comic font-extrabold text-[10.5px] px-3 py-1.5 rounded-xl" style={{ color: status.color, background: status.bg }}>{status.label}</span>
-                  <span className="text-[11.5px] font-bold text-[#8A8A8A]">{t.studioLearnerCountShort.replace('{n}', learnerCounts[c.id] || 0)}</span>
-                </div>
-              </button>
+              <div key={c.id} className="relative">
+                <button onClick={() => { setSelected(c.id); setView('detail'); }}
+                  className="w-full text-left bg-white rounded-[26px] p-5.5 flex flex-col gap-3.5 hover:-translate-y-0.5 transition-transform"
+                  style={{ boxShadow: '0 6px 0 rgba(16,26,36,0.06)' }}
+                >
+                  <div className="flex items-start justify-between gap-2.5">
+                    <span className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center text-xl shrink-0 ${courseIconBg(c.id)}`}>{courseIcon(c.id)}</span>
+                    <HealthRing health={c.health_score} />
+                  </div>
+                  <div>
+                    <div className="font-comic font-extrabold text-[15.5px] text-[#101A24] mb-1 truncate">{c.title}</div>
+                    <div className="text-xs font-bold text-[#8A8A8A] truncate">{c.target_group}</div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pr-8">
+                    <span className="font-comic font-extrabold text-[10.5px] px-3 py-1.5 rounded-xl" style={{ color: status.color, background: status.bg }}>{status.label}</span>
+                    <span className="text-[11.5px] font-bold text-[#8A8A8A]">{t.studioLearnerCountShort.replace('{n}', learnerCounts[c.id] || 0)}</span>
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(c); }}
+                  disabled={deletingId === c.id}
+                  title={t.studioDeleteCourseBtn}
+                  className="absolute bottom-5.5 right-5.5 w-7 h-7 rounded-full bg-white flex items-center justify-center text-[#101A24]/40 hover:text-red-600 disabled:opacity-40"
+                  style={{ boxShadow: '0 2px 0 rgba(16,26,36,0.08)' }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             );
           })}
         </div>

@@ -10,8 +10,8 @@ import mammoth from 'mammoth';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { getDb } from '../db.js';
-import { storeDocument, decodeUploadedFilename } from '../knowledgeBase.js';
-import { generateCurriculumFromPrompt, generateLessonKit, generateContentFromDocument, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
+import { storeDocument, decodeUploadedFilename, getCourseChunks } from '../knowledgeBase.js';
+import { generateCurriculumFromPrompt, generateLessonKit, generateContentFromDocument, generateContentFromCourseChunks, generateContentFromLessonGoal, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
 import { checkCourseQuality } from './engines/courseQuality.js';
 import { calculateCohortOverview, calculateTopicPerformance, classifyTrend } from './engines/mockExamAnalytics.js';
 import { detectLearnerRisk } from './engines/learnerRisk.js';
@@ -362,6 +362,23 @@ export function mountStudioRoutes(app, authenticateToken) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  app.delete('/api/studio/courses/:id', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const course = await db.get('SELECT id FROM studio_courses WHERE id = ?', [req.params.id]);
+      if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      // knowledge_documents.course_id has no FK/cascade (added via a later
+      // ALTER TABLE) — clean those up manually; everything else (camps,
+      // lessons, content items, quality history, cohorts + roster) cascades
+      // off studio_courses via real foreign keys. Already-published
+      // questions/flashcards live in test_questions/flashcards with no link
+      // back here, so learners keep whatever was already published.
+      await db.run('DELETE FROM knowledge_documents WHERE course_id = ?', [course.id]);
+      await db.run('DELETE FROM studio_courses WHERE id = ?', [course.id]);
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   app.post('/api/studio/courses/:id/curriculum/generate', ...T, async (req, res) => {
     const db = req.db;
     try {
@@ -691,44 +708,61 @@ export function mountStudioRoutes(app, authenticateToken) {
       );
       if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
 
-      // The lesson's title doubles as its mapped real exam topic (see studioAIService's DEFAULT_CAMP_GROUPING).
+      // The lesson's title doubles as its mapped real exam topic for the
+      // legacy MOF exam bank (see studioAIService's DEFAULT_CAMP_GROUPING) —
+      // but that bank only covers courses built from it. Any course built
+      // via the AI course-goal wizard has freely AI-authored lesson titles
+      // that never match, so this falls through to whichever of the
+      // course's own source documents or stated goal it actually has,
+      // rather than erroring out.
       const topicRow = await db.get(`SELECT DISTINCT topic FROM test_questions WHERE topic LIKE ?`, [`%${lesson.title}%`]);
       const topic = topicRow?.topic;
-      if (!topic) return res.status(400).json({ error: 'Không tìm được chủ đề nguồn tương ứng cho chặng này.' });
 
-      const kit = await generateLessonKit(db, {
-        topic, lessonTitle: lesson.title, genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz
-      });
-      if (lesson.randomize_questions) {
-        for (const list of [kit.easyQuestions, kit.mediumQuestions, kit.hardQuestions]) shuffleInPlace(list);
-      }
-      const insertItem = (type, fields) => db.run(
-        `INSERT INTO studio_content_items
-           (lesson_id, content_type, title, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_chunk_ids, source_title, source_version, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT')`,
-        [lesson.id, type, fields.title || null, fields.questionText || null, JSON.stringify(fields.options || []), fields.correctOption ?? null,
-          fields.explanation || null, fields.difficulty || 'Trung bình', fields.cognitiveLevel || 'Hiểu',
-          fields.front || null, fields.back || null, fields.keyword || null,
-          JSON.stringify(fields.sourceChunkIds || []), fields.sourceTitle || 'Giáo trình MOF', fields.sourceVersion || '1.0']
-      );
-      for (const f of kit.flashcards) await insertItem('flashcard', f);
-      for (const q of kit.easyQuestions) await insertItem('mcq', q);
-      for (const q of kit.mediumQuestions) await insertItem('mcq', q);
-      for (const q of kit.hardQuestions) await insertItem('mcq', q);
-      if (kit.scenario) await insertItem('scenario', kit.scenario);
-      if (kit.checkpoint) await insertItem('checkpoint', kit.checkpoint);
-      // Previously the microLesson/memoryTips only ever appeared once in a
-      // transient Llama-bubble reaction and were never saved anywhere — a
-      // trainer had no way to see, edit, or approve them again after the
-      // fact. Persisting them as a real (reviewable, editable) knowledge
-      // item fixes that.
-      if (kit.microLesson) {
-        const body = [kit.microLesson, ...(kit.memoryTips || []).map((tip) => `• ${tip}`)].join('\n\n');
-        await insertItem('knowledge', { title: 'Kiến thức cốt lõi', questionText: body });
+      if (topic) {
+        const kit = await generateLessonKit(db, {
+          topic, lessonTitle: lesson.title, genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz
+        });
+        if (lesson.randomize_questions) {
+          for (const list of [kit.easyQuestions, kit.mediumQuestions, kit.hardQuestions]) shuffleInPlace(list);
+        }
+        const insertItem = (type, fields) => db.run(
+          `INSERT INTO studio_content_items
+             (lesson_id, content_type, title, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_chunk_ids, source_title, source_version, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT')`,
+          [lesson.id, type, fields.title || null, fields.questionText || null, JSON.stringify(fields.options || []), fields.correctOption ?? null,
+            fields.explanation || null, fields.difficulty || 'Trung bình', fields.cognitiveLevel || 'Hiểu',
+            fields.front || null, fields.back || null, fields.keyword || null,
+            JSON.stringify(fields.sourceChunkIds || []), fields.sourceTitle || 'Giáo trình MOF', fields.sourceVersion || '1.0']
+        );
+        for (const f of kit.flashcards) await insertItem('flashcard', f);
+        for (const q of kit.easyQuestions) await insertItem('mcq', q);
+        for (const q of kit.mediumQuestions) await insertItem('mcq', q);
+        for (const q of kit.hardQuestions) await insertItem('mcq', q);
+        if (kit.scenario) await insertItem('scenario', kit.scenario);
+        if (kit.checkpoint) await insertItem('checkpoint', kit.checkpoint);
+        // Previously the microLesson/memoryTips only ever appeared once in a
+        // transient Llama-bubble reaction and were never saved anywhere — a
+        // trainer had no way to see, edit, or approve them again after the
+        // fact. Persisting them as a real (reviewable, editable) knowledge
+        // item fixes that.
+        if (kit.microLesson) {
+          const body = [kit.microLesson, ...(kit.memoryTips || []).map((tip) => `• ${tip}`)].join('\n\n');
+          await insertItem('knowledge', { title: 'Kiến thức cốt lõi', questionText: body });
+        }
+
+        await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
+        return res.json({ microLesson: kit.microLesson, memoryTips: kit.memoryTips, itemCount: kit.flashcards.length + kit.easyQuestions.length + kit.mediumQuestions.length + kit.hardQuestions.length + (kit.scenario ? 1 : 0) + (kit.checkpoint ? 1 : 0) });
       }
 
+      const chunks = await getCourseChunks(db, lesson.course_id);
+      const result = chunks.length > 0
+        ? await generateContentFromCourseChunks(db, { lessonId: lesson.id, courseId: lesson.course_id, genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz })
+        : await generateContentFromLessonGoal(db, {
+            lessonId: lesson.id, lessonTitle: lesson.title, lessonDescription: lesson.description,
+            genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz
+          });
       await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
-      res.json({ microLesson: kit.microLesson, memoryTips: kit.memoryTips, itemCount: kit.flashcards.length + kit.easyQuestions.length + kit.mediumQuestions.length + kit.hardQuestions.length + (kit.scenario ? 1 : 0) + (kit.checkpoint ? 1 : 0) });
+      res.json(result);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

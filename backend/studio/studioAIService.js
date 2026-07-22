@@ -394,6 +394,14 @@ export async function generateContentFromDocument(db, { lessonId, documentId, do
   const sourceText = chunks.map((c) => c.content).join('\n\n').slice(0, 6000);
   const grounding = `CHỈ dựa trên đoạn tài liệu bên dưới, TUYỆT ĐỐI không bịa thêm nội dung/số liệu/pháp lý ngoài đoạn này.\n\nTài liệu:\n${sourceText}`;
 
+  return generateGroundedLessonContent(db, { lessonId, grounding, sourceChunkIds, sourceTitle: documentTitle || 'Tài liệu tải lên', genFlashcards, genQuiz });
+}
+
+// Same four-call shape as generateContentFromDocument, generalized over
+// where the grounding text/source citation come from — used both for a
+// specific uploaded document (above) and for lessons with no document at
+// all (below), so neither path duplicates the Gemini-calling logic.
+async function generateGroundedLessonContent(db, { lessonId, grounding, sourceChunkIds, sourceTitle, genFlashcards = true, genQuiz = true }) {
   let knowledge = null;
   const knowledgeRaw = await studioCallGemini(
     STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"title": string, "body": string}',
@@ -456,7 +464,7 @@ export async function generateContentFromDocument(db, { lessonId, documentId, do
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT', 1)`,
     [lessonId, type, title || null, fields.questionText || null, JSON.stringify(fields.options || []), fields.correctOption ?? null,
       fields.explanation || null, 'Trung bình', 'Hiểu', fields.front || null, fields.back || null, fields.keyword || null,
-      JSON.stringify(sourceChunkIds), documentTitle || 'Tài liệu tải lên', '1.0']
+      JSON.stringify(sourceChunkIds || []), sourceTitle || 'Tài liệu tải lên', '1.0']
   );
 
   if (knowledge) await insertItem('knowledge', { questionText: knowledge.body }, knowledge.title);
@@ -468,6 +476,47 @@ export async function generateContentFromDocument(db, { lessonId, documentId, do
     itemCount: (knowledge ? 1 : 0) + flashcards.length + mcqs.length + (scenario ? 1 : 0),
     generatedKnowledge: !!knowledge, generatedFlashcards: flashcards.length, generatedQuestions: mcqs.length, generatedScenario: !!scenario
   };
+}
+
+// Same document-grounded generation as generateContentFromDocument above,
+// but scoped to whichever document a lesson happens to cite — used by
+// kit/generate's fallback when a lesson's title doesn't match the legacy
+// MOF exam-bank topics (any course built via the AI course-goal wizard) but
+// the course does have at least one approved source document.
+/**
+ * @param {import('sqlite').Database} db
+ * @param {{ lessonId: number, courseId: number, genFlashcards?: boolean, genQuiz?: boolean }} input
+ */
+export async function generateContentFromCourseChunks(db, { lessonId, courseId, genFlashcards = true, genQuiz = true }) {
+  const chunks = await getCourseChunks(db, courseId);
+  const sourceChunkIds = chunks.map((c) => c.id);
+  const sourceText = chunks.map((c) => c.content).join('\n\n').slice(0, 6000);
+  const grounding = `CHỈ dựa trên đoạn tài liệu bên dưới, TUYỆT ĐỐI không bịa thêm nội dung/số liệu/pháp lý ngoài đoạn này.\n\nTài liệu:\n${sourceText}`;
+
+  return generateGroundedLessonContent(db, { lessonId, grounding, sourceChunkIds, sourceTitle: 'Tài liệu khóa học', genFlashcards, genQuiz });
+}
+
+// Lessons from a course with no uploaded source document at all (the common
+// case for courses built via the AI course-goal wizard, whose lesson titles
+// are freely AI-authored and never match the legacy MOF exam-bank topics
+// generateLessonKit above depends on) — grounds Gemini in the lesson's own
+// title/description plus the course's stated goal instead of source text,
+// so "Generate AI content" always produces something rather than erroring.
+/**
+ * @param {import('sqlite').Database} db
+ * @param {{ lessonId: number, lessonTitle: string, lessonDescription?: string, courseGoal?: string, genFlashcards?: boolean, genQuiz?: boolean }} input
+ */
+export async function generateContentFromLessonGoal(db, { lessonId, lessonTitle, lessonDescription, courseGoal, genFlashcards = true, genQuiz = true }) {
+  const contextLines = [
+    `Chủ đề bài học: "${lessonTitle}"`,
+    lessonDescription && `Mô tả bài học: ${lessonDescription}`,
+    courseGoal && `Bối cảnh khóa học: ${courseGoal}`
+  ].filter(Boolean).join('\n');
+  const grounding = `${contextLines}\n\nKhông có tài liệu nguồn cụ thể cho bài học này — hãy dùng kiến thức chuyên môn bảo hiểm của bạn, giữ nội dung chính xác và bám sát chủ đề bài học trên.`;
+
+  return generateGroundedLessonContent(db, {
+    lessonId, grounding, sourceChunkIds: [], sourceTitle: 'Do Llama đề xuất (chưa có tài liệu nguồn)', genFlashcards, genQuiz
+  });
 }
 
 // ── Explanations, fixes, rewrites (LLM-assisted, deterministic fallback) ──
