@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  getCourses, createCourse, getCourse, getCohorts, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
+  getCourses, createCourse, getCourse, getCohorts, createCohort, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
   getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
   createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
 } from '../../utils/studioApi';
@@ -44,48 +44,303 @@ function HealthRing({ health, size = 44 }) {
   );
 }
 
-function CreateCourseForm({ onCreated, onCancel }) {
-  const t = useT();
-  const [form, setForm] = useState({ title: '', description: '', targetGroup: '', durationWeeks: 4, examDate: '', learningGoal: '', targetScore: 70, preferredCamps: 4 });
+const WIZARD_STEP_META = [
+  { n: 1, key: 'studioWizardStepSetup', icon: '📤' },
+  { n: 2, key: 'studioWizardStepProcessing', icon: '🤖' },
+  { n: 3, key: 'studioWizardStepPreview', icon: '👀' },
+  { n: 4, key: 'studioWizardStepReview', icon: '✅' },
+  { n: 5, key: 'studioWizardStepPublish', icon: '🚀' }
+];
+
+function WizardStepper({ step, t }) {
+  return (
+    <div className="flex items-start gap-1.5 max-w-[720px]">
+      {WIZARD_STEP_META.map((s, i) => {
+        const done = step > s.n;
+        const active = step === s.n;
+        return (
+          <div key={s.n} className="flex items-center gap-1.5 flex-1">
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center font-comic font-extrabold text-sm"
+                style={{
+                  background: done ? '#9FE870' : active ? '#101A24' : '#EEF0F3',
+                  color: done ? '#101A24' : active ? '#fff' : '#8A8A8A',
+                  boxShadow: active ? '0 3px 0 rgba(0,0,0,0.3)' : done ? '0 3px 0 #6BAE2E' : 'none'
+                }}
+              >{done ? '✓' : s.icon}</div>
+              <span className={`text-[10px] font-extrabold text-center whitespace-nowrap ${done || active ? 'text-[#101A24]' : 'text-[#8A8A8A]'}`}>{t[s.key]}</span>
+            </div>
+            {i < WIZARD_STEP_META.length - 1 && <div className="h-[3px] flex-1 rounded mb-4.5" style={{ background: step > s.n ? '#9FE870' : '#EEF0F3' }} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CreateCohortInline({ courseId, t, onCreated }) {
+  const [cohorts, setCohorts] = useState(null);
+  const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => { getCohorts().then((all) => setCohorts(all.filter((c) => c.course_id === courseId))); }, [courseId]);
 
   async function submit(e) {
     e.preventDefault();
     setSaving(true); setError(null);
     try {
-      const { id } = await createCourse(form);
-      onCreated(id);
+      await createCohort({ courseId, name });
+      setName('');
+      setCohorts((await getCohorts()).filter((c) => c.course_id === courseId));
+      onCreated();
     } catch (err) { setError(err.message); } finally { setSaving(false); }
   }
 
+  if (!cohorts || cohorts.length > 0) return null;
+
+  return (
+    <div className="rounded-[22px] p-5 max-w-[960px]" style={{ background: '#F4F1FB', boxShadow: '0 4px 0 #C7B8E8' }}>
+      <p className="font-comic font-extrabold text-[13px] text-[#5B3F94] mb-3">👥 {t.studioWizardNoCohortsYet}</p>
+      <form onSubmit={submit} className="flex flex-wrap gap-2.5">
+        <input value={name} onChange={(e) => setName(e.target.value)} required placeholder={t.studioCohortNameLabel}
+          className="flex-1 min-w-[200px] px-4 py-2.5 rounded-xl border-2 border-white text-sm font-bold text-[#101A24] bg-white" />
+        <Button type="submit" disabled={saving}>{saving ? t.studioSaving : t.studioCreateCohortBtn}</Button>
+      </form>
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+    </div>
+  );
+}
+
+function CreateCourseWizard({ onCreated, onCancel }) {
+  const t = useT();
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({ title: '', description: '', targetGroup: '', durationWeeks: 4, examDate: '', learningGoal: '', targetScore: 70, preferredCamps: 4 });
+  const [prompt, setPrompt] = useState('');
+  const [files, setFiles] = useState([]);
+  const [courseId, setCourseId] = useState(null);
+  const [bundle, setBundle] = useState(null);
+  const [quality, setQuality] = useState(null);
+  const [cohortsVersion, setCohortsVersion] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
   const field = (key, label, type = 'text') => (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-bold text-[#101A24]">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{label}</span>
       <input type={type} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
-        className="px-3 py-2 rounded-lg border border-[#101A24]/15 focus:outline-none focus:ring-2 focus:ring-[#B9E7EF]" required={key === 'title'} />
+        className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" required={key === 'title'} />
     </label>
   );
 
+  async function load() {
+    const b = await getCourse(courseId);
+    setBundle(b);
+    setQuality(await getQuality(courseId));
+  }
+
+  async function handleQualityCheck() {
+    setBusy(true);
+    try { setQuality(await runQualityCheck(courseId)); } finally { setBusy(false); }
+  }
+
+  useEffect(() => {
+    if (step === 5 && courseId && !quality) handleQualityCheck();
+  }, [step, courseId]);
+
+  async function handleStartProcessing(e) {
+    e.preventDefault();
+    setStep(2); setBusy(true); setError(null);
+    try {
+      const { id } = await createCourse(form);
+      setCourseId(id);
+      for (const file of files) await uploadCourseKnowledge(id, file);
+      await generateCourseCurriculum(id, prompt);
+      setBundle(await getCourse(id));
+      setStep(3);
+    } catch (err) {
+      setError(err.message);
+    } finally { setBusy(false); }
+  }
+
+  function handleFilePick(e) {
+    const picked = Array.from(e.target.files || []);
+    setFiles((fs) => [...fs, ...picked]);
+    e.target.value = '';
+  }
+
+  const camps = bundle?.camps || [];
+  const lessons = bundle?.lessons || [];
+  const contentItems = bundle?.contentItems || [];
+  const questionCount = contentItems.filter((c) => ['mcq', 'scenario', 'checkpoint'].includes(c.contentType)).length;
+  const flashcardCount = contentItems.filter((c) => c.contentType === 'flashcard').length;
+
   return (
-    <Card>
-      <SectionTitle>{t.studioCreateCourseTitle}</SectionTitle>
-      <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {field('title', t.studioFieldCourseTitle)}
-        {field('targetGroup', t.studioFieldTargetGroup)}
-        {field('description', t.studioFieldDescription)}
-        {field('learningGoal', t.studioFieldLearningGoal)}
-        {field('durationWeeks', t.studioFieldDurationWeeks, 'number')}
-        {field('targetScore', t.studioFieldTargetScore, 'number')}
-        {field('examDate', t.studioFieldExamDate, 'date')}
-        {field('preferredCamps', t.studioFieldPreferredCamps, 'number')}
-        {error && <p className="text-sm text-red-600 md:col-span-2">{error}</p>}
-        <div className="md:col-span-2 flex gap-3 mt-2">
-          <Button type="submit" disabled={saving}>{saving ? t.studioSaving : t.studioCreateCourseBtn}</Button>
-          <Button type="button" variant="secondary" onClick={onCancel}>{t.studioCancel}</Button>
+    <div className="flex flex-col gap-5">
+      <button
+        onClick={() => (courseId ? onCreated(courseId) : onCancel())}
+        className="flex items-center gap-2 text-sm font-bold text-[#101A24] w-fit bg-white rounded-2xl px-4 py-2.5"
+        style={{ boxShadow: '0 3px 0 rgba(16,26,36,0.1)' }}
+      >
+        <ArrowLeft size={16} /> {courseId ? t.studioWizardCloseSavedBtn : t.studioWizardCancelBtn}
+      </button>
+
+      <WizardStepper step={step} t={t} />
+
+      {step === 1 && (
+        <Card className="!rounded-[28px] !p-8 max-w-[720px]">
+          <SectionTitle>{t.studioCreateCourseTitle}</SectionTitle>
+          <form onSubmit={handleStartProcessing} className="flex flex-col gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {field('title', t.studioFieldCourseTitle)}
+              {field('targetGroup', t.studioFieldTargetGroup)}
+            </div>
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{t.studioFieldDescription}</span>
+              <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2}
+                className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" />
+            </label>
+            {field('learningGoal', t.studioFieldLearningGoal)}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {field('durationWeeks', t.studioFieldDurationWeeks, 'number')}
+              {field('targetScore', t.studioFieldTargetScore, 'number')}
+              {field('examDate', t.studioFieldExamDate, 'date')}
+              {field('preferredCamps', t.studioFieldPreferredCamps, 'number')}
+            </div>
+
+            <label className="flex flex-col gap-1.5 text-sm pt-2 border-t border-[#101A24]/10">
+              <span className="font-comic font-extrabold text-[13px] text-[#101A24] pt-3">{t.studioCurriculumPromptLabel}</span>
+              <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} placeholder={t.studioCurriculumPromptPlaceholder}
+                className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" />
+            </label>
+
+            <div>
+              <p className="font-comic font-extrabold text-[13px] text-[#101A24] mb-2">{t.studioSourcesTitle}</p>
+              <label className="block border-3 border-dashed border-[#C7B8E8] rounded-3xl p-8 text-center bg-[#F9F7FE] cursor-pointer">
+                <input type="file" accept=".pdf,.txt" multiple onChange={handleFilePick} className="hidden" />
+                <div className="text-4xl mb-2">🦙</div>
+                <div className="font-comic font-extrabold text-sm text-[#101A24] flex items-center justify-center gap-2"><Upload size={16} /> {t.studioUploadSourceBtn}</div>
+              </label>
+              {files.length > 0 && (
+                <div className="flex flex-col gap-2 mt-3">
+                  {files.map((f, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-[#F9FAFB] rounded-2xl px-4 py-2.5">
+                      <span>📄</span>
+                      <span className="flex-1 text-sm font-bold text-[#101A24] truncate">{f.name}</span>
+                      <button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))} className="text-[#101A24]/50 hover:text-red-600"><Trash2 size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              type="submit" disabled={busy}
+              className="w-full flex items-center justify-center gap-2 font-comic font-extrabold text-[15px] text-[#101A24] px-5 py-4 rounded-2xl bg-[#9FE870] disabled:opacity-50"
+              style={{ boxShadow: '0 5px 0 #6BAE2E' }}
+            >
+              <Sparkles size={18} /> {t.studioWizardStartBtn}
+            </button>
+          </form>
+        </Card>
+      )}
+
+      {step === 2 && (
+        <div className="rounded-[28px] p-9 max-w-[720px] text-center" style={{ background: 'linear-gradient(160deg,#101A24,#2B3A4A)', boxShadow: '0 6px 0 rgba(16,26,36,0.2)' }}>
+          <div className="text-5xl mb-2" style={{ animation: 'bob 2.2s ease-in-out infinite' }}>🦙</div>
+          <div className="font-comic font-extrabold text-[17px] text-white mb-1.5">{t.studioWizardProcessingTitle}</div>
+          <div className="text-[12.5px] font-bold text-white/65 mb-7">{t.studioWizardProcessingSubtitle}</div>
+          <div className="flex flex-col gap-3 text-left">
+            {[
+              [t.studioWizardProcessingStep1, '📖'],
+              [t.studioWizardProcessingStep2, '🏔️'],
+              [t.studioWizardProcessingStep3, '📝'],
+              [t.studioWizardProcessingStep4, '🗂️']
+            ].map(([label, icon]) => (
+              <div key={label} className="flex items-center gap-3.5 bg-white/[0.06] rounded-2xl px-4.5 py-3.5">
+                <span className="w-8 h-8 rounded-full bg-[#E3D9F5] flex items-center justify-center text-sm shrink-0">{icon}</span>
+                <span className="font-comic font-bold text-[13px] text-white flex-1">{label}</span>
+                <span className="text-sm shrink-0">{error ? '⛔' : '⏳'}</span>
+              </div>
+            ))}
+          </div>
+          {error && (
+            <div className="mt-6 bg-white/10 rounded-2xl p-4">
+              <p className="text-sm font-bold text-[#F5C9DA] mb-3">{error}</p>
+              <Button variant="secondary" onClick={handleStartProcessing}>{t.studioWizardRetryBtn}</Button>
+            </div>
+          )}
         </div>
-      </form>
-    </Card>
+      )}
+
+      {step === 3 && bundle && (
+        <>
+          <div className="flex items-center gap-3.5 rounded-[22px] px-5.5 py-4 max-w-[960px]" style={{ background: '#EAF6DD', boxShadow: '0 4px 0 #C4E8A8' }}>
+            <span className="text-2xl">🎉</span>
+            <div className="text-[13.5px] font-bold text-[#3D7A2E]">{t.studioWizardPreviewIntro}</div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 max-w-[960px]">
+            {[
+              { icon: '🏔️', value: camps.length, label: t.studioWizardStatCamps, bg: '#C7EFC4', shadow: '#8FCB82' },
+              { icon: '📖', value: lessons.length, label: t.studioWizardStatLessons, bg: '#B9E7EF', shadow: '#7FBFC9' },
+              { icon: '📝', value: questionCount, label: t.studioWizardStatQuestions, bg: '#E3D9F5', shadow: '#B7A3DE' },
+              { icon: '🗂️', value: flashcardCount, label: t.studioWizardStatFlashcards, bg: '#FBE3B0', shadow: '#D9BE78' }
+            ].map((s) => (
+              <div key={s.label} className="rounded-[20px] p-4" style={{ background: s.bg, boxShadow: `0 4px 0 ${s.shadow}` }}>
+                <div className="text-xl mb-1.5">{s.icon}</div>
+                <div className="font-comic font-extrabold text-xl text-[#101A24]">{s.value}</div>
+                <div className="text-[10.5px] font-extrabold text-[#8A8A8A] uppercase">{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <Card className="!rounded-[28px] !p-6 max-w-[960px]">
+            <div className="font-comic font-extrabold text-[15px] text-[#101A24] mb-3.5">🏔️ {t.studioMountainTitle}</div>
+            {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
+          </Card>
+          <div className="flex gap-3 max-w-[960px]">
+            <button onClick={() => setStep(4)}
+              className="flex-1 font-comic font-extrabold text-[14.5px] text-[#101A24] px-5 py-4 rounded-2xl"
+              style={{ background: '#00B4D8', boxShadow: '0 4px 0 #0E7C99' }}
+            >{t.studioWizardContinueToReview}</button>
+          </div>
+        </>
+      )}
+
+      {step === 4 && bundle && (
+        <>
+          <ContentLibrary bundle={bundle} onChanged={load} />
+          <div className="flex gap-3 max-w-[960px]">
+            <button onClick={() => setStep(3)}
+              className="font-comic font-bold text-[13.5px] text-[#101A24] px-5.5 py-4 rounded-2xl"
+              style={{ background: '#F9FAFB', boxShadow: '0 4px 0 rgba(16,26,36,0.08)' }}
+            >{t.studioWizardBackToPreview}</button>
+            <button onClick={() => setStep(5)}
+              className="flex-1 font-comic font-extrabold text-[14.5px] text-[#101A24] px-5 py-4 rounded-2xl"
+              style={{ background: '#00B4D8', boxShadow: '0 4px 0 #0E7C99' }}
+            >{t.studioWizardContinueToPublish}</button>
+          </div>
+        </>
+      )}
+
+      {step === 5 && bundle && (
+        <>
+          <CreateCohortInline courseId={courseId} t={t} onCreated={() => setCohortsVersion((v) => v + 1)} />
+          <PublishCenter key={cohortsVersion} courseId={courseId} bundle={bundle} quality={quality} onRunQualityCheck={handleQualityCheck} busy={busy} />
+          <div className="flex gap-3 max-w-[960px]">
+            <button onClick={() => setStep(4)}
+              className="font-comic font-bold text-[13.5px] text-[#101A24] px-5.5 py-4 rounded-2xl"
+              style={{ background: '#F9FAFB', boxShadow: '0 4px 0 rgba(16,26,36,0.08)' }}
+            >{t.studioWizardBackToReview}</button>
+            <button onClick={() => onCreated(courseId)}
+              className="flex-1 font-comic font-extrabold text-[14.5px] text-[#101A24] px-5 py-4 rounded-2xl"
+              style={{ background: '#9FE870', boxShadow: '0 4px 0 #6BAE2E' }}
+            >{t.studioWizardFinishBtn}</button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -590,7 +845,7 @@ export default function Courses() {
   }
   useEffect(() => { refresh(); }, []);
 
-  if (view === 'create') return <CreateCourseForm onCreated={(id) => { setSelected(id); setView('detail'); refresh(); }} onCancel={() => setView('list')} />;
+  if (view === 'create') return <CreateCourseWizard onCreated={(id) => { setSelected(id); setView('detail'); refresh(); }} onCancel={() => setView('list')} />;
   if (view === 'detail' && selected) return <CourseDetail courseId={selected} onBack={() => { setView('list'); refresh(); }} />;
 
   if (!courses) return <Spinner label={t.studioLoading} />;
