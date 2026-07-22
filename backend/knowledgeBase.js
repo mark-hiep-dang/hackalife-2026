@@ -2,15 +2,61 @@
 // "Hỏi Llama" chat retrieval logic can be reused by LlamaAIService.answerQuestion
 // for contextual Ask Llama, without duplicating it (spec §16/§17).
 
+// A line that's just a page number/marker ("12", "Trang 12", "Page 12/40",
+// "- 12 -") carries no teachable content — left in, it either becomes its
+// own noise paragraph or gets welded onto whatever paragraph follows it.
+const PAGE_MARKER_RE = /^\s*(page|trang)?\s*\.?\s*\d{1,4}(\s*[/-]\s*\d{1,4})?\s*\.?\s*$|^\s*[-–—_]{1,3}\s*\d{1,4}\s*[-–—_]{1,3}\s*$/i;
+
+// Running headers/footers ("Giáo trình đại lý bảo hiểm — 2024", a chapter
+// name repeated on every page, ©/confidentiality boilerplate) show up as the
+// exact same short line recurring many times through a long document. A
+// single occurrence is legitimate content; the same short line 3+ times is
+// page furniture, not something a lesson should ever be grounded in or
+// (worse) have literally become its title.
+function stripRunningHeadersFooters(lines, minRepeats = 3) {
+  const counts = new Map();
+  for (const line of lines) {
+    const key = line.trim();
+    if (key.length < 3 || key.length > 120) continue; // headers/footers are short
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const repeated = new Set([...counts.entries()].filter(([, c]) => c >= minRepeats).map(([key]) => key));
+  if (repeated.size === 0) return lines;
+  return lines.filter((line) => !repeated.has(line.trim()));
+}
+
+// Strips page-number lines, repeated header/footer lines, and stray null
+// bytes (some PDF extractors leave a few behind) before the text is ever
+// chunked — upstream of every downstream use (RAG chat, curriculum/blueprint
+// generation, lesson content generation), so cleanup happens exactly once
+// per upload rather than being re-derived (or re-sent to Gemini) every time.
+export function cleanDocumentText(rawText) {
+  const lines = (rawText || '').replace(/\u0000/g, '').split(/\r\n|\r|\n/);
+  const withoutPageMarkers = lines.filter((line) => !PAGE_MARKER_RE.test(line.trim()));
+  return stripRunningHeadersFooters(withoutPageMarkers, 3).join('\n');
+}
+
 export function chunkText(text, maxLen = 700) {
-  const paragraphs = text
+  const cleaned = cleanDocumentText(text);
+  const paragraphs = cleaned
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\s+/g, ' ').trim())
     .filter((p) => p.length > 30);
 
+  // Exact-duplicate paragraphs (a disclaimer, a boilerplate notice, a
+  // classroom instruction repeated per topic) waste chunk budget and can
+  // themselves get pulled in as a lesson's "content" multiple times over.
+  const seen = new Set();
+  const deduped = paragraphs.filter((p) => {
+    const key = p.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
   const chunks = [];
   let current = '';
-  for (const p of paragraphs) {
+  for (const p of deduped) {
     if (current && (current.length + p.length + 1) > maxLen) {
       chunks.push(current.trim());
       current = p;
@@ -20,6 +66,19 @@ export function chunkText(text, maxLen = 700) {
   }
   if (current) chunks.push(current.trim());
   return chunks;
+}
+
+// Compact stand-in for a document's full text — one short preview line per
+// chunk, tagged with that chunk's real id. Course-blueprint generation grounds
+// itself in this map (a few KB total) instead of resending every chunk's
+// full content on every generation call, which is where most of the wasted
+// token spend in the old flow came from.
+const DOC_MAP_PREVIEW_LEN = 100;
+export function buildDocumentMap(chunkRows) {
+  return chunkRows.map((c) => ({
+    chunkId: c.id,
+    preview: c.content.length > DOC_MAP_PREVIEW_LEN ? `${c.content.slice(0, DOC_MAP_PREVIEW_LEN).trim()}…` : c.content
+  }));
 }
 
 // multer/busboy decodes the multipart Content-Disposition "filename" header as
@@ -91,6 +150,44 @@ export async function getCourseChunks(db, courseId) {
   );
 }
 
+// Exactly the chunks a Course Blueprint already cited for one specific
+// lesson (lesson.source_chunk_ids) — used for per-lesson content generation
+// so a lesson's prompt is grounded only in what that lesson is actually
+// about, instead of resending the whole course's document text.
+export async function getChunksByIds(db, chunkIds) {
+  if (!Array.isArray(chunkIds) || chunkIds.length === 0) return [];
+  const placeholders = chunkIds.map(() => '?').join(',');
+  return db.all(
+    `SELECT * FROM knowledge_chunks WHERE id IN (${placeholders}) ORDER BY document_id, chunk_index`,
+    chunkIds
+  );
+}
+
+// The compact grounding for course-blueprint generation: every document's
+// stored doc_map (falling back to building one on the fly for documents
+// uploaded before this column existed), merged in document order and capped
+// so a course with many/large uploads still produces one bounded prompt
+// instead of scaling unboundedly with document count.
+const COURSE_DOC_MAP_MAX_ENTRIES = 120;
+export async function getCourseDocumentMap(db, courseId) {
+  const docs = await db.all(
+    'SELECT id, title, doc_map FROM knowledge_documents WHERE course_id = ? ORDER BY created_at',
+    [courseId]
+  );
+  const entries = [];
+  for (const doc of docs) {
+    let docMap = null;
+    if (doc.doc_map) { try { docMap = JSON.parse(doc.doc_map); } catch { docMap = null; } }
+    if (!docMap) {
+      const chunkRows = await db.all('SELECT id, content FROM knowledge_chunks WHERE document_id = ? ORDER BY chunk_index', [doc.id]);
+      docMap = buildDocumentMap(chunkRows);
+    }
+    for (const entry of docMap) entries.push({ ...entry, documentTitle: doc.title });
+    if (entries.length >= COURSE_DOC_MAP_MAX_ENTRIES) break;
+  }
+  return entries.slice(0, COURSE_DOC_MAP_MAX_ENTRIES);
+}
+
 function tokenize(text) {
   return new Set(
     (text || '')
@@ -152,6 +249,7 @@ export async function storeDocument(db, title, sourceType, text, userId, { cours
   );
   const documentId = doc.lastID;
 
+  const chunkRows = [];
   for (let i = 0; i < chunks.length; i++) {
     const chunk = await db.run(
       'INSERT INTO knowledge_chunks (document_id, chunk_index, content) VALUES (?, ?, ?)',
@@ -161,6 +259,10 @@ export async function storeDocument(db, title, sourceType, text, userId, { cours
       'INSERT INTO knowledge_chunks_fts (content, chunk_id, document_id) VALUES (?, ?, ?)',
       [chunks[i], chunk.lastID, documentId]
     );
+    chunkRows.push({ id: chunk.lastID, content: chunks[i] });
   }
+  // Computed once here rather than on every later generation call —
+  // getCourseDocumentMap just reads this back.
+  await db.run('UPDATE knowledge_documents SET doc_map = ? WHERE id = ?', [JSON.stringify(buildDocumentMap(chunkRows)), documentId]);
   return { documentId, chunkCount: chunks.length };
 }

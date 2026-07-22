@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
-  getCourses, createCourse, getCourse, deleteCourse, getCohorts, generateCourseCurriculum, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
+  getCourses, createCourse, getCourse, deleteCourse, getCohorts, generateCourseBlueprint, confirmCourseBlueprint, generateCourseContent, runQualityCheck, getQuality, suggestQualityFix, ignoreQualityIssue,
   getCourseKnowledge, uploadCourseKnowledge, deleteCourseKnowledge, generateContentFromDocument,
-  createCamp, updateCamp, deleteCamp, createLesson, updateLesson, deleteLesson
+  createCamp, updateCamp, deleteCamp, regenerateCamp, createLesson, updateLesson, deleteLesson, regenerateLessonDetails
 } from '../../utils/studioApi';
 import { Card, SectionTitle, Button, Spinner, EmptyState, SeverityBadge } from '../components/ui';
 import StudioLlamaBubble from '../components/StudioLlamaBubble';
 import ContentLibrary from './ContentLibrary';
 import PublishCenter from './PublishCenter';
-import { Plus, ArrowLeft, Sparkles, Upload, Pencil, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Sparkles, Upload, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import { useT } from '../../translations';
 
 const COURSE_ICONS = ['🎓', '📈', '📑', '💡', '📚'];
@@ -93,17 +93,84 @@ function ToggleSwitch({ label, checked, onChange }) {
   );
 }
 
+// Shown after a Course Blueprint is generated (structure only — no lesson
+// content/quiz/flashcards yet) and before it's persisted. Shared by the
+// wizard's "Start building" and CourseDetail's "Regenerate curriculum" —
+// both need the same review-before-commit gate so a trainer never has AI
+// output silently saved over an existing course.
+function BlueprintPreview({ blueprint, busy, onConfirm, onRegenerate, onCancel, t }) {
+  return (
+    <div className="rounded-[28px] p-7 max-w-[880px] bg-white border-3 border-[#101A24]/10" style={{ boxShadow: '0 6px 0 rgba(16,26,36,0.08)' }}>
+      <div className="flex items-center gap-2.5 mb-1">
+        <span className="text-2xl">🧭</span>
+        <div className="font-comic font-extrabold text-[17px] text-[#101A24]">{t.studioBlueprintPreviewTitle}</div>
+      </div>
+      <p className="text-[12.5px] font-bold text-[#8A8A8A] mb-4">{t.studioBlueprintPreviewSubtitle}</p>
+
+      {blueprint.outcomes?.length > 0 && (
+        <div className="bg-[#F4F1FB] rounded-2xl p-4 mb-4">
+          <div className="font-comic font-extrabold text-[12.5px] text-[#101A24] mb-2">🎯 {t.studioBlueprintOutcomesLabel}</div>
+          <ul className="flex flex-col gap-1.5">
+            {blueprint.outcomes.map((o, i) => <li key={i} className="text-[12.5px] font-bold text-[#5B3F94]">• {o}</li>)}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3.5 mb-5">
+        {blueprint.camps.map((camp, campIndex) => {
+          const campLessons = blueprint.lessons.filter((l) => l.campIndex === campIndex);
+          return (
+            <div key={campIndex} className="rounded-2xl p-4" style={{ background: CAMP_BG[campIndex % CAMP_BG.length] }}>
+              <div className="font-comic font-extrabold text-[13.5px] text-[#101A24] mb-2.5">{t.studioCampLabel.replace('{n}', campIndex + 1)}: {camp.title}</div>
+              <div className="flex flex-col gap-1.5">
+                {campLessons.map((l, li) => (
+                  <div key={li} className="bg-white/80 rounded-xl px-3.5 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-comic font-extrabold text-[#101A24]">{l.title}</span>
+                      <span className="text-[10px] font-extrabold text-[#8A8A8A] shrink-0 whitespace-nowrap">{t.studioMinutesLabel.replace('{n}', l.estimatedMinutes)} · {l.difficulty}</span>
+                    </div>
+                    {l.summary && <div className="text-[11px] font-bold text-[#8A8A8A] mt-1">{l.summary}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-3 flex-wrap">
+        <button onClick={onConfirm} disabled={busy}
+          className="flex-1 min-w-[160px] font-comic font-extrabold text-[14px] text-[#101A24] px-5 py-3.5 rounded-2xl disabled:opacity-50"
+          style={{ background: '#9FE870', boxShadow: '0 4px 0 #6BAE2E' }}
+        >✓ {t.studioBlueprintConfirmBtn}</button>
+        <button onClick={onRegenerate} disabled={busy}
+          className="font-comic font-extrabold text-[13px] text-[#101A24] px-5 py-3.5 rounded-2xl bg-[#F9FAFB] disabled:opacity-50"
+        >🔄 {t.studioBlueprintRegenerateBtn}</button>
+        {onCancel && (
+          <button onClick={onCancel} disabled={busy} className="font-comic font-bold text-[13px] text-[#101A24] px-5 py-3.5 rounded-2xl bg-white border border-[#101A24]/10 disabled:opacity-50">
+            {t.studioCancel}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CreateCourseWizard({ onCreated, onCancel }) {
   const t = useT();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ title: '', durationWeeks: 4, examDate: '', targetScore: 70, preferredCamps: 4 });
   const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState([]);
+  const [uploadedFileNames, setUploadedFileNames] = useState(new Set());
   const [genFlashcards, setGenFlashcards] = useState(true);
   const [genQuiz, setGenQuiz] = useState(true);
   const [randomizeQuestions, setRandomizeQuestions] = useState(false);
+  const [quizCountPerLesson, setQuizCountPerLesson] = useState(3);
+  const [flashcardCountPerLesson, setFlashcardCountPerLesson] = useState(5);
   const [courseId, setCourseId] = useState(null);
   const [bundle, setBundle] = useState(null);
+  const [blueprint, setBlueprint] = useState(null);
   const [quality, setQuality] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -112,6 +179,11 @@ function CreateCourseWizard({ onCreated, onCancel }) {
   // than a fixed list — see handleStartProcessing, which is the single source
   // of truth for what each key here really does.
   const [processingTasks, setProcessingTasks] = useState([]);
+  // Set once handleConfirmBlueprint's automatic content generation finishes —
+  // surfaced as a warning on the Review step so a trainer knows which
+  // lesson(s), if any, need a manual retry (see ContentLibrary's per-lesson
+  // regenerate button).
+  const [contentGenSummary, setContentGenSummary] = useState(null);
 
   const field = (key, label, type = 'text') => (
     <label className="flex flex-col gap-1.5 text-sm">
@@ -143,39 +215,81 @@ function CreateCourseWizard({ onCreated, onCancel }) {
 
   async function handleStartProcessing(e) {
     e.preventDefault();
+    // A retry (e.g. after the "add more detail" validation message, or a
+    // transient Gemini error) must not create a second course or re-upload
+    // documents already attached — only the still-missing steps re-run.
+    const isRetry = !!courseId;
+    const pendingFiles = files.filter((f) => !uploadedFileNames.has(f.name));
     const tasks = [
-      { key: 'create', label: t.studioWizardStepCreateCourse, icon: '🚀', status: 'pending' },
-      ...(files.length > 0 ? [{ key: 'upload', label: t.studioWizardStepAnalyzeDocs, icon: '📖', status: 'pending' }] : []),
+      ...(isRetry ? [] : [{ key: 'create', label: t.studioWizardStepCreateCourse, icon: '🚀', status: 'pending' }]),
+      ...(pendingFiles.length > 0 ? [{ key: 'upload', label: t.studioWizardStepAnalyzeDocs, icon: '📖', status: 'pending' }] : []),
       { key: 'curriculum', label: t.studioWizardStepBuildCurriculum, icon: '🏔️', status: 'pending' }
     ];
     setProcessingTasks(tasks);
     setStep(2); setBusy(true); setError(null);
     try {
-      markTask('create', 'active');
-      // Cohort assignment happens separately in Học viên & Thi thử, not here.
-      const { id } = await createCourse({ ...form, description: prompt, genFlashcards, genQuiz, randomizeQuestions });
-      setCourseId(id);
-      markTask('create', 'done');
+      let id = courseId;
+      if (!isRetry) {
+        markTask('create', 'active');
+        // Cohort assignment happens separately in Học viên & Thi thử, not here.
+        const created = await createCourse({ ...form, description: prompt, genFlashcards, genQuiz, randomizeQuestions, quizCountPerLesson, flashcardCountPerLesson });
+        id = created.id;
+        setCourseId(id);
+        markTask('create', 'done');
+      }
 
-      if (files.length > 0) {
+      if (pendingFiles.length > 0) {
         markTask('upload', 'active');
-        for (const file of files) await uploadCourseKnowledge(id, file);
+        for (const file of pendingFiles) await uploadCourseKnowledge(id, file);
+        setUploadedFileNames((prev) => new Set([...prev, ...pendingFiles.map((f) => f.name)]));
         markTask('upload', 'done');
       }
 
-      // No separate prompt to pass — the backend builds the generation
-      // prompt from everything just stored on the course row above
-      // (title/cohort/description/duration/score/exam date) plus any
-      // uploaded source documents.
+      // Same prompt-passing as CourseDetail's "Regenerate curriculum" — the
+      // trainer's own goal text, unmodified, plus any uploaded documents.
+      // Only a Blueprint (structure) comes back here — nothing is persisted
+      // until the trainer reviews it in BlueprintPreview and confirms. Throws
+      // with a trainer-facing message (see validateCourseInput) if there's
+      // neither a real document nor enough of a goal description to ground on.
       markTask('curriculum', 'active');
-      await generateCourseCurriculum(id);
+      const { blueprint: proposed } = await generateCourseBlueprint(id, prompt);
+      setBlueprint(proposed);
       markTask('curriculum', 'done');
-
-      setBundle(await getCourse(id));
-      setStep(3);
     } catch (err) {
       setError(err.message);
     } finally { setBusy(false); }
+  }
+
+  async function handleRegenerateBlueprint() {
+    setBusy(true); setError(null);
+    try {
+      const { blueprint: proposed } = await generateCourseBlueprint(courseId, prompt);
+      setBlueprint(proposed);
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+
+  async function handleConfirmBlueprint() {
+    setBusy(true); setError(null);
+    try {
+      await confirmCourseBlueprint(courseId, blueprint);
+      setBlueprint(null);
+      // Stay on the processing screen — confirming the structure is the
+      // trainer's approval, so content generation for every lesson runs
+      // right away as the wizard's last step, instead of requiring a
+      // separate manual visit to the Content tab per lesson.
+      setProcessingTasks((tasks) => [...tasks, { key: 'content', label: t.studioWizardStepGenerateContent, icon: '✨', status: 'active' }]);
+      let summary = null;
+      try {
+        summary = await generateCourseContent(courseId, 'all');
+      } catch (err) {
+        // Structure is already saved — a content-generation hiccup shouldn't
+        // block reaching Review; failed lessons can be retried individually there.
+      }
+      setContentGenSummary(summary);
+      markTask('content', 'done');
+      setBundle(await getCourse(courseId));
+      setStep(3);
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
 
   function handleFilePick(e) {
@@ -224,7 +338,23 @@ function CreateCourseWizard({ onCreated, onCancel }) {
               <p className="font-comic font-extrabold text-[13px] text-[#101A24] mb-2 pt-3">⚙️ {t.studioCourseSettingsTitle}</p>
               <div className="flex flex-col gap-2">
                 <ToggleSwitch label={t.studioGenFlashcardsToggle} checked={genFlashcards} onChange={setGenFlashcards} />
+                {genFlashcards && (
+                  <label className="flex items-center justify-between gap-3 text-sm pl-8">
+                    <span className="font-comic font-bold text-[12.5px] text-[#101A24]/70">{t.studioFlashcardCountLabel}</span>
+                    <input type="number" min={1} max={10} value={flashcardCountPerLesson}
+                      onChange={(e) => setFlashcardCountPerLesson(Number(e.target.value))}
+                      className="w-20 px-3 py-2 rounded-xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                  </label>
+                )}
                 <ToggleSwitch label={t.studioGenQuizToggle} checked={genQuiz} onChange={setGenQuiz} />
+                {genQuiz && (
+                  <label className="flex items-center justify-between gap-3 text-sm pl-8">
+                    <span className="font-comic font-bold text-[12.5px] text-[#101A24]/70">{t.studioQuizCountLabel}</span>
+                    <input type="number" min={1} max={10} value={quizCountPerLesson}
+                      onChange={(e) => setQuizCountPerLesson(Number(e.target.value))}
+                      className="w-20 px-3 py-2 rounded-xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                  </label>
+                )}
                 <ToggleSwitch label={t.studioRandomizeQuestionsToggle} checked={randomizeQuestions} onChange={setRandomizeQuestions} />
               </div>
             </div>
@@ -262,7 +392,7 @@ function CreateCourseWizard({ onCreated, onCancel }) {
         </Card>
       )}
 
-      {step === 2 && (
+      {step === 2 && !blueprint && (
         <div className="rounded-[28px] p-9 max-w-[880px] text-center" style={{ background: 'linear-gradient(160deg,#101A24,#2B3A4A)', boxShadow: '0 6px 0 rgba(16,26,36,0.2)' }}>
           <div className="text-5xl mb-2" style={{ animation: 'bob 2.2s ease-in-out infinite' }}>🦙</div>
           <div className="font-comic font-extrabold text-[17px] text-white mb-1.5">{t.studioWizardProcessingTitle}</div>
@@ -285,12 +415,29 @@ function CreateCourseWizard({ onCreated, onCancel }) {
         </div>
       )}
 
+      {step === 2 && blueprint && (
+        <>
+          <BlueprintPreview blueprint={blueprint} busy={busy} t={t} onConfirm={handleConfirmBlueprint} onRegenerate={handleRegenerateBlueprint} />
+          {error && <p className="text-sm text-red-600 max-w-[880px]">{error}</p>}
+        </>
+      )}
+
       {step === 3 && bundle && (
         <>
           <div className="flex items-center gap-3.5 rounded-[22px] px-5.5 py-4 max-w-[960px]" style={{ background: '#EAF6DD', boxShadow: '0 4px 0 #C4E8A8' }}>
             <span className="text-2xl">🎉</span>
             <div className="text-[13.5px] font-bold text-[#3D7A2E]">{t.studioWizardPreviewIntro}</div>
           </div>
+          {contentGenSummary?.failureCount > 0 && (
+            <div className="flex items-center gap-3.5 rounded-[22px] px-5.5 py-4 max-w-[960px]" style={{ background: '#FDF0DC', boxShadow: '0 4px 0 #E8CE9E' }}>
+              <span className="text-2xl">⚠️</span>
+              <div className="text-[13.5px] font-bold text-[#8A6414]">
+                {t.studioWizardContentGenerateWarning
+                  .replace('{failed}', contentGenSummary.failureCount)
+                  .replace('{total}', contentGenSummary.results.length)}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 max-w-[960px]">
             {[
               { icon: '🏔️', value: camps.length, label: t.studioWizardStatCamps, bg: '#C7EFC4', shadow: '#8FCB82' },
@@ -363,11 +510,23 @@ function AddLessonForm({ campId, t, onAdded, onCancel }) {
   );
 }
 
-function LessonRow({ lesson, t, onChanged }) {
+function LessonRow({ lesson, items, course, t, onChanged }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: lesson.title, description: lesson.description || '', estimatedMinutes: lesson.estimatedMinutes, difficulty: lesson.difficulty });
   const [busy, setBusy] = useState(false);
   const isPublished = lesson.status === 'PUBLISHED';
+  const isConfirmed = isPublished || lesson.status === 'APPROVED';
+
+  // Compact per-lesson asset summary (spec §10) — a trainer should be able to
+  // see what's been generated for a lesson without leaving the roadmap view;
+  // the full preview/edit/regenerate/delete actions per content type already
+  // live in the Content tab (ContentLibrary) just below.
+  const hasKnowledge = items.some((i) => i.contentType === 'knowledge');
+  const flashcardCount = items.filter((i) => i.contentType === 'flashcard').length;
+  const quizCount = items.filter((i) => ['mcq', 'scenario', 'checkpoint'].includes(i.contentType)).length;
+  const attemptedGeneration = lesson.status !== 'AI_DRAFT';
+  const quizFailed = attemptedGeneration && !!course?.gen_quiz && quizCount === 0;
+  const flashcardsFailed = attemptedGeneration && !!course?.gen_flashcards && flashcardCount === 0;
 
   async function save() {
     setBusy(true);
@@ -377,6 +536,10 @@ function LessonRow({ lesson, t, onChanged }) {
     if (!window.confirm(t.studioDeleteLessonConfirm)) return;
     setBusy(true);
     try { await deleteLesson(lesson.id); onChanged(); } catch (err) { window.alert(err.message); } finally { setBusy(false); }
+  }
+  async function handleRegenerate() {
+    setBusy(true);
+    try { await regenerateLessonDetails(lesson.id); onChanged(); } catch (err) { window.alert(err.message); } finally { setBusy(false); }
   }
 
   if (editing) {
@@ -403,13 +566,24 @@ function LessonRow({ lesson, t, onChanged }) {
   }
 
   return (
-    <div className="bg-white/70 rounded-xl px-3 py-2 text-xs font-bold text-[#101A24] flex items-center justify-between gap-2">
-      <span className="truncate">{lesson.title}</span>
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-[10px] font-extrabold" style={{ color: LESSON_STATUS_COLOR[lesson.status] || '#8A8A8A' }}>{lesson.status}</span>
-        <button onClick={() => setEditing(true)} className="text-[#101A24]/60 hover:text-[#101A24]"><Pencil size={12} /></button>
-        <button onClick={handleDelete} disabled={busy || isPublished} title={isPublished ? t.studioDeleteLessonBlockedPublished : undefined}
-          className="text-[#101A24]/60 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/60"><Trash2 size={12} /></button>
+    <div className="bg-white/70 rounded-xl px-3 py-2 flex flex-col gap-1 text-xs font-bold text-[#101A24] overflow-hidden">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate">{lesson.title}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-extrabold" style={{ color: LESSON_STATUS_COLOR[lesson.status] || '#8A8A8A' }}>{lesson.status}</span>
+          <button onClick={handleRegenerate} disabled={busy || isConfirmed} title={isConfirmed ? t.studioRegenerateLessonBlocked : t.studioRegenerateLessonBtn}
+            className="text-[#101A24]/60 hover:text-[#101A24] disabled:opacity-30 disabled:hover:text-[#101A24]/60"><RefreshCw size={12} /></button>
+          <button onClick={() => setEditing(true)} className="text-[#101A24]/60 hover:text-[#101A24]"><Pencil size={12} /></button>
+          <button onClick={handleDelete} disabled={busy || isPublished} title={isPublished ? t.studioDeleteLessonBlockedPublished : undefined}
+            className="text-[#101A24]/60 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/60"><Trash2 size={12} /></button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap text-[10px] font-bold text-[#101A24]/60">
+        <span>📖 {hasKnowledge ? t.studioKnowledgeGenerated : t.studioKnowledgeNotYet}</span>
+        <span>🗂️ {flashcardCount}</span>
+        <span>📝 {quizCount}</span>
+        {quizFailed && <span className="text-red-600">{t.studioQuizGenerationFailed}</span>}
+        {flashcardsFailed && <span className="text-red-600">{t.studioFlashcardGenerationFailed}</span>}
       </div>
     </div>
   );
@@ -422,6 +596,7 @@ function CampCard({ camp, index, lessons, t, onChanged }) {
   const [busy, setBusy] = useState(false);
   const campLessons = lessons.filter((l) => l.campId === camp.id);
   const hasPublished = campLessons.some((l) => l.status === 'PUBLISHED');
+  const hasConfirmed = campLessons.some((l) => l.status === 'APPROVED' || l.status === 'PUBLISHED');
 
   async function saveTitle() {
     setBusy(true);
@@ -432,12 +607,18 @@ function CampCard({ camp, index, lessons, t, onChanged }) {
     setBusy(true);
     try { await deleteCamp(camp.id); onChanged(); } catch (err) { window.alert(err.message); } finally { setBusy(false); }
   }
+  async function handleRegenerateCamp() {
+    setBusy(true);
+    try { await regenerateCamp(camp.id); onChanged(); } catch (err) { window.alert(err.message); } finally { setBusy(false); }
+  }
 
   return (
     <div className="min-w-[230px] rounded-[22px] p-4.5 shrink-0" style={{ background: CAMP_BG[index % CAMP_BG.length] }}>
       <div className="flex items-center justify-between mb-2">
         <div className="text-[10.5px] font-extrabold uppercase tracking-widest" style={{ color: CAMP_LABEL_COLOR[index % CAMP_LABEL_COLOR.length] }}>{t.studioCampLabel.replace('{n}', index + 1)}</div>
         <div className="flex gap-1.5">
+          <button onClick={handleRegenerateCamp} disabled={busy || hasConfirmed} title={hasConfirmed ? t.studioRegenerateCampBlocked : t.studioRegenerateCampBtn}
+            className="text-[#101A24]/50 hover:text-[#101A24] disabled:opacity-30 disabled:hover:text-[#101A24]/50"><RefreshCw size={13} /></button>
           <button onClick={() => setEditingTitle(true)} className="text-[#101A24]/50 hover:text-[#101A24]"><Pencil size={13} /></button>
           <button onClick={handleDeleteCamp} disabled={busy || hasPublished} title={hasPublished ? t.studioDeleteCampBlockedPublished : undefined}
             className="text-[#101A24]/50 hover:text-red-600 disabled:opacity-30 disabled:hover:text-[#101A24]/50"><Trash2 size={13} /></button>
@@ -636,6 +817,7 @@ const DETAIL_TABS = [
 function CourseDetail({ courseId, onBack }) {
   const t = useT();
   const [bundle, setBundle] = useState(null);
+  const [blueprint, setBlueprint] = useState(null);
   const [quality, setQuality] = useState(null);
   const [busy, setBusy] = useState(false);
   const [reaction, setReaction] = useState(null);
@@ -654,11 +836,28 @@ function CourseDetail({ courseId, onBack }) {
   }
   useEffect(() => { load(); loadKnowledgeDocs(); }, [courseId]);
 
+  // Preview-only — nothing is persisted until handleConfirmBlueprint below.
   async function handleGenerate() {
     setBusy(true);
     try {
-      const result = await generateCourseCurriculum(courseId, prompt);
+      const { blueprint: proposed } = await generateCourseBlueprint(courseId, prompt);
+      setBlueprint(proposed);
+    } catch (err) {
+      window.alert(err.message);
+    } finally { setBusy(false); }
+  }
+
+  async function handleConfirmBlueprint() {
+    setBusy(true);
+    try {
+      const result = await confirmCourseBlueprint(courseId, blueprint);
+      setBlueprint(null);
       setReaction({ event: 'CURRICULUM_CREATED', context: result });
+      await load();
+      // Confirming the structure is the trainer's approval — generate
+      // knowledge/flashcard/quiz for every lesson right away rather than
+      // requiring a separate manual visit to each lesson.
+      try { await generateCourseContent(courseId, 'all'); } catch (err) { /* per-lesson failures are retryable from ContentLibrary */ }
       await load();
     } catch (err) {
       window.alert(err.message);
@@ -726,7 +925,7 @@ function CourseDetail({ courseId, onBack }) {
               </div>
               {hasApprovedContent ? (
                 <p className="text-sm text-[#888] italic mb-4">{t.studioRegenerateBlockedMessage}</p>
-              ) : (
+              ) : !blueprint && (
                 <div className="flex flex-col gap-3 mb-4">
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="font-bold text-[#101A24]">{t.studioCurriculumPromptLabel}</span>
@@ -748,9 +947,18 @@ function CourseDetail({ courseId, onBack }) {
                   </button>
                 </div>
               )}
-              {camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />}
+              {blueprint ? (
+                <BlueprintPreview
+                  blueprint={blueprint} busy={busy} t={t}
+                  onConfirm={handleConfirmBlueprint}
+                  onRegenerate={handleGenerate}
+                  onCancel={() => setBlueprint(null)}
+                />
+              ) : camps.length === 0 ? <EmptyState>{t.studioNoCurriculum}</EmptyState> : (
+                <MountainVisual courseId={courseId} camps={camps} lessons={lessons} t={t} onChanged={load} />
+              )}
             </Card>
-            <GenerateFromSourcePanel docs={knowledgeDocs} lessons={lessons} t={t} />
+            {!blueprint && <GenerateFromSourcePanel docs={knowledgeDocs} lessons={lessons} t={t} />}
           </>
         );
       })()}

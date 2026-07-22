@@ -7,7 +7,16 @@
 import { shouldCallAI, modelNameForTask } from './aiConfig.js';
 import { logAIUsage } from './aiUsageLog.js';
 
-const DEFAULT_TIMEOUT_MS = 6000;
+// Measured against this project's live key: the configured main model
+// (gemini-3.5-flash, a "thinking" model — see aiConfig.js) routinely takes
+// 9-20s to respond even to short prompts, well past a naive 6s budget. That
+// mismatch was the actual cause of most "AI generation" silently falling
+// back to deterministic/empty results — the Gemini call really was being
+// attempted, it just kept losing the race against the timeout. Callers on
+// the fast light model (aiConfig.js LIGHT_MODEL_TASKS, ~1s observed) still
+// get a comfortable safety margin at this value; call sites on the main
+// model pass their own longer explicit timeoutMs (see studioAIService.js).
+const DEFAULT_TIMEOUT_MS = 10000;
 const MAX_ATTEMPTS = 2; // one call + one retry, per audit §10 rule 9
 
 async function requestOnce(model, systemInstruction, userMessage, timeoutMs, history) {

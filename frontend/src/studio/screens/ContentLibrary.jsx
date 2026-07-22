@@ -248,7 +248,10 @@ function LessonPanel({ lesson, items, onChanged, t }) {
   async function handleGenerate() {
     setBusy(true);
     try {
-      const kit = await generateLessonKit(lesson.id);
+      // Scoped to whichever tab the trainer is looking at — generating while
+      // on the Quiz tab must only touch quiz items, never silently redo
+      // knowledge/flashcards too (see routes.js's kit/generate contentType).
+      const kit = await generateLessonKit(lesson.id, activeTab);
       setReaction({ event: 'LESSON_KIT_CREATED', context: { lessonTitle: lesson.title, ...kit } });
       onChanged();
     } catch (err) {
@@ -259,6 +262,7 @@ function LessonPanel({ lesson, items, onChanged, t }) {
   const TAB_LABEL = { knowledge: t.studioTabKnowledge, flashcard: t.studioTabFlashcard, quiz: t.studioTabQuiz };
   const activeTypes = TABS.find((tb) => tb.key === activeTab).types;
   const visibleItems = items.filter((i) => activeTypes.includes(i.contentType));
+  const generateLabel = (visibleItems.length ? t.studioRegenerateKitFor : t.studioGenerateKitFor).replace('{type}', TAB_LABEL[activeTab]);
 
   return (
     <Card className="!rounded-[28px] !p-6">
@@ -270,7 +274,7 @@ function LessonPanel({ lesson, items, onChanged, t }) {
         <button onClick={handleGenerate} disabled={busy}
           className="flex items-center gap-2 font-comic font-extrabold text-[13px] text-white px-5 py-3 rounded-2xl bg-[#101A24] disabled:opacity-50"
         >
-          <Sparkles size={16} /> {items.length ? t.studioRegenerateKit : t.studioGenerateKit}
+          <Sparkles size={16} /> {generateLabel}
         </button>
       </div>
 

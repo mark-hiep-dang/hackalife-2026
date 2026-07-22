@@ -29,6 +29,13 @@ export async function initStudioDb(db) {
   try { await db.exec('ALTER TABLE studio_courses ADD COLUMN gen_flashcards INTEGER DEFAULT 1'); } catch (err) { /* already exists */ }
   try { await db.exec('ALTER TABLE studio_courses ADD COLUMN gen_quiz INTEGER DEFAULT 1'); } catch (err) { /* already exists */ }
   try { await db.exec('ALTER TABLE studio_courses ADD COLUMN randomize_questions INTEGER DEFAULT 0'); } catch (err) { /* already exists */ }
+  // Course-level learning outcomes (JSON string[]) from the Course Blueprint —
+  // distinct from studio_learning_outcomes, which is one row per lesson.
+  try { await db.exec('ALTER TABLE studio_courses ADD COLUMN outcomes TEXT'); } catch (err) { /* already exists */ }
+  // Trainer-configured "how many" for per-lesson quiz/flashcard generation —
+  // read back by every lesson-kit generation call under this course.
+  try { await db.exec('ALTER TABLE studio_courses ADD COLUMN quiz_count_per_lesson INTEGER DEFAULT 3'); } catch (err) { /* already exists */ }
+  try { await db.exec('ALTER TABLE studio_courses ADD COLUMN flashcard_count_per_lesson INTEGER DEFAULT 5'); } catch (err) { /* already exists */ }
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS studio_competencies (
@@ -144,6 +151,11 @@ export async function initStudioDb(db) {
   // other content type is fine without one (a flashcard/mcq/checkpoint is
   // self-describing), but a knowledge block reads much better with a heading.
   try { await db.exec('ALTER TABLE studio_content_items ADD COLUMN title TEXT'); } catch (err) { /* already exists */ }
+  // Links a generated question/flashcard back to the specific learning
+  // outcome its lesson targets (studio_lessons.learning_outcome_id) — lets a
+  // trainer/quality-check see which outcomes actually have assessment
+  // coverage, beyond just the implicit lesson_id -> camp -> course chain.
+  try { await db.exec('ALTER TABLE studio_content_items ADD COLUMN learning_outcome_id INTEGER'); } catch (err) { /* already exists */ }
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS studio_content_reviews (

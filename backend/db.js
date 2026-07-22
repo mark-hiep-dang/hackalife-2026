@@ -206,7 +206,11 @@ export async function initDb() {
     "content_version TEXT DEFAULT '1.0'",
     "course_id INTEGER",
     "effective_date TEXT",
-    "expiry_date TEXT"
+    "expiry_date TEXT",
+    // Compact per-chunk preview list ({chunkId, preview}[], JSON) computed
+    // once at upload time — course-blueprint generation grounds itself in
+    // this instead of resending every chunk's full text on every call.
+    "doc_map TEXT"
   ]) {
     try { await db.exec(`ALTER TABLE knowledge_documents ADD COLUMN ${col}`); } catch (err) { /* already exists */ }
   }

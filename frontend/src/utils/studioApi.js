@@ -22,20 +22,30 @@ export const getCourses = () => req('/courses');
 export const createCourse = (course) => req('/courses', { method: 'POST', body: course });
 export const getCourse = (id) => req(`/courses/${id}`);
 export const deleteCourse = (id) => req(`/courses/${id}`, { method: 'DELETE' });
-export const generateCourseCurriculum = (id, prompt) => req(`/courses/${id}/curriculum/generate`, { method: 'POST', body: { prompt } });
+// Blueprint flow: generate returns a preview (nothing persisted yet);
+// confirm persists that (possibly trainer-tweaked) blueprint as the
+// course's camps/lessons. Regenerating a single camp or lesson never
+// touches the rest of the course.
+export const generateCourseBlueprint = (id, prompt) => req(`/courses/${id}/blueprint/generate`, { method: 'POST', body: { prompt } });
+export const confirmCourseBlueprint = (id, blueprint) => req(`/courses/${id}/blueprint/confirm`, { method: 'POST', body: { blueprint } });
 export const createCamp = (courseId, title) => req(`/courses/${courseId}/camps`, { method: 'POST', body: { title } });
 export const updateCamp = (campId, fields) => req(`/camps/${campId}`, { method: 'PUT', body: fields });
 export const deleteCamp = (campId) => req(`/camps/${campId}`, { method: 'DELETE' });
+export const regenerateCamp = (campId, prompt) => req(`/camps/${campId}/regenerate`, { method: 'POST', body: { prompt } });
 export const createLesson = (campId, fields) => req(`/camps/${campId}/lessons`, { method: 'POST', body: fields });
 export const updateLesson = (lessonId, fields) => req(`/lessons/${lessonId}`, { method: 'PUT', body: fields });
 export const deleteLesson = (lessonId) => req(`/lessons/${lessonId}`, { method: 'DELETE' });
+export const regenerateLessonDetails = (lessonId, prompt) => req(`/lessons/${lessonId}/regenerate-details`, { method: 'POST', body: { prompt } });
 export const publishCourse = (id) => req(`/courses/${id}/publish`, { method: 'POST' });
 export const runQualityCheck = (id) => req(`/courses/${id}/quality-check`, { method: 'POST' });
 export const getQuality = (id) => req(`/courses/${id}/quality`);
 export const suggestQualityFix = (issueId) => req(`/quality-issues/${issueId}/suggest-fix`, { method: 'POST' });
 export const ignoreQualityIssue = (issueId, reason) => req(`/quality-issues/${issueId}/ignore`, { method: 'PUT', body: { reason } });
 
-export const generateLessonKit = (lessonId) => req(`/lessons/${lessonId}/kit/generate`, { method: 'POST' });
+export const generateLessonKit = (lessonId, contentType = 'all') => req(`/lessons/${lessonId}/kit/generate`, { method: 'POST', body: { contentType } });
+// Runs automatically right after the trainer confirms a Course Blueprint —
+// generates knowledge/flashcard/quiz for every lesson in the course in one pass.
+export const generateCourseContent = (courseId, contentType = 'all') => req(`/courses/${courseId}/generate-content`, { method: 'POST', body: { contentType } });
 export const generateContentFromDocument = (lessonId, documentId) => req(`/lessons/${lessonId}/generate-from-document`, { method: 'POST', body: { documentId } });
 export const getCourseKnowledge = (courseId) => req(`/courses/${courseId}/knowledge`);
 export const deleteCourseKnowledge = (docId) => req(`/knowledge/${docId}`, { method: 'DELETE' });

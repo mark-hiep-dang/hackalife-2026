@@ -23,6 +23,12 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
   const NAV = getNav(t);
   const [tab, setTab] = useState('overview');
   const [switching, setSwitching] = useState(false);
+  const [focusCohortId, setFocusCohortId] = useState(null);
+
+  function handleNavigate(tabId, cohortId) {
+    if (cohortId) setFocusCohortId(cohortId);
+    setTab(tabId);
+  }
 
   async function handleExit() {
     setSwitching(true);
@@ -108,9 +114,9 @@ export default function StudioApp({ profile, onExitStudio, onLogout }) {
 
       <main className="flex-1 w-full overflow-y-auto">
         <div className="max-w-[1280px] mx-auto px-4 md:px-10 py-8 md:py-12">
-          {tab === 'overview' && <Overview onNavigate={setTab} />}
+          {tab === 'overview' && <Overview onNavigate={handleNavigate} />}
           {tab === 'courses' && <Courses />}
-          {tab === 'learners-exams' && <LearnersAndExams />}
+          {tab === 'learners-exams' && <LearnersAndExams initialCohortId={focusCohortId} />}
         </div>
       </main>
       <TrainerCopilot />

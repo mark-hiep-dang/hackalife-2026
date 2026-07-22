@@ -80,6 +80,43 @@ export function Button({ children, variant = 'primary', className = '', ...props
   );
 }
 
+const TOPIC_BAND_STYLE = {
+  weak: { color: '#D14343', bg: '#F9D9D9' },
+  fair: { color: '#E8A23A', bg: '#FBE9CB' },
+  good: { color: '#1E9E5A', bg: '#D6F0DE' }
+};
+export function topicBand(rate) {
+  if (rate < 50) return { key: 'weak', ...TOPIC_BAND_STYLE.weak };
+  if (rate < 75) return { key: 'fair', ...TOPIC_BAND_STYLE.fair };
+  return { key: 'good', ...TOPIC_BAND_STYLE.good };
+}
+
+// Ranked topic list (weakest first) with a progress bar + band chip — shared
+// by Cohort Overview (cohort-wide topics) and Learner Detail (per-learner
+// topics), both sourced from the same calculateTopicPerformance shape.
+export function TopicBarList({ topics, bandLabels }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {topics.map((tp) => {
+        const rate = tp.correctRate ?? tp.rate;
+        const band = topicBand(rate);
+        return (
+          <div key={tp.topic} className="flex items-center gap-3.5 flex-wrap sm:flex-nowrap">
+            <span className="w-full sm:w-[210px] shrink-0 text-[13px] font-extrabold text-[#101A24]">{tp.topic}</span>
+            <div className="flex-1 h-3.5 rounded-lg bg-[#F5F6F8] overflow-hidden min-w-[80px]">
+              <div className="h-full rounded-lg" style={{ background: band.color, width: `${rate}%` }} />
+            </div>
+            <span className="w-10 text-right shrink-0 text-[13px] font-extrabold text-[#101A24]">{rate}%</span>
+            <span className="w-16 shrink-0 text-center text-[10px] font-extrabold uppercase tracking-wide py-1 rounded-lg" style={{ background: band.bg, color: band.color }}>
+              {bandLabels[band.key]}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Spinner({ label = 'Đang tải…' }) {
   return <div className="flex items-center gap-2 text-sm text-[#888] py-8 justify-center">{label}</div>;
 }

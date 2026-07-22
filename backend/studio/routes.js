@@ -10,11 +10,15 @@ import mammoth from 'mammoth';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { getDb } from '../db.js';
-import { storeDocument, decodeUploadedFilename, getCourseChunks } from '../knowledgeBase.js';
-import { generateCurriculumFromPrompt, generateLessonKit, generateContentFromDocument, generateContentFromCourseChunks, generateContentFromLessonGoal, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
+import { storeDocument, decodeUploadedFilename } from '../knowledgeBase.js';
+import {
+  generateCourseBlueprint, regenerateCampLessons, regenerateLessonDetails,
+  generateContentFromDocument, generateContentForLesson, generateContentForCourse,
+  explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion
+} from './studioAIService.js';
 import { checkCourseQuality } from './engines/courseQuality.js';
 import { calculateCohortOverview, calculateTopicPerformance, classifyTrend } from './engines/mockExamAnalytics.js';
-import { detectLearnerRisk } from './engines/learnerRisk.js';
+import { detectLearnerRisk, RISK_STATUS } from './engines/learnerRisk.js';
 import { detectOutlierPatterns } from './engines/outlierPatterns.js';
 import { analyzeQuestionQuality } from './engines/questionQuality.js';
 import { clusterMisconceptions } from './engines/misconceptionCluster.js';
@@ -42,14 +46,6 @@ async function requireTrainer(req, res, next) {
 function parseJSON(value, fallback) {
   if (value == null) return fallback;
   try { return JSON.parse(value); } catch { return fallback; }
-}
-
-function shuffleInPlace(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
 }
 
 // PPTX is a zip of slide XML files (ppt/slides/slideN.xml) — no dedicated
@@ -87,7 +83,15 @@ async function loadCourseBundle(db, courseId) {
   const contentItems = lessonIds.length
     ? await db.all(`SELECT * FROM studio_content_items WHERE lesson_id IN (${lessonIds.join(',')})`)
     : [];
-  return { course, camps, lessons, contentItems };
+  const prereqRows = lessonIds.length
+    ? await db.all(`SELECT lesson_id, prerequisite_lesson_id FROM studio_lesson_prerequisites WHERE lesson_id IN (${lessonIds.join(',')})`)
+    : [];
+  const prereqMap = new Map();
+  for (const row of prereqRows) {
+    if (!prereqMap.has(row.lesson_id)) prereqMap.set(row.lesson_id, []);
+    prereqMap.get(row.lesson_id).push(row.prerequisite_lesson_id);
+  }
+  return { course, camps, lessons, contentItems, prereqMap };
 }
 
 function toContentItemDTO(c) {
@@ -101,12 +105,13 @@ function toContentItemDTO(c) {
   };
 }
 
-function toLessonDTO(l) {
+function toLessonDTO(l, prereqMap = null) {
   return {
     id: l.id, campId: l.camp_id, title: l.title, description: l.description, learningOutcomeId: l.learning_outcome_id,
     skillIds: parseJSON(l.skill_ids, []), estimatedMinutes: l.estimated_minutes, difficulty: l.difficulty,
     recommendedActivities: parseJSON(l.recommended_activities, []), examWeight: l.exam_weight,
-    sourceChunkIds: parseJSON(l.source_chunk_ids, []), status: l.status, aiLocked: !!l.ai_locked, orderIndex: l.order_index
+    sourceChunkIds: parseJSON(l.source_chunk_ids, []), status: l.status, aiLocked: !!l.ai_locked, orderIndex: l.order_index,
+    prerequisiteLessonIds: prereqMap?.get(l.id) || []
   };
 }
 
@@ -265,10 +270,92 @@ export async function getRealLearnersWithRisk(db, cohortId) {
       id: learner.id, name: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
       scoreHistory: summary.scores, scoreTrend: classifyTrend(summary.scores), status: risk.status, reasons: risk.reasons,
       recommendedAction: risk.recommendedAction, weakestTopic: summary.weakestTopic, commonMistakeType: summary.commonMistakeType,
-      outlierPatterns: summary.outlierPatterns
+      outlierPatterns: summary.outlierPatterns,
+      summitReadinessScore: summary.summitReadiness.score,
+      lastActivityAt: summary.quizzes[summary.quizzes.length - 1]?.created_at ?? null
     });
   }
   return results;
+}
+
+// Cohort Summit Journey (Overview dashboard): buckets learners into stages
+// that mirror the REAL camp structure of the course they're actually
+// studying (e.g. MOF's own Base Camp / Camp 1 / Camp 2 / Camp 3 in
+// studio_camps), rather than an invented generic stage taxonomy — the
+// mountain a trainer sees should be the actual mountain their learners are
+// climbing. The final camp is always relabeled "Summit" (reaching it means
+// exam-ready), so an N-camp course yields exactly N stages. Score bands
+// (which decide which stage a learner currently sits in) split the real
+// Summit Readiness score (computeSummitReadiness) into N equal ranges.
+const NON_LAST_STAGE_ICONS = ['⛺', '🧗', '🏕️', '🥾'];
+
+export function buildJourneyStages(camps) {
+  return camps.map((camp, i) => {
+    const isLast = i === camps.length - 1;
+    const label = isLast ? 'Summit' : camp.title.split(':')[0].trim();
+    const maxScore = isLast ? 100 : Math.round(((i + 1) / camps.length) * 100) - 1;
+    const icon = isLast ? '🏔️' : NON_LAST_STAGE_ICONS[Math.min(i, NON_LAST_STAGE_ICONS.length - 1)];
+    return { key: isLast ? 'summit' : `stage${i}`, icon, label, maxScore };
+  });
+}
+
+export function journeyStageForScore(score, stages) {
+  return stages.find((s) => score <= s.maxScore) || stages[stages.length - 1];
+}
+
+const EMPTY_JOURNEY = { stages: [], total: 0, medianStageKey: null, modeStageKey: null, movedForwardCount: 0, noProgressCount: 0, needsInterventionCount: 0 };
+
+// `learnersWithRisk` is the already-computed getRealLearnersWithRisk(db)
+// result (system-wide) — passed in rather than recomputed, since the
+// overview route already needs that same call for learnersNeedingAttention.
+export async function computeCohortJourney(db, learnersWithRisk) {
+  const course = await db.get("SELECT * FROM studio_courses WHERE status = 'PUBLISHED' ORDER BY id LIMIT 1");
+  if (!course) return EMPTY_JOURNEY;
+
+  const camps = await db.all('SELECT * FROM studio_camps WHERE course_id = ? ORDER BY order_index', [course.id]);
+  if (camps.length === 0) return EMPTY_JOURNEY;
+
+  const stages = buildJourneyStages(camps);
+  const rosterRows = await db.all(
+    `SELECT DISTINCT learner_id FROM studio_cohort_learners WHERE cohort_id IN (SELECT id FROM studio_cohorts WHERE course_id = ?)`,
+    [course.id]
+  );
+  const rosterIds = new Set(rosterRows.map((r) => r.learner_id));
+  const stageCounts = Object.fromEntries(stages.map((s) => [s.key, 0]));
+  const activeIdsInRoster = new Set();
+  let movedForwardCount = 0, noProgressCount = 0, needsInterventionCount = 0;
+  const sevenDaysAgo = Date.now() - 7 * 86400000;
+
+  for (const learner of learnersWithRisk) {
+    if (!rosterIds.has(learner.id)) continue;
+    activeIdsInRoster.add(learner.id);
+    const stage = journeyStageForScore(learner.summitReadinessScore, stages);
+    stageCounts[stage.key]++;
+    if (learner.status === RISK_STATUS.NEEDS_HELP_NOW) needsInterventionCount++;
+    if (learner.lastActivityAt) {
+      const lastMs = new Date(learner.lastActivityAt).getTime();
+      if (lastMs >= sevenDaysAgo) movedForwardCount++;
+      else noProgressCount++;
+    }
+  }
+  // Roster members with zero quiz activity ever (never appear in
+  // learnersWithRisk, which only covers real+active accounts) still count
+  // toward the journey total, at the first (Base Camp) stage.
+  for (const id of rosterIds) {
+    if (!activeIdsInRoster.has(id)) stageCounts[stages[0].key]++;
+  }
+
+  const stagesOut = stages.map((s) => ({ key: s.key, icon: s.icon, label: s.label, count: stageCounts[s.key] }));
+  const total = stagesOut.reduce((sum, s) => sum + s.count, 0);
+  let cumulative = 0;
+  let medianStageKey = stagesOut[0]?.key ?? null;
+  for (const s of stagesOut) {
+    cumulative += s.count;
+    if (total > 0 && cumulative >= total / 2) { medianStageKey = s.key; break; }
+  }
+  const modeStage = stagesOut.reduce((best, s) => (s.count > (best?.count ?? -1) ? s : best), null);
+
+  return { stages: stagesOut, total, medianStageKey, modeStageKey: modeStage?.key ?? null, movedForwardCount, noProgressCount, needsInterventionCount };
 }
 
 export function mountStudioRoutes(app, authenticateToken) {
@@ -308,6 +395,79 @@ export function mountStudioRoutes(app, authenticateToken) {
         : { c: 0 };
       const coursesNeedingReview = courses.filter((c) => c.status === 'AI_DRAFT' || (c.health_score ?? 100) < 70).length;
 
+      const learnersWithRisk = await getRealLearnersWithRisk(db);
+      const learnersNeedingAttention = learnersWithRisk.filter(
+        (l) => l.status === RISK_STATUS.NEEDS_HELP_NOW || l.status === RISK_STATUS.NEEDS_MONITORING || (l.outlierPatterns || []).length > 0
+      ).length;
+
+      const cohortResults = [];
+      for (const cohort of cohorts) {
+        const rosterRow = await db.get('SELECT COUNT(DISTINCT learner_id) c FROM studio_cohort_learners WHERE cohort_id = ?', [cohort.id]);
+        const latestExam = await db.get(
+          'SELECT id, round_number FROM studio_mock_exams WHERE cohort_id = ? ORDER BY round_number DESC LIMIT 1', [cohort.id]
+        );
+        let cohortAvgScore = null, cohortPassRate = null;
+        if (latestExam) {
+          const attempts = await db.all('SELECT * FROM studio_mock_exam_attempts WHERE mock_exam_id = ?', [latestExam.id]);
+          if (attempts.length > 0) {
+            const cohortOverview = calculateCohortOverview(attempts.map((a) => ({ score: a.score, totalQuestions: a.total_questions, completionTimeSeconds: a.completion_time_seconds, summitReadinessBefore: a.summit_readiness_before })), 70);
+            cohortAvgScore = cohortOverview.averageScore;
+            cohortPassRate = cohortOverview.passRate;
+          }
+        }
+        const course = courses.find((c) => c.id === cohort.course_id);
+        cohortResults.push({
+          id: cohort.id, name: cohort.name, courseTitle: course?.title ?? null,
+          learnerCount: rosterRow.c, averageScore: cohortAvgScore, passRate: cohortPassRate
+        });
+      }
+
+      // ── Trainer Action Queue: up to 3 real, actionable items — never
+      // filler. Each kind only appears when its underlying data actually
+      // exists (an open cluster, an unhealthy checked course, pending
+      // drafts) rather than always showing exactly 3.
+      const topCluster = cohortIds.length
+        ? await db.get(
+            `SELECT * FROM studio_misconception_clusters WHERE cohort_id IN (${cohortIds.join(',')}) AND status = 'open' ORDER BY learner_count DESC LIMIT 1`
+          )
+        : null;
+
+      const worstCourse = courses
+        .filter((c) => c.health_score != null && c.health_score < 70)
+        .sort((a, b) => a.health_score - b.health_score)[0] || null;
+      let worstCourseTopIssue = null;
+      if (worstCourse) {
+        const latestCheck = await db.get('SELECT id FROM studio_quality_checks WHERE course_id = ? ORDER BY id DESC LIMIT 1', [worstCourse.id]);
+        if (latestCheck) {
+          worstCourseTopIssue = await db.get(
+            `SELECT * FROM studio_quality_issues WHERE quality_check_id = ? AND status = 'open'
+             ORDER BY CASE severity WHEN 'BLOCKER' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'SUGGESTION' THEN 2 ELSE 3 END LIMIT 1`,
+            [latestCheck.id]
+          );
+        }
+      }
+      const aiDraftRow = await db.get("SELECT COUNT(*) c FROM studio_content_items WHERE status = 'AI_DRAFT'");
+
+      const actionQueue = [];
+      if (topCluster) {
+        actionQueue.push({
+          kind: 'urgent', clusterId: topCluster.id, cohortId: topCluster.cohort_id, topic: topCluster.topic,
+          mistakeType: topCluster.mistake_type, learnerCount: topCluster.learner_count,
+          confidentWrongPercent: topCluster.learner_count > 0 ? Math.round((topCluster.high_confidence_count / topCluster.learner_count) * 100) : 0
+        });
+      }
+      if (worstCourse) {
+        actionQueue.push({
+          kind: 'courseReview', courseId: worstCourse.id, courseTitle: worstCourse.title, healthScore: worstCourse.health_score,
+          topIssueMessage: worstCourseTopIssue?.message ?? null
+        });
+      }
+      if (aiDraftRow.c > 0) {
+        actionQueue.push({ kind: 'aiDrafts', count: aiDraftRow.c });
+      }
+
+      const cohortJourney = await computeCohortJourney(db, learnersWithRisk);
+
       res.json({
         activeCourses: courses.length,
         activeLearners: learnerCountRow.c,
@@ -316,7 +476,11 @@ export function mountStudioRoutes(app, authenticateToken) {
         mockExamTrend,
         coursesNeedingReview,
         misconceptionClustersOpen: clustersOpen.c,
-        courses: courses.map((c) => ({ id: c.id, title: c.title, status: c.status, healthScore: c.health_score }))
+        learnersNeedingAttention,
+        courses: courses.map((c) => ({ id: c.id, title: c.title, status: c.status, healthScore: c.health_score })),
+        cohortResults,
+        cohortJourney,
+        actionQueue
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -325,16 +489,17 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.post('/api/studio/courses', ...T, async (req, res) => {
     const {
       title, description, targetGroup, durationWeeks, examDate, learningGoal, targetScore, preferredCamps, difficultyTarget, assessmentTarget,
-      genFlashcards, genQuiz, randomizeQuestions
+      genFlashcards, genQuiz, randomizeQuestions, quizCountPerLesson, flashcardCountPerLesson
     } = req.body;
     const db = req.db;
     try {
       const result = await db.run(
-        `INSERT INTO studio_courses (trainer_id, title, description, target_group, duration_weeks, exam_date, learning_goal, target_score, preferred_camps, difficulty_target, assessment_target, gen_flashcards, gen_quiz, randomize_questions)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO studio_courses (trainer_id, title, description, target_group, duration_weeks, exam_date, learning_goal, target_score, preferred_camps, difficulty_target, assessment_target, gen_flashcards, gen_quiz, randomize_questions, quiz_count_per_lesson, flashcard_count_per_lesson)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           req.user.id, title, description || '', targetGroup || '', durationWeeks || 4, examDate || null, learningGoal || '', targetScore || 70, preferredCamps || 4, difficultyTarget || 'balanced', assessmentTarget || '',
-          genFlashcards === false ? 0 : 1, genQuiz === false ? 0 : 1, randomizeQuestions ? 1 : 0
+          genFlashcards === false ? 0 : 1, genQuiz === false ? 0 : 1, randomizeQuestions ? 1 : 0,
+          quizCountPerLesson || 3, flashcardCountPerLesson || 5
         ]
       );
       res.status(201).json({ id: result.lastID });
@@ -354,9 +519,9 @@ export function mountStudioRoutes(app, authenticateToken) {
       const bundle = await loadCourseBundle(db, req.params.id);
       if (!bundle) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
       res.json({
-        course: bundle.course,
+        course: { ...bundle.course, outcomes: parseJSON(bundle.course.outcomes, []) },
         camps: bundle.camps,
-        lessons: bundle.lessons.map(toLessonDTO),
+        lessons: bundle.lessons.map((l) => toLessonDTO(l, bundle.prereqMap)),
         contentItems: bundle.contentItems.map(toContentItemDTO)
       });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -379,17 +544,39 @@ export function mountStudioRoutes(app, authenticateToken) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  app.post('/api/studio/courses/:id/curriculum/generate', ...T, async (req, res) => {
+  // Preview-only: generates a Course Blueprint (title/outcomes/camps/lessons
+  // — no lesson content, quizzes, or flashcards) and returns it WITHOUT
+  // persisting anything. The wizard's "Start building" and CourseDetail's
+  // "Regenerate curriculum" both hit this, then show the result as a
+  // Blueprint Preview for the trainer to review/edit before calling
+  // blueprint/confirm below to actually save it. Safe to call regardless of
+  // existing approved/published content, since nothing changes yet.
+  app.post('/api/studio/courses/:id/blueprint/generate', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const course = await db.get('SELECT * FROM studio_courses WHERE id = ?', [req.params.id]);
+      if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
+      const blueprint = await generateCourseBlueprint(db, {
+        courseId: course.id, courseTitle: course.title, prompt: req.body.prompt || '', preferredCamps: course.preferred_camps || 4
+      });
+      res.json({ blueprint });
+    } catch (err) {
+      res.status(err.code === 'VAGUE_INPUT' ? 400 : 500).json({ error: err.message, code: err.code });
+    }
+  });
+
+  // Persists a (possibly trainer-tweaked) Course Blueprint: replaces every
+  // camp/lesson/prerequisite for this course and stores the course-level
+  // outcomes. Blocked once anything has been approved/published — same
+  // "never silently destroy confirmed work" rule as before; manual
+  // add/edit/delete or the single-camp/lesson regenerate routes below take
+  // over from there.
+  app.post('/api/studio/courses/:id/blueprint/confirm', ...T, async (req, res) => {
     const db = req.db;
     try {
       const course = await db.get('SELECT * FROM studio_courses WHERE id = ?', [req.params.id]);
       if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
 
-      // Regenerating wipes every camp/lesson/content-item for the course (FK
-      // cascade below) — only safe while nothing has been confirmed yet.
-      // Once anything is approved/published, block it so confirmed work is
-      // never silently destroyed — manual add/edit/delete (routes below)
-      // takes over from there.
       const approvedLesson = await db.get(
         `SELECT 1 FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id
          WHERE c.course_id = ? AND l.status IN ('APPROVED', 'PUBLISHED') LIMIT 1`,
@@ -404,44 +591,46 @@ export function mountStudioRoutes(app, authenticateToken) {
         return res.status(400).json({ error: 'Khóa học đã có nội dung được duyệt hoặc publish. Hãy dùng chức năng thêm/sửa/xoá camp và chặng học thủ công thay vì tạo lại toàn bộ, để tránh mất nội dung đã duyệt.' });
       }
 
-      // Fold every input the trainer already gave (course row, set at
-      // creation) into the generation prompt, not just whatever's passed in
-      // this request body — title/cohort/duration/target score/exam date/
-      // description all shape what camps & lessons Gemini proposes. An
-      // explicit req.body.prompt (e.g. CourseDetail's manual "regenerate"
-      // flow) is appended on top rather than replacing this context.
-      const contextLines = [
-        `Tên khóa học: ${course.title}`,
-        course.target_group && `Nhóm học viên (cohort): ${course.target_group}`,
-        `Thời lượng: ${course.duration_weeks || 4} tuần`,
-        course.target_score && `Điểm mục tiêu: ${course.target_score}`,
-        course.exam_date && `Ngày thi: ${course.exam_date}`,
-        course.description && `Mục tiêu / mô tả khóa học: ${course.description}`
-      ].filter(Boolean).join('\n');
-      const combinedPrompt = [contextLines, req.body.prompt?.trim()].filter(Boolean).join('\n\n');
-
-      const curriculum = await generateCurriculumFromPrompt(db, {
-        courseId: course.id, prompt: combinedPrompt, preferredCamps: course.preferred_camps || 4
-      });
-
-      // Persist as AI_DRAFT.
-      await db.run('DELETE FROM studio_camps WHERE course_id = ?', [course.id]);
-      const campIdMap = new Map();
-      for (const camp of curriculum.camps) {
-        const r = await db.run('INSERT INTO studio_camps (course_id, title, order_index) VALUES (?, ?, ?)', [course.id, camp.title, camp.orderIndex]);
-        campIdMap.set(camp.id, r.lastID);
+      const blueprint = req.body.blueprint;
+      if (!blueprint || !Array.isArray(blueprint.camps) || !Array.isArray(blueprint.lessons) || blueprint.camps.length === 0) {
+        return res.status(400).json({ error: 'Thiếu dữ liệu blueprint.' });
       }
-      for (const lesson of curriculum.lessons) {
-        const outcomeResult = await db.run('INSERT INTO studio_learning_outcomes (course_id, description) VALUES (?, ?)', [course.id, lesson.learningOutcome]);
-        await db.run(
+
+      await db.run('DELETE FROM studio_camps WHERE course_id = ?', [course.id]); // cascades lessons/content-items/prerequisites
+      const campIds = [];
+      for (const camp of blueprint.camps) {
+        const r = await db.run('INSERT INTO studio_camps (course_id, title, order_index) VALUES (?, ?, ?)', [course.id, camp.title, campIds.length]);
+        campIds.push(r.lastID);
+      }
+
+      const lessonIds = [];
+      for (let i = 0; i < blueprint.lessons.length; i++) {
+        const lesson = blueprint.lessons[i];
+        const campId = campIds[lesson.campIndex] ?? campIds[0];
+        const outcomeResult = await db.run('INSERT INTO studio_learning_outcomes (course_id, description) VALUES (?, ?)', [course.id, lesson.learningOutcome || '']);
+        const r = await db.run(
           `INSERT INTO studio_lessons (camp_id, title, description, learning_outcome_id, estimated_minutes, difficulty, recommended_activities, exam_weight, source_chunk_ids, status, order_index)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT', ?)`,
-          [campIdMap.get(lesson.campId), lesson.title, lesson.description, outcomeResult.lastID, lesson.estimatedMinutes, lesson.difficulty, JSON.stringify(lesson.recommendedActivities), lesson.examWeight, JSON.stringify(lesson.sourceChunkIds || []), curriculum.lessons.indexOf(lesson)]
+          [campId, lesson.title, lesson.summary || '', outcomeResult.lastID, lesson.estimatedMinutes, lesson.difficulty,
+            JSON.stringify(['micro-lesson', 'flashcard', 'mcq']), blueprint.lessons.length ? Math.round((1 / blueprint.lessons.length) * 100) / 100 : 0.1,
+            JSON.stringify(lesson.sourceChunkIds || []), i]
         );
+        lessonIds.push(r.lastID);
       }
-      await db.run("UPDATE studio_courses SET status = 'AI_DRAFT', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [course.id]);
+      for (let i = 0; i < blueprint.lessons.length; i++) {
+        for (const prereqIndex of blueprint.lessons[i].prerequisiteIndexes || []) {
+          if (lessonIds[prereqIndex] != null && lessonIds[prereqIndex] !== lessonIds[i]) {
+            await db.run('INSERT OR IGNORE INTO studio_lesson_prerequisites (lesson_id, prerequisite_lesson_id) VALUES (?, ?)', [lessonIds[i], lessonIds[prereqIndex]]);
+          }
+        }
+      }
 
-      res.json({ summary: curriculum.summary, campCount: curriculum.camps.length, lessonCount: curriculum.lessons.length, usedSource: curriculum.usedSource });
+      await db.run(
+        "UPDATE studio_courses SET status = 'AI_DRAFT', outcomes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [JSON.stringify(blueprint.outcomes || []), course.id]
+      );
+
+      res.json({ campCount: campIds.length, lessonCount: lessonIds.length });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -482,6 +671,39 @@ export function mountStudioRoutes(app, authenticateToken) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  // Regenerates ONLY this camp's lessons (via Gemini) — every other camp in
+  // the course is untouched. Blocked if this camp already has an
+  // approved/published lesson, same "never silently destroy confirmed work"
+  // rule as the camp-delete route above.
+  app.post('/api/studio/camps/:id/regenerate', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const camp = await db.get('SELECT * FROM studio_camps WHERE id = ?', [req.params.id]);
+      if (!camp) return res.status(404).json({ error: 'Không tìm thấy camp' });
+      const blocked = await db.get(
+        `SELECT 1 FROM studio_lessons l LEFT JOIN studio_content_items ci ON ci.lesson_id = l.id
+         WHERE l.camp_id = ? AND (l.status IN ('APPROVED', 'PUBLISHED') OR ci.published_question_id IS NOT NULL OR ci.published_flashcard_id IS NOT NULL) LIMIT 1`,
+        [camp.id]
+      );
+      if (blocked) return res.status(400).json({ error: 'Camp này có chặng học hoặc nội dung đã duyệt/publish, không thể tạo lại tự động.' });
+
+      const { lessons } = await regenerateCampLessons(db, { courseId: camp.course_id, campTitle: camp.title, prompt: req.body.prompt || '' });
+
+      await db.run('DELETE FROM studio_lessons WHERE camp_id = ?', [camp.id]); // cascades content items + prerequisites
+      let orderIndex = 0;
+      for (const lesson of lessons) {
+        const outcomeResult = await db.run('INSERT INTO studio_learning_outcomes (course_id, description) VALUES (?, ?)', [camp.course_id, lesson.learningOutcome || '']);
+        await db.run(
+          `INSERT INTO studio_lessons (camp_id, title, description, learning_outcome_id, estimated_minutes, difficulty, recommended_activities, exam_weight, source_chunk_ids, status, order_index)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT', ?)`,
+          [camp.id, lesson.title, lesson.summary || '', outcomeResult.lastID, lesson.estimatedMinutes, lesson.difficulty,
+            JSON.stringify(['micro-lesson', 'flashcard', 'mcq']), Math.round((1 / lessons.length) * 100) / 100, JSON.stringify(lesson.sourceChunkIds || []), orderIndex++]
+        );
+      }
+      res.json({ lessonCount: lessons.length });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   // Manually-created lessons start APPROVED — the trainer wrote it
   // themselves, same reasoning as manually-created content items.
   app.post('/api/studio/camps/:id/lessons', ...T, async (req, res) => {
@@ -511,6 +733,35 @@ export function mountStudioRoutes(app, authenticateToken) {
         [title, description, estimatedMinutes, difficulty, req.params.id]
       );
       res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Regenerates ONLY this lesson's framing (title/summary/outcome/duration/
+  // difficulty) via Gemini — never its content items (flashcards/quiz have
+  // their own per-type regenerate under kit/generate) and never other
+  // lessons. Blocked once approved/published, same rule as everywhere else.
+  app.post('/api/studio/lessons/:id/regenerate-details', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const lesson = await db.get(
+        `SELECT l.*, c.course_id, c.title as camp_title FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id WHERE l.id = ?`,
+        [req.params.id]
+      );
+      if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
+      if (lesson.status === 'APPROVED' || lesson.status === 'PUBLISHED') {
+        return res.status(400).json({ error: 'Chặng học đã được duyệt/publish, không thể tạo lại tự động.' });
+      }
+
+      const { lesson: updated } = await regenerateLessonDetails(db, {
+        courseId: lesson.course_id, lessonTitle: lesson.title, campTitle: lesson.camp_title, prompt: req.body.prompt || ''
+      });
+
+      const outcomeResult = await db.run('INSERT INTO studio_learning_outcomes (course_id, description) VALUES (?, ?)', [lesson.course_id, updated.learningOutcome || '']);
+      await db.run(
+        `UPDATE studio_lessons SET title = ?, description = ?, learning_outcome_id = ?, estimated_minutes = ?, difficulty = ?, source_chunk_ids = ? WHERE id = ?`,
+        [updated.title, updated.summary || '', outcomeResult.lastID, updated.estimatedMinutes, updated.difficulty, JSON.stringify(updated.sourceChunkIds || []), lesson.id]
+      );
+      res.json({ success: true, title: updated.title });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -697,72 +948,42 @@ export function mountStudioRoutes(app, authenticateToken) {
   });
 
   // ── Lesson Kit Generator + Lesson Editor ────────────────────────────────
+  // `contentType` ('all' | 'knowledge' | 'flashcard' | 'quiz', default 'all')
+  // scopes generation to exactly what the trainer asked for — clicking
+  // "Regenerate" while on the Quiz tab must only touch quiz items, never
+  // silently redo knowledge/flashcards too. For 'all' (the plain "Generate
+  // AI content kit" button with no tab context), each category still
+  // respects the course-wide gen_flashcards/gen_quiz toggles from step 1 of
+  // the wizard; an explicit per-type request always runs regardless of
+  // those toggles, since the trainer is asking for that type directly.
+  // Every lesson — regardless of course origin — now goes through the real
+  // Gemini pipeline (course source documents if any, else the lesson's own
+  // goal/description); this used to first check the lesson's title against
+  // the legacy MOF exam-bank topics via a SQL LIKE substring match, which
+  // could silently route a brand-new AI-authored lesson (e.g. titled "Bảo
+  // hiểm nhân thọ") onto the generic legacy bank (topic "Bảo hiểm nhân thọ
+  // cơ bản") — real quiz-typed content, but about the wrong course.
   app.post('/api/studio/lessons/:id/kit/generate', ...T, async (req, res) => {
-    const db = req.db;
     try {
-      const lesson = await db.get(
-        `SELECT l.*, c.course_id, co.gen_flashcards, co.gen_quiz, co.randomize_questions
-         FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id JOIN studio_courses co ON c.course_id = co.id
-         WHERE l.id = ?`,
-        [req.params.id]
-      );
-      if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
-
-      // The lesson's title doubles as its mapped real exam topic for the
-      // legacy MOF exam bank (see studioAIService's DEFAULT_CAMP_GROUPING) —
-      // but that bank only covers courses built from it. Any course built
-      // via the AI course-goal wizard has freely AI-authored lesson titles
-      // that never match, so this falls through to whichever of the
-      // course's own source documents or stated goal it actually has,
-      // rather than erroring out.
-      const topicRow = await db.get(`SELECT DISTINCT topic FROM test_questions WHERE topic LIKE ?`, [`%${lesson.title}%`]);
-      const topic = topicRow?.topic;
-
-      if (topic) {
-        const kit = await generateLessonKit(db, {
-          topic, lessonTitle: lesson.title, genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz
-        });
-        if (lesson.randomize_questions) {
-          for (const list of [kit.easyQuestions, kit.mediumQuestions, kit.hardQuestions]) shuffleInPlace(list);
-        }
-        const insertItem = (type, fields) => db.run(
-          `INSERT INTO studio_content_items
-             (lesson_id, content_type, title, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_chunk_ids, source_title, source_version, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AI_DRAFT')`,
-          [lesson.id, type, fields.title || null, fields.questionText || null, JSON.stringify(fields.options || []), fields.correctOption ?? null,
-            fields.explanation || null, fields.difficulty || 'Trung bình', fields.cognitiveLevel || 'Hiểu',
-            fields.front || null, fields.back || null, fields.keyword || null,
-            JSON.stringify(fields.sourceChunkIds || []), fields.sourceTitle || 'Giáo trình MOF', fields.sourceVersion || '1.0']
-        );
-        for (const f of kit.flashcards) await insertItem('flashcard', f);
-        for (const q of kit.easyQuestions) await insertItem('mcq', q);
-        for (const q of kit.mediumQuestions) await insertItem('mcq', q);
-        for (const q of kit.hardQuestions) await insertItem('mcq', q);
-        if (kit.scenario) await insertItem('scenario', kit.scenario);
-        if (kit.checkpoint) await insertItem('checkpoint', kit.checkpoint);
-        // Previously the microLesson/memoryTips only ever appeared once in a
-        // transient Llama-bubble reaction and were never saved anywhere — a
-        // trainer had no way to see, edit, or approve them again after the
-        // fact. Persisting them as a real (reviewable, editable) knowledge
-        // item fixes that.
-        if (kit.microLesson) {
-          const body = [kit.microLesson, ...(kit.memoryTips || []).map((tip) => `• ${tip}`)].join('\n\n');
-          await insertItem('knowledge', { title: 'Kiến thức cốt lõi', questionText: body });
-        }
-
-        await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
-        return res.json({ microLesson: kit.microLesson, memoryTips: kit.memoryTips, itemCount: kit.flashcards.length + kit.easyQuestions.length + kit.mediumQuestions.length + kit.hardQuestions.length + (kit.scenario ? 1 : 0) + (kit.checkpoint ? 1 : 0) });
-      }
-
-      const chunks = await getCourseChunks(db, lesson.course_id);
-      const result = chunks.length > 0
-        ? await generateContentFromCourseChunks(db, { lessonId: lesson.id, courseId: lesson.course_id, genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz })
-        : await generateContentFromLessonGoal(db, {
-            lessonId: lesson.id, lessonTitle: lesson.title, lessonDescription: lesson.description,
-            genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz
-          });
-      await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
+      const { contentType = 'all' } = req.body || {};
+      const result = await generateContentForLesson(req.db, { lessonId: req.params.id, contentType });
       res.json(result);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Runs automatically once the trainer confirms the Course Blueprint (see
+  // the wizard's handleConfirmBlueprint) — generates kit/generate's exact
+  // per-lesson content for every lesson in the course, in order, so the
+  // trainer never has to visit each lesson individually. Each lesson's
+  // failure is caught individually (see generateContentForCourse): one bad
+  // Gemini call never deletes another lesson's already-saved AI_DRAFT
+  // content, and the per-lesson `results` array lets the trainer retry just
+  // the failed lesson (or a single failed asset type on it) via kit/generate.
+  app.post('/api/studio/courses/:id/generate-content', ...T, async (req, res) => {
+    try {
+      const { contentType = 'all' } = req.body || {};
+      const summary = await generateContentForCourse(req.db, { courseId: req.params.id, contentType });
+      res.json(summary);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -887,7 +1108,7 @@ export function mountStudioRoutes(app, authenticateToken) {
       const quality = checkCourseQuality({
         course: { id: bundle.course.id, targetDurationMinutes: (bundle.course.duration_weeks || 4) * 5 * 20 },
         camps: bundle.camps.map((c) => ({ id: c.id, title: c.title, orderIndex: c.order_index })),
-        lessons: bundle.lessons.map((l) => ({ ...toLessonDTO(l), prerequisiteLessonIds: [] })),
+        lessons: bundle.lessons.map((l) => toLessonDTO(l, bundle.prereqMap)),
         learningOutcomes: await db.all('SELECT id, description FROM studio_learning_outcomes WHERE course_id = ?', [bundle.course.id]),
         skills: await db.all('SELECT id, name FROM studio_skills WHERE course_id = ?', [bundle.course.id]),
         contentItems: bundle.contentItems.map((c) => ({
@@ -1073,7 +1294,7 @@ export function mountStudioRoutes(app, authenticateToken) {
 
       overview.rosterSize = await getCohortRosterSize(db, cohort.id);
 
-      res.json({ overview, topics, trend, cohortTrend, insight: insight.summary, latestExamId: latestExam.id });
+      res.json({ overview, topics, trend, cohortTrend, insight: insight.summary, latestExamId: latestExam.id, targetScore });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -1139,6 +1360,7 @@ export function mountStudioRoutes(app, authenticateToken) {
       if (!learner) return res.status(404).json({ error: 'Không tìm thấy học viên' });
       const summary = await computeRealLearnerSummary(db, learner);
       const topicPerf = calculateTopicPerformance(summary.answers.map((a) => ({ topic: a.topic, isCorrect: !!a.is_correct, mistakeType: a.mistake_type })), 70);
+      const targetScore = summary.prefs?.target_score || 70;
 
       const insight = await summarizeLearnerInsight({
         learnerName: learner.username, latestScore: summary.scores[summary.scores.length - 1] ?? null,
@@ -1151,10 +1373,17 @@ export function mountStudioRoutes(app, authenticateToken) {
 
       const interventions = await getLearnerInterventions(db, learner.id);
 
+      const risk = detectLearnerRisk({
+        recentScoresChronological: summary.scores, targetScore,
+        summitReadiness: summary.summitReadiness, daysUntilExam: summary.daysUntilExam,
+        highConfidenceMistakeCount: summary.highConfidenceMistakeCount,
+        hasAttemptedAssigned: true, recentActivityCount: summary.quizzes.length
+      });
+
       res.json({
         learner, mockExamHistory: summary.scores, latestScore: summary.scores[summary.scores.length - 1] ?? null,
         scoreTrend: classifyTrend(summary.scores), topicPerformance: topicPerf, commonMistakeType: summary.commonMistakeType,
-        interventions, insight: insight.summary,
+        interventions, insight: insight.summary, targetScore, riskStatus: risk.status,
         outlierPatterns: summary.outlierPatterns, masteryTrend
       });
     } catch (err) { res.status(500).json({ error: err.message }); }

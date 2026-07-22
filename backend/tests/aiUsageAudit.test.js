@@ -138,9 +138,18 @@ describe('Structured output validation', () => {
     assert.strictEqual(validateGeneratedFlashcard({ front: 'Q', back: 'A' }).valid, true);
   });
 
-  test('rejects a generated knowledge block with an empty body', () => {
-    assert.strictEqual(validateGeneratedKnowledge({ title: 'T', body: '' }).valid, false);
-    assert.strictEqual(validateGeneratedKnowledge({ title: 'T', body: 'Nội dung thật.' }).valid, true);
+  test('rejects a generated knowledge block missing sections or key takeaways', () => {
+    assert.strictEqual(validateGeneratedKnowledge({ title: 'T', sections: [], keyTakeaways: ['x'] }).valid, false);
+    assert.strictEqual(validateGeneratedKnowledge({ title: 'T', sections: [{ heading: 'H', body: 'B' }, { heading: 'H2', body: 'B2' }], keyTakeaways: [] }).valid, false);
+    assert.strictEqual(
+      validateGeneratedKnowledge({ title: 'T', introduction: 'I', sections: [{ heading: 'H', body: 'B' }, { heading: 'H2', body: 'B2' }], keyTakeaways: ['Điểm chính'] }).valid,
+      true
+    );
+  });
+
+  test('rejects a generated knowledge block with more than 4 sections', () => {
+    const sections = Array.from({ length: 5 }, (_, i) => ({ heading: `H${i}`, body: `B${i}` }));
+    assert.strictEqual(validateGeneratedKnowledge({ title: 'T', sections, keyTakeaways: ['x'] }).valid, false);
   });
 });
 

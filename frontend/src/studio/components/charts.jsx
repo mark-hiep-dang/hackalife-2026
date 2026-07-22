@@ -134,8 +134,9 @@ function bandColorForValue(v) {
 
 // Full-ring variant of GaugeChart — same fixed red/amber/green status bands
 // (never categorical), just a single tier color filling the ring instead of
-// three stacked arcs + needle. Meant for a dark card background.
-export function CircularGauge({ value, label, size = 150 }) {
+// three stacked arcs + needle. `dark=false` switches the track/text for use
+// on a white card instead of the original dark hero-card background.
+export function CircularGauge({ value, label, size = 150, dark = true }) {
   const clamped = value == null ? null : Math.max(0, Math.min(100, value));
   const radius = size / 2 - 13;
   const circumference = 2 * Math.PI * radius;
@@ -154,7 +155,7 @@ export function CircularGauge({ value, label, size = 150 }) {
           width={size} height={size} viewBox={`0 0 ${size} ${size}`}
           style={{ display: 'block', maxWidth: '100%', height: 'auto', transform: 'rotate(-90deg)' }}
         >
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="14" />
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={dark ? 'rgba(255,255,255,0.12)' : '#F0EEF7'} strokeWidth="14" />
           {clamped != null && (
             <circle
               cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
@@ -163,10 +164,105 @@ export function CircularGauge({ value, label, size = 150 }) {
           )}
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-comic font-extrabold text-white text-2xl">{clamped != null ? `${Math.round(clamped)}%` : '—'}</span>
+          <span className={`font-comic font-extrabold text-2xl ${dark ? 'text-white' : 'text-[#101A24]'}`}>{clamped != null ? `${Math.round(clamped)}%` : '—'}</span>
         </div>
       </div>
-      <div className="text-[11px] font-extrabold uppercase tracking-widest text-white/70 text-center mt-2 break-words max-w-full px-1">{label}</div>
+      <div className={`text-[11px] font-extrabold uppercase tracking-widest text-center mt-2 break-words max-w-full px-1 ${dark ? 'text-white/70' : 'text-[#888]'}`}>{label}</div>
+    </div>
+  );
+}
+
+// Single-series line chart for round-by-round scores against a pass mark:
+// dashed threshold line + per-round dots colored pass (green) / fail (red),
+// matching the Cohort Overview / Learner Detail score-history charts. Not a
+// multi-series TrendChart — this always shows the pass/fail read at a glance.
+export function RoundScoreChart({ rounds, targetScore, maxScore = 100, emptyMessage }) {
+  const width = 560;
+  const height = 180;
+  const pad = { top: 16, right: 16, bottom: 28, left: 16 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+
+  if (!rounds || rounds.length < 2) {
+    return <p className="text-sm text-[#888] py-8 text-center">{emptyMessage}</p>;
+  }
+
+  const stepX = innerW / (rounds.length - 1);
+  const yFor = (score) => pad.top + innerH - (Math.max(0, Math.min(maxScore, score)) / maxScore) * innerH;
+  const dots = rounds.map((r, i) => ({
+    cx: pad.left + i * stepX, cy: yFor(r.score), round: r.round,
+    pass: r.score >= targetScore, color: r.score >= targetScore ? '#1E9E5A' : '#D14343'
+  }));
+  const polylinePoints = dots.map((d) => `${d.cx},${d.cy}`).join(' ');
+  const passLineY = yFor(targetScore);
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+      <line x1={pad.left} y1={passLineY} x2={width - pad.right} y2={passLineY} stroke="#101A24" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="5 5" />
+      <polyline points={polylinePoints} fill="none" stroke="#101A24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {dots.map((d) => (
+        <g key={d.round}>
+          <circle cx={d.cx} cy={d.cy} r="6" fill={d.color} stroke="#fff" strokeWidth="2" />
+          <text x={d.cx} y={height - 16} textAnchor="middle" fontSize="11" fontWeight="800" fill="#8A8A8A">R{d.round}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+const JOURNEY_STAGE_COLORS = ['#5B87B8', '#4FA7B8', '#4FB88B', '#8FD673', '#C9EF7A'];
+
+// Cohort Summit Journey — a mountain-range read of where every real learner
+// currently sits (Base Camp/Foundation/Practice/Mock Exam/Summit Ready),
+// deliberately not a single-number gauge: the whole point is showing the
+// *distribution* across stages, which stage is typical (the llama marker),
+// and which learners just crossed into a new one this week vs stalled.
+// `stages`: [{ key, icon, count, label }] in stage order.
+export function MountainJourney({ stages, medianStageKey }) {
+  const width = 1000, height = 220;
+  const colW = width / stages.length;
+  const baseY = 200, minH = 46, maxH = 140;
+  const counts = stages.map((s) => s.count);
+  const minC = Math.min(...counts), maxC = Math.max(...counts);
+  const spread = maxC - minC || 1;
+
+  const peaks = stages.map((s, i) => {
+    const h = counts.every((c) => c === 0) ? minH : minH + ((s.count - minC) / spread) * (maxH - minH);
+    const xC = colW * i + colW / 2;
+    const peakY = baseY - h;
+    return { ...s, xC, peakY, color: JOURNEY_STAGE_COLORS[i % JOURNEY_STAGE_COLORS.length] };
+  });
+  const medianPeak = peaks.find((p) => p.key === medianStageKey) || peaks[0];
+
+  return (
+    <div className="w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ display: 'block', height: 'auto' }}>
+        <line x1="0" y1={baseY} x2={width} y2={baseY} stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
+        <polyline
+          points={peaks.map((p) => `${p.xC},${p.peakY - 22}`).join(' ')}
+          fill="none" stroke="#9FE870" strokeWidth="2.5" strokeDasharray="6 6" opacity="0.85"
+        />
+        {peaks.map((p) => (
+          <g key={p.key}>
+            <polygon points={`${p.xC - 62},${baseY} ${p.xC - 24},${p.peakY} ${p.xC + 24},${p.peakY} ${p.xC + 62},${baseY}`} fill={p.color} opacity="0.92" />
+            <circle cx={p.xC} cy={p.peakY - 34} r="20" fill="#101A24" stroke={p.color} strokeWidth="3" />
+            <text x={p.xC} y={p.peakY - 34} textAnchor="middle" dominantBaseline="central" fontFamily="'Baloo 2',sans-serif" fontWeight="800" fontSize="16" fill="#fff">{p.count}</text>
+            <text x={p.xC} y={p.peakY + 26} textAnchor="middle" fontSize="20">{p.icon}</text>
+          </g>
+        ))}
+        {medianPeak && <text x={medianPeak.xC} y={medianPeak.peakY - 66} textAnchor="middle" fontSize="28">🦙</text>}
+      </svg>
+      <div className="grid gap-2 mt-1" style={{ gridTemplateColumns: `repeat(${stages.length}, 1fr)` }}>
+        {stages.map((s) => (
+          <div key={s.key} className="text-center py-2 px-1 rounded-2xl" style={{
+            background: s.key === medianStageKey ? 'rgba(159,232,112,0.18)' : 'rgba(255,255,255,0.05)',
+            border: s.key === medianStageKey ? '2px solid #9FE870' : '2px solid transparent'
+          }}>
+            <div className="font-comic font-extrabold text-[12.5px] text-white">{s.label}</div>
+            <div className="text-[11px] font-bold text-white/60 mt-0.5">{s.count}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
