@@ -6,6 +6,9 @@
 
 import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
+import mammoth from 'mammoth';
+import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 import { getDb } from '../db.js';
 import { storeDocument, decodeUploadedFilename } from '../knowledgeBase.js';
 import { generateCurriculumFromPrompt, generateLessonKit, generateContentFromDocument, explainCurriculumDecision, suggestQualityFix, suggestQuestionRewrite, generateIntervention, summarizeMockExamInsight, summarizeLearnerInsight, answerTrainerQuestion } from './studioAIService.js';
@@ -39,6 +42,37 @@ async function requireTrainer(req, res, next) {
 function parseJSON(value, fallback) {
   if (value == null) return fallback;
   try { return JSON.parse(value); } catch { return fallback; }
+}
+
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// PPTX is a zip of slide XML files (ppt/slides/slideN.xml) — no dedicated
+// pptx library is needed just for plain-text extraction, only a zip reader.
+async function extractPptxText(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const slideFiles = Object.keys(zip.files)
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+  const slideTexts = [];
+  for (const name of slideFiles) {
+    const xml = await zip.files[name].async('string');
+    const runs = [...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]);
+    if (runs.length) slideTexts.push(runs.join(' '));
+  }
+  return slideTexts.join('\n\n');
+}
+
+function extractXlsxText(buffer) {
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  return workbook.SheetNames
+    .map((name) => `Sheet: ${name}\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name])}`)
+    .join('\n\n');
 }
 
 async function loadCourseBundle(db, courseId) {
@@ -76,7 +110,25 @@ function toLessonDTO(l) {
   };
 }
 
-const studioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const SUPPORTED_UPLOAD_EXTENSIONS = ['.pdf', '.txt', '.docx', '.pptx', '.xlsx', '.xls'];
+const studioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const name = decodeUploadedFilename(file.originalname).toLowerCase();
+    if (SUPPORTED_UPLOAD_EXTENSIONS.some((ext) => name.endsWith(ext))) return cb(null, true);
+    cb(new Error('Định dạng file không được hỗ trợ. Chỉ nhận PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx/.xls) hoặc .txt.'));
+  }
+});
+// No global multer error-handling middleware exists in server.js, so a
+// fileFilter rejection would otherwise fall through to Express's default
+// HTML error page instead of this API's usual {error} JSON shape.
+function handleKnowledgeUpload(req, res, next) {
+  studioUpload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}
 
 async function getCohortMockExams(db, cohortId) {
   return db.all('SELECT * FROM studio_mock_exams WHERE cohort_id = ? ORDER BY round_number', [cohortId]);
@@ -271,13 +323,19 @@ export function mountStudioRoutes(app, authenticateToken) {
 
   // ── Course creation + AI Course Architect ───────────────────────────────
   app.post('/api/studio/courses', ...T, async (req, res) => {
-    const { title, description, targetGroup, durationWeeks, examDate, learningGoal, targetScore, preferredCamps, difficultyTarget, assessmentTarget } = req.body;
+    const {
+      title, description, targetGroup, durationWeeks, examDate, learningGoal, targetScore, preferredCamps, difficultyTarget, assessmentTarget,
+      genFlashcards, genQuiz, randomizeQuestions
+    } = req.body;
     const db = req.db;
     try {
       const result = await db.run(
-        `INSERT INTO studio_courses (trainer_id, title, description, target_group, duration_weeks, exam_date, learning_goal, target_score, preferred_camps, difficulty_target, assessment_target)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [req.user.id, title, description || '', targetGroup || '', durationWeeks || 4, examDate || null, learningGoal || '', targetScore || 70, preferredCamps || 4, difficultyTarget || 'balanced', assessmentTarget || '']
+        `INSERT INTO studio_courses (trainer_id, title, description, target_group, duration_weeks, exam_date, learning_goal, target_score, preferred_camps, difficulty_target, assessment_target, gen_flashcards, gen_quiz, randomize_questions)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          req.user.id, title, description || '', targetGroup || '', durationWeeks || 4, examDate || null, learningGoal || '', targetScore || 70, preferredCamps || 4, difficultyTarget || 'balanced', assessmentTarget || '',
+          genFlashcards === false ? 0 : 1, genQuiz === false ? 0 : 1, randomizeQuestions ? 1 : 0
+        ]
       );
       res.status(201).json({ id: result.lastID });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -504,25 +562,36 @@ export function mountStudioRoutes(app, authenticateToken) {
   // generation (never the shared learner chat, see retrieveKnowledge's
   // course_id IS NULL filter), and the generated camps/lessons/content still
   // go through their own AI_DRAFT → APPROVED → PUBLISHED review regardless.
-  app.post('/api/studio/courses/:id/knowledge', ...T, studioUpload.single('file'), async (req, res) => {
+  app.post('/api/studio/courses/:id/knowledge', ...T, handleKnowledgeUpload, async (req, res) => {
     const db = req.db;
     try {
       const course = await db.get('SELECT id FROM studio_courses WHERE id = ?', [req.params.id]);
       if (!course) return res.status(404).json({ error: 'Không tìm thấy khóa học' });
       if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file để tải lên' });
 
-      const { mimetype, buffer } = req.file;
+      const { buffer } = req.file;
       const originalname = decodeUploadedFilename(req.file.originalname);
+      const lowerName = originalname.toLowerCase();
       let text = '';
       let sourceType = 'txt';
-      if (mimetype === 'application/pdf' || originalname.toLowerCase().endsWith('.pdf')) {
+      if (lowerName.endsWith('.pdf')) {
         sourceType = 'pdf';
         const parser = new PDFParse({ data: buffer });
         text = (await parser.getText()).text;
         await parser.destroy();
+      } else if (lowerName.endsWith('.docx')) {
+        sourceType = 'docx';
+        text = (await mammoth.extractRawText({ buffer })).value;
+      } else if (lowerName.endsWith('.pptx')) {
+        sourceType = 'pptx';
+        text = await extractPptxText(buffer);
+      } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
+        sourceType = 'xlsx';
+        text = extractXlsxText(buffer);
       } else {
         text = buffer.toString('utf-8');
       }
+      if (!text.trim()) return res.status(400).json({ error: 'Không đọc được nội dung văn bản từ file này.' });
 
       const title = (req.body.title || '').trim() || originalname;
       const result = await storeDocument(db, title, sourceType, text, req.user.id, { courseId: course.id, approved: 1 });
@@ -574,13 +643,20 @@ export function mountStudioRoutes(app, authenticateToken) {
   app.post('/api/studio/lessons/:id/generate-from-document', ...T, async (req, res) => {
     const db = req.db;
     try {
-      const lesson = await db.get('SELECT * FROM studio_lessons WHERE id = ?', [req.params.id]);
+      const lesson = await db.get(
+        `SELECT l.*, co.gen_flashcards, co.gen_quiz
+         FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id JOIN studio_courses co ON c.course_id = co.id
+         WHERE l.id = ?`,
+        [req.params.id]
+      );
       if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
       const { documentId } = req.body;
       const doc = await db.get('SELECT * FROM knowledge_documents WHERE id = ?', [documentId]);
       if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
 
-      const result = await generateContentFromDocument(db, { lessonId: lesson.id, documentId: doc.id, documentTitle: doc.title });
+      const result = await generateContentFromDocument(db, {
+        lessonId: lesson.id, documentId: doc.id, documentTitle: doc.title, genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz
+      });
       await db.run("UPDATE studio_lessons SET status = 'READY_FOR_REVIEW' WHERE id = ?", [lesson.id]);
       res.json(result);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -591,7 +667,9 @@ export function mountStudioRoutes(app, authenticateToken) {
     const db = req.db;
     try {
       const lesson = await db.get(
-        `SELECT l.*, c.course_id FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id WHERE l.id = ?`,
+        `SELECT l.*, c.course_id, co.gen_flashcards, co.gen_quiz, co.randomize_questions
+         FROM studio_lessons l JOIN studio_camps c ON l.camp_id = c.id JOIN studio_courses co ON c.course_id = co.id
+         WHERE l.id = ?`,
         [req.params.id]
       );
       if (!lesson) return res.status(404).json({ error: 'Không tìm thấy chặng học' });
@@ -601,7 +679,12 @@ export function mountStudioRoutes(app, authenticateToken) {
       const topic = topicRow?.topic;
       if (!topic) return res.status(400).json({ error: 'Không tìm được chủ đề nguồn tương ứng cho chặng này.' });
 
-      const kit = await generateLessonKit(db, { topic, lessonTitle: lesson.title });
+      const kit = await generateLessonKit(db, {
+        topic, lessonTitle: lesson.title, genFlashcards: !!lesson.gen_flashcards, genQuiz: !!lesson.gen_quiz
+      });
+      if (lesson.randomize_questions) {
+        for (const list of [kit.easyQuestions, kit.mediumQuestions, kit.hardQuestions]) shuffleInPlace(list);
+      }
       const insertItem = (type, fields) => db.run(
         `INSERT INTO studio_content_items
            (lesson_id, content_type, title, question_text, options, correct_option, explanation, difficulty, cognitive_level, front, back, keyword, source_chunk_ids, source_title, source_version, status)

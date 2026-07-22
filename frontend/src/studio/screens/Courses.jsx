@@ -113,12 +113,31 @@ function CreateCohortInline({ courseId, t, onCreated }) {
   );
 }
 
+const TARGET_GROUP_OPTIONS = ['Tất cả học viên', 'Đại lý mới', 'Đại lý tái tục', 'Đại lý cao cấp'];
+const UPLOAD_ACCEPT = '.pdf,.txt,.docx,.pptx,.xlsx,.xls';
+
+function ToggleSwitch({ label, checked, onChange }) {
+  return (
+    <button type="button" onClick={() => onChange(!checked)}
+      className="w-full flex items-center justify-between gap-2.5 bg-[#F9FAFB] rounded-2xl px-4 py-3"
+    >
+      <span className="text-[13px] font-bold text-[#101A24]">{label}</span>
+      <span className="w-10 h-6 rounded-xl relative shrink-0 transition-colors" style={{ background: checked ? '#9FE870' : '#EEF0F3' }}>
+        <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all" style={{ left: checked ? 18 : 2 }} />
+      </span>
+    </button>
+  );
+}
+
 function CreateCourseWizard({ onCreated, onCancel }) {
   const t = useT();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ title: '', description: '', targetGroup: '', durationWeeks: 4, examDate: '', learningGoal: '', targetScore: 70, preferredCamps: 4 });
   const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState([]);
+  const [genFlashcards, setGenFlashcards] = useState(true);
+  const [genQuiz, setGenQuiz] = useState(true);
+  const [randomizeQuestions, setRandomizeQuestions] = useState(false);
   const [courseId, setCourseId] = useState(null);
   const [bundle, setBundle] = useState(null);
   const [quality, setQuality] = useState(null);
@@ -153,7 +172,7 @@ function CreateCourseWizard({ onCreated, onCancel }) {
     e.preventDefault();
     setStep(2); setBusy(true); setError(null);
     try {
-      const { id } = await createCourse(form);
+      const { id } = await createCourse({ ...form, genFlashcards, genQuiz, randomizeQuestions });
       setCourseId(id);
       for (const file of files) await uploadCourseKnowledge(id, file);
       await generateCourseCurriculum(id, prompt);
@@ -194,7 +213,15 @@ function CreateCourseWizard({ onCreated, onCancel }) {
           <form onSubmit={handleStartProcessing} className="flex flex-col gap-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {field('title', t.studioFieldCourseTitle)}
-              {field('targetGroup', t.studioFieldTargetGroup)}
+              <label className="flex flex-col gap-1.5 text-sm">
+                <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{t.studioFieldTargetGroup}</span>
+                <select value={form.targetGroup} onChange={(e) => setForm((f) => ({ ...f, targetGroup: e.target.value }))}
+                  className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] bg-white focus:outline-none focus:border-[#C7B8E8]"
+                >
+                  <option value="">{t.studioChooseTargetGroupPlaceholder}</option>
+                  {TARGET_GROUP_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </label>
             </div>
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-comic font-extrabold text-[13px] text-[#101A24]">{t.studioFieldDescription}</span>
@@ -215,12 +242,22 @@ function CreateCourseWizard({ onCreated, onCancel }) {
                 className="px-4 py-3 rounded-2xl border-2 border-[#EEF0F3] text-sm font-bold text-[#101A24] focus:outline-none focus:border-[#C7B8E8]" />
             </label>
 
+            <div className="pt-2 border-t border-[#101A24]/10">
+              <p className="font-comic font-extrabold text-[13px] text-[#101A24] mb-2 pt-3">⚙️ {t.studioCourseSettingsTitle}</p>
+              <div className="flex flex-col gap-2">
+                <ToggleSwitch label={t.studioGenFlashcardsToggle} checked={genFlashcards} onChange={setGenFlashcards} />
+                <ToggleSwitch label={t.studioGenQuizToggle} checked={genQuiz} onChange={setGenQuiz} />
+                <ToggleSwitch label={t.studioRandomizeQuestionsToggle} checked={randomizeQuestions} onChange={setRandomizeQuestions} />
+              </div>
+            </div>
+
             <div>
               <p className="font-comic font-extrabold text-[13px] text-[#101A24] mb-2">{t.studioSourcesTitle}</p>
               <label className="block border-3 border-dashed border-[#C7B8E8] rounded-3xl p-8 text-center bg-[#F9F7FE] cursor-pointer">
-                <input type="file" accept=".pdf,.txt" multiple onChange={handleFilePick} className="hidden" />
+                <input type="file" accept={UPLOAD_ACCEPT} multiple onChange={handleFilePick} className="hidden" />
                 <div className="text-4xl mb-2">🦙</div>
                 <div className="font-comic font-extrabold text-sm text-[#101A24] flex items-center justify-center gap-2"><Upload size={16} /> {t.studioUploadSourceBtn}</div>
+                <div className="text-[11px] font-bold text-[#8A8A8A] mt-2">{t.studioUploadFormatsHint}</div>
               </label>
               {files.length > 0 && (
                 <div className="flex flex-col gap-2 mt-3">
@@ -545,7 +582,7 @@ function SourceMaterialsPanel({ courseId, docs, onDocsChanged, t }) {
           <input value={title} onChange={(e) => setTitle(e.target.value)} className="px-3 py-2 rounded-lg border border-[#101A24]/15 text-sm bg-white" />
         </label>
         <label className={`px-4 py-2.5 rounded-xl text-sm font-extrabold uppercase tracking-wide bg-white text-[#101A24] border border-[#101A24]/15 hover:bg-[#F5F6F8] flex items-center gap-2 w-fit ${uploading ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}>
-          <input type="file" accept=".pdf,.txt" onChange={handleUpload} className="hidden" disabled={uploading} />
+          <input type="file" accept=".pdf,.txt,.docx,.pptx,.xlsx,.xls" onChange={handleUpload} className="hidden" disabled={uploading} />
           <Upload size={16} /> {uploading ? t.studioAdding : t.studioUploadSourceBtn}
         </label>
       </div>

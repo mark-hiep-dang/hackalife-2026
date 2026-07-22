@@ -323,15 +323,15 @@ function buildChunkBucketProposal(chunks, preferredCamps) {
 
 /**
  * @param {import('sqlite').Database} db
- * @param {{ topic: string, lessonTitle: string }} input
+ * @param {{ topic: string, lessonTitle: string, genFlashcards?: boolean, genQuiz?: boolean }} input
  */
-export async function generateLessonKit(db, { topic, lessonTitle }) {
-  const flashcards = await db.all('SELECT * FROM flashcards WHERE topic = ? ORDER BY RANDOM() LIMIT 5', [topic]);
-  const easy = await db.all(`SELECT * FROM test_questions WHERE topic = ? AND difficulty = 'Dễ' ORDER BY RANDOM() LIMIT 2`, [topic]);
-  const medium = await db.all(`SELECT * FROM test_questions WHERE topic = ? AND difficulty = 'Trung bình' ORDER BY RANDOM() LIMIT 2`, [topic]);
-  const hard = await db.all(`SELECT * FROM test_questions WHERE topic = ? AND difficulty = 'Khó' ORDER BY RANDOM() LIMIT 2`, [topic]);
-  const scenario = await db.get(`SELECT * FROM test_questions WHERE topic = ? AND question LIKE '%Tình huống%' ORDER BY RANDOM() LIMIT 1`, [topic]);
-  const checkpoint = await db.get(`SELECT * FROM test_questions WHERE topic = ? ORDER BY RANDOM() LIMIT 1`, [topic]);
+export async function generateLessonKit(db, { topic, lessonTitle, genFlashcards = true, genQuiz = true }) {
+  const flashcards = genFlashcards ? await db.all('SELECT * FROM flashcards WHERE topic = ? ORDER BY RANDOM() LIMIT 5', [topic]) : [];
+  const easy = genQuiz ? await db.all(`SELECT * FROM test_questions WHERE topic = ? AND difficulty = 'Dễ' ORDER BY RANDOM() LIMIT 2`, [topic]) : [];
+  const medium = genQuiz ? await db.all(`SELECT * FROM test_questions WHERE topic = ? AND difficulty = 'Trung bình' ORDER BY RANDOM() LIMIT 2`, [topic]) : [];
+  const hard = genQuiz ? await db.all(`SELECT * FROM test_questions WHERE topic = ? AND difficulty = 'Khó' ORDER BY RANDOM() LIMIT 2`, [topic]) : [];
+  const scenario = genQuiz ? await db.get(`SELECT * FROM test_questions WHERE topic = ? AND question LIKE '%Tình huống%' ORDER BY RANDOM() LIMIT 1`, [topic]) : null;
+  const checkpoint = genQuiz ? await db.get(`SELECT * FROM test_questions WHERE topic = ? ORDER BY RANDOM() LIMIT 1`, [topic]) : null;
   const source = await findSourceChunkForTopic(db, topic);
   const sourceChunkIds = source ? [source.chunkId] : [];
 
@@ -382,9 +382,9 @@ function stripJsonFence(raw) {
 
 /**
  * @param {import('sqlite').Database} db
- * @param {{ lessonId: number, documentId: number, documentTitle: string }} input
+ * @param {{ lessonId: number, documentId: number, documentTitle: string, genFlashcards?: boolean, genQuiz?: boolean }} input
  */
-export async function generateContentFromDocument(db, { lessonId, documentId, documentTitle }) {
+export async function generateContentFromDocument(db, { lessonId, documentId, documentTitle, genFlashcards = true, genQuiz = true }) {
   const chunks = await db.all('SELECT * FROM knowledge_chunks WHERE document_id = ? ORDER BY chunk_index', [documentId]);
   if (chunks.length === 0) throw new Error('Tài liệu chưa có nội dung để tạo.');
 
@@ -408,42 +408,46 @@ export async function generateContentFromDocument(db, { lessonId, documentId, do
   }
 
   let flashcards = [];
-  const flashcardsRaw = await studioCallGemini(
-    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"flashcards": [{"front": string, "back": string, "keyword": string}]}',
-    `${grounding}\n\nTạo 3-5 flashcard (mặt trước là thuật ngữ/câu hỏi ngắn, mặt sau là câu trả lời) từ đoạn tài liệu trên.`,
-    AI_TASKS.GENERATE_FLASHCARDS, db
-  );
-  if (flashcardsRaw) {
-    try {
-      const parsed = JSON.parse(stripJsonFence(flashcardsRaw));
-      if (Array.isArray(parsed.flashcards)) flashcards = parsed.flashcards.filter((f) => validateGeneratedFlashcard(f).valid);
-    } catch (err) { /* skip */ }
+  if (genFlashcards) {
+    const flashcardsRaw = await studioCallGemini(
+      STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"flashcards": [{"front": string, "back": string, "keyword": string}]}',
+      `${grounding}\n\nTạo 3-5 flashcard (mặt trước là thuật ngữ/câu hỏi ngắn, mặt sau là câu trả lời) từ đoạn tài liệu trên.`,
+      AI_TASKS.GENERATE_FLASHCARDS, db
+    );
+    if (flashcardsRaw) {
+      try {
+        const parsed = JSON.parse(stripJsonFence(flashcardsRaw));
+        if (Array.isArray(parsed.flashcards)) flashcards = parsed.flashcards.filter((f) => validateGeneratedFlashcard(f).valid);
+      } catch (err) { /* skip */ }
+    }
   }
 
   let mcqs = [];
-  const mcqRaw = await studioCallGemini(
-    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"questions": [{"questionText": string, "options": [string, string, string, string], "correctOption": number, "explanation": string}]}',
-    `${grounding}\n\nTạo 2-3 câu hỏi trắc nghiệm 4 đáp án (correctOption là chỉ số 0-3) từ đoạn tài liệu trên, chỉ dùng thông tin có trong tài liệu.`,
-    AI_TASKS.GENERATE_MCQ_FROM_SOURCE, db, 12000
-  );
-  if (mcqRaw) {
-    try {
-      const parsed = JSON.parse(stripJsonFence(mcqRaw));
-      if (Array.isArray(parsed.questions)) mcqs = parsed.questions.filter((q) => validateGeneratedQuestion(q).valid);
-    } catch (err) { /* skip */ }
-  }
-
   let scenario = null;
-  const scenarioRaw = await studioCallGemini(
-    STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"questionText": string, "options": [string, string, string, string], "correctOption": number, "explanation": string}',
-    `${grounding}\n\nTạo MỘT câu hỏi tình huống thực tế (áp dụng kiến thức) 4 đáp án từ đoạn tài liệu trên.`,
-    AI_TASKS.GENERATE_COMPLEX_SCENARIO, db, 12000
-  );
-  if (scenarioRaw) {
-    try {
-      const parsed = JSON.parse(stripJsonFence(scenarioRaw));
-      if (validateGeneratedQuestion(parsed).valid) scenario = parsed;
-    } catch (err) { /* skip */ }
+  if (genQuiz) {
+    const mcqRaw = await studioCallGemini(
+      STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"questions": [{"questionText": string, "options": [string, string, string, string], "correctOption": number, "explanation": string}]}',
+      `${grounding}\n\nTạo 2-3 câu hỏi trắc nghiệm 4 đáp án (correctOption là chỉ số 0-3) từ đoạn tài liệu trên, chỉ dùng thông tin có trong tài liệu.`,
+      AI_TASKS.GENERATE_MCQ_FROM_SOURCE, db, 12000
+    );
+    if (mcqRaw) {
+      try {
+        const parsed = JSON.parse(stripJsonFence(mcqRaw));
+        if (Array.isArray(parsed.questions)) mcqs = parsed.questions.filter((q) => validateGeneratedQuestion(q).valid);
+      } catch (err) { /* skip */ }
+    }
+
+    const scenarioRaw = await studioCallGemini(
+      STUDIO_PERSONALITY_RULES + '\nTrả lời DUY NHẤT bằng JSON: {"questionText": string, "options": [string, string, string, string], "correctOption": number, "explanation": string}',
+      `${grounding}\n\nTạo MỘT câu hỏi tình huống thực tế (áp dụng kiến thức) 4 đáp án từ đoạn tài liệu trên.`,
+      AI_TASKS.GENERATE_COMPLEX_SCENARIO, db, 12000
+    );
+    if (scenarioRaw) {
+      try {
+        const parsed = JSON.parse(stripJsonFence(scenarioRaw));
+        if (validateGeneratedQuestion(parsed).valid) scenario = parsed;
+      } catch (err) { /* skip */ }
+    }
   }
 
   const insertItem = (type, fields, title) => db.run(

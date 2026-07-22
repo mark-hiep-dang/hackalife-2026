@@ -23,6 +23,12 @@ export async function initStudioDb(db) {
       FOREIGN KEY (trainer_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
+  // Course-level generation preferences, set once in the create-course wizard
+  // and read back by every later lesson-kit/document generation call for
+  // lessons under this course — trainer never has to repeat the choice.
+  try { await db.exec('ALTER TABLE studio_courses ADD COLUMN gen_flashcards INTEGER DEFAULT 1'); } catch (err) { /* already exists */ }
+  try { await db.exec('ALTER TABLE studio_courses ADD COLUMN gen_quiz INTEGER DEFAULT 1'); } catch (err) { /* already exists */ }
+  try { await db.exec('ALTER TABLE studio_courses ADD COLUMN randomize_questions INTEGER DEFAULT 0'); } catch (err) { /* already exists */ }
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS studio_competencies (
