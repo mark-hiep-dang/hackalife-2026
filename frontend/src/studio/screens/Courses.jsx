@@ -107,13 +107,6 @@ function BlueprintPreview({ blueprint, busy, onConfirm, onRegenerate, onCancel, 
       </div>
       <p className="text-[12.5px] font-bold text-[#8A8A8A] mb-4">{t.studioBlueprintPreviewSubtitle}</p>
 
-      {blueprint.usedAI === false && (
-        <div className="flex items-start gap-2.5 bg-[#FDF0DC] rounded-2xl px-4 py-3.5 mb-4">
-          <span className="text-lg shrink-0">⚠️</span>
-          <div className="text-[12.5px] font-bold text-[#8A6414] leading-snug">{t.studioBlueprintFallbackWarning}</div>
-        </div>
-      )}
-
       {blueprint.outcomes?.length > 0 && (
         <div className="bg-[#F4F1FB] rounded-2xl p-4 mb-4">
           <div className="font-comic font-extrabold text-[12.5px] text-[#101A24] mb-2">🎯 {t.studioBlueprintOutcomesLabel}</div>

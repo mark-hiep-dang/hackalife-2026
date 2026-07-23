@@ -38,6 +38,19 @@ test('Case C: a course with only recall questions receives a quality issue', () 
   assert.ok(issues.some((i) => i.category === 'ASSESSMENT' && i.message.includes('Ghi nhớ')));
 });
 
+test('Case D: archived (rejected) content no longer counts toward quality — a trainer archiving a duplicate improves the score', () => {
+  const live = { id: 1, lessonId: 1, contentType: 'mcq', questionText: 'Câu hỏi gốc?', correctOption: 0, explanation: 'exp', difficulty: 'Trung bình', cognitiveLevel: 'Hiểu', sourceChunkIds: [1], sourceVersion: '1.0', status: 'APPROVED' };
+  const archivedDuplicate = { ...live, id: 2, questionText: 'Câu hỏi gốc?', status: 'ARCHIVED' };
+  const liveDuplicate = { ...live, id: 3, questionText: 'Câu hỏi gốc?', status: 'APPROVED' };
+
+  const withArchivedDup = checkCourseQuality(baseBundle({ contentItems: [live, archivedDuplicate] }));
+  const withLiveDup = checkCourseQuality(baseBundle({ contentItems: [live, liveDuplicate] }));
+
+  assert.ok(!withArchivedDup.issues.some((i) => i.message.includes('khá giống nhau')), 'an archived duplicate must not trigger the similar-questions issue');
+  assert.ok(withLiveDup.issues.some((i) => i.message.includes('khá giống nhau')), 'a live (non-archived) duplicate still should');
+  assert.ok(withArchivedDup.healthScore > withLiveDup.healthScore, 'archiving the duplicate should raise the score, not leave it unchanged');
+});
+
 test('a fully-approved, well-covered course can publish with a high health score', () => {
   const bundle = baseBundle({
     contentItems: [

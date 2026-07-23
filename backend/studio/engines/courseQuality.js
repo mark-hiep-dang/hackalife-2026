@@ -41,14 +41,20 @@ export function checkCourseQuality({ course, camps = [], lessons = [], learningO
   const push = (category, severity, message, affectedEntityType, affectedEntityId) =>
     issues.push({ category, severity, message, affectedEntityType, affectedEntityId });
 
+  // A trainer archiving (rejecting) a piece of content — a duplicate, a bad
+  // question, whatever — takes it out of the live course; it shouldn't keep
+  // counting against coverage/assessment/experience quality once it's been
+  // dealt with, or archiving would never actually improve the score.
+  const liveContentItems = contentItems.filter((c) => c.status !== 'ARCHIVED');
+
   const lessonById = new Map(lessons.map((l) => [l.id, l]));
   const itemsByLesson = new Map();
-  for (const item of contentItems) {
+  for (const item of liveContentItems) {
     if (!itemsByLesson.has(item.lessonId)) itemsByLesson.set(item.lessonId, []);
     itemsByLesson.get(item.lessonId).push(item);
   }
   const assessmentTypes = new Set(['mcq', 'scenario']);
-  const assessedItems = contentItems.filter((c) => assessmentTypes.has(c.contentType));
+  const assessedItems = liveContentItems.filter((c) => assessmentTypes.has(c.contentType));
 
   // ── CURRICULUM COVERAGE ──────────────────────────────────────────────
   for (const outcome of learningOutcomes) {
@@ -75,13 +81,13 @@ export function checkCourseQuality({ course, camps = [], lessons = [], learningO
   }
 
   // ── ASSESSMENT QUALITY ───────────────────────────────────────────────
-  const mcqs = contentItems.filter((c) => c.contentType === 'mcq');
+  const mcqs = liveContentItems.filter((c) => c.contentType === 'mcq');
   if (mcqs.length > 0) {
     const recallCount = mcqs.filter((q) => q.cognitiveLevel === 'Ghi nhớ').length;
     if (recallCount / mcqs.length > 0.6) {
       push('ASSESSMENT', SEVERITY.WARNING, `${Math.round((recallCount / mcqs.length) * 100)}% câu hỏi chỉ ở mức "Ghi nhớ" — nên thêm câu vận dụng/tình huống.`, 'course', course.id);
     }
-    const scenarioCount = contentItems.filter((c) => c.contentType === 'scenario').length;
+    const scenarioCount = liveContentItems.filter((c) => c.contentType === 'scenario').length;
     if (scenarioCount === 0) {
       push('ASSESSMENT', SEVERITY.SUGGESTION, 'Khóa học chưa có câu hỏi tình huống nào để kiểm tra khả năng vận dụng.', 'course', course.id);
     }
@@ -158,11 +164,11 @@ export function checkCourseQuality({ course, camps = [], lessons = [], learningO
   }
 
   // ── CONTENT GOVERNANCE ────────────────────────────────────────────────
-  const draftItems = contentItems.filter((c) => c.status === 'AI_DRAFT');
+  const draftItems = liveContentItems.filter((c) => c.status === 'AI_DRAFT');
   if (draftItems.length > 0) {
     push('GOVERNANCE', SEVERITY.BLOCKER, `${draftItems.length} nội dung vẫn ở trạng thái AI_DRAFT, chưa được trainer duyệt.`, 'course', course.id);
   }
-  for (const item of contentItems) {
+  for (const item of liveContentItems) {
     if (item.sourceChunkIds?.length > 0 && !item.sourceVersion) {
       push('GOVERNANCE', SEVERITY.WARNING, 'Một nội dung có nguồn nhưng chưa ghi phiên bản nguồn.', 'contentItem', item.id);
     }
