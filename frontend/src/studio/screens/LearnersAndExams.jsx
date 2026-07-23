@@ -362,7 +362,7 @@ export default function LearnersAndExams({ initialCohortId } = {}) {
               {secondaryKpis.map((k, i) => (
                 <div key={k.label} className={`rounded-[22px] p-4 ${KPI_STYLE[i].bg} flex flex-col justify-center min-h-24`} style={{ boxShadow: `0 5px 0 ${KPI_STYLE[i].shadow}` }}>
                   <div className={`text-[10px] font-extrabold uppercase tracking-wide mb-1.5 leading-tight ${KPI_STYLE[i].ink}`}>{k.label}</div>
-                  <div className="font-comic font-extrabold text-[15px] text-[#101A24]">{k.value}</div>
+                  <div className="font-comic font-extrabold text-[24px] leading-tight text-[#101A24]">{k.value}</div>
                 </div>
               ))}
             </div>

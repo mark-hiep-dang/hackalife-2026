@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { initDb, getDb } from '../../db.js';
 import { buildJourneyStages, journeyStageForScore, computeCohortJourney } from '../routes.js';
 
-test('buildJourneyStages: derives one stage per real camp, labeled from the camp title, last camp forced to Summit', () => {
+test('buildJourneyStages: derives one stage per real camp, positional labels (Base Camp/Camp N/Summit), last camp forced to Summit', () => {
   const camps = [
     { title: 'Base Camp: Kiến thức chung về bảo hiểm' },
     { title: 'Camp 1: Pháp luật kinh doanh bảo hiểm' },
@@ -17,6 +17,21 @@ test('buildJourneyStages: derives one stage per real camp, labeled from the camp
   assert.equal(stages[stages.length - 1].maxScore, 100);
   // 4 equal bands across 0-100
   assert.deepEqual(stages.map((s) => s.maxScore), [24, 49, 74, 100]);
+});
+
+test('buildJourneyStages: labels stay Base Camp/Camp N/Summit even when a trainer renames camps to drop the prefix entirely', () => {
+  // Regression: a trainer editing a camp's title down to just its topic
+  // name (e.g. "Kiến thức chung về bảo hiểm", no "Base Camp:" prefix) must
+  // never leak that raw topic name into the journey's stage label — labels
+  // are purely positional, independent of whatever the camp is titled.
+  const camps = [
+    { title: 'Kiến thức chung về bảo hiểm' },
+    { title: 'Pháp luật kinh doanh bảo hiểm' },
+    { title: 'Sản phẩm bảo hiểm nhân thọ & sức khỏe' },
+    { title: 'Quyền, nghĩa vụ & đạo đức hành nghề' }
+  ];
+  const stages = buildJourneyStages(camps);
+  assert.deepEqual(stages.map((s) => s.label), ['Base Camp', 'Camp 1', 'Camp 2', 'Summit']);
 });
 
 test('journeyStageForScore: maps a score to the correct real-camp-derived stage', () => {

@@ -279,20 +279,25 @@ export async function getRealLearnersWithRisk(db, cohortId) {
 }
 
 // Cohort Summit Journey (Overview dashboard): buckets learners into stages
-// that mirror the REAL camp structure of the course they're actually
-// studying (e.g. MOF's own Base Camp / Camp 1 / Camp 2 / Camp 3 in
-// studio_camps), rather than an invented generic stage taxonomy — the
-// mountain a trainer sees should be the actual mountain their learners are
-// climbing. The final camp is always relabeled "Summit" (reaching it means
-// exam-ready), so an N-camp course yields exactly N stages. Score bands
-// (which decide which stage a learner currently sits in) split the real
-// Summit Readiness score (computeSummitReadiness) into N equal ranges.
+// that mirror the real camp COUNT of the course they're actually studying
+// (e.g. MOF's 4 camps), rather than an invented generic stage taxonomy — the
+// mountain a trainer sees should have as many steps as their learners'
+// actual mountain. The final camp is always relabeled "Summit" (reaching it
+// means exam-ready), so an N-camp course yields exactly N stages. Labels are
+// positional ("Base Camp", "Camp 1", "Camp 2", ..., "Summit") rather than
+// parsed from each camp's own title — a trainer renaming a camp (e.g.
+// dropping the "Base Camp:"/"Camp 1:" prefix down to just its topic) must
+// never silently break this label, since the two are otherwise unrelated.
+// Score bands (which decide which stage a learner currently sits in) split
+// the real Summit Readiness score (computeSummitReadiness) into N equal
+// ranges.
 const NON_LAST_STAGE_ICONS = ['⛺', '🧗', '🏕️', '🥾'];
 
 export function buildJourneyStages(camps) {
   return camps.map((camp, i) => {
+    const isFirst = i === 0;
     const isLast = i === camps.length - 1;
-    const label = isLast ? 'Summit' : camp.title.split(':')[0].trim();
+    const label = isLast ? 'Summit' : (isFirst ? 'Base Camp' : `Camp ${i}`);
     const maxScore = isLast ? 100 : Math.round(((i + 1) / camps.length) * 100) - 1;
     const icon = isLast ? '🏔️' : NON_LAST_STAGE_ICONS[Math.min(i, NON_LAST_STAGE_ICONS.length - 1)];
     return { key: isLast ? 'summit' : `stage${i}`, icon, label, maxScore };
