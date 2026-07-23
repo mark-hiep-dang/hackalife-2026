@@ -401,6 +401,9 @@ export function mountStudioRoutes(app, authenticateToken) {
       const learnerCountRow = cohortIds.length
         ? await db.get(`SELECT COUNT(DISTINCT learner_id) c FROM studio_cohort_learners WHERE cohort_id IN (${cohortIds.join(',')})`)
         : { c: 0 };
+      const newLearnersThisWeekRow = cohortIds.length
+        ? await db.get(`SELECT COUNT(DISTINCT learner_id) c FROM studio_cohort_learners WHERE cohort_id IN (${cohortIds.join(',')}) AND joined_at >= datetime('now', '-7 days')`)
+        : { c: 0 };
 
       let averageScore = null, averagePassRate = null;
       let mockExamTrend = [];
@@ -501,6 +504,7 @@ export function mountStudioRoutes(app, authenticateToken) {
       res.json({
         activeCourses: courses.length,
         activeLearners: learnerCountRow.c,
+        newLearnersThisWeek: newLearnersThisWeekRow.c,
         averageMockExamScore: averageScore,
         estimatedPassRate: averagePassRate,
         mockExamTrend,
@@ -1256,6 +1260,19 @@ export function mountStudioRoutes(app, authenticateToken) {
     try {
       await removeLearnerFromCohort(req.db, req.params.id, req.params.learnerId);
       res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // Raw join timestamps for this cohort's roster — the client buckets by
+  // day/week/month (whichever granularity the trainer picks) so no extra
+  // round-trip is needed to switch views.
+  app.get('/api/studio/cohorts/:id/enrollment-trend', ...T, async (req, res) => {
+    const db = req.db;
+    try {
+      const cohort = await db.get('SELECT id FROM studio_cohorts WHERE id = ?', [req.params.id]);
+      if (!cohort) return res.status(404).json({ error: 'Không tìm thấy nhóm học' });
+      const rows = await db.all('SELECT joined_at FROM studio_cohort_learners WHERE cohort_id = ? ORDER BY joined_at', [cohort.id]);
+      res.json(rows.map((r) => r.joined_at));
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

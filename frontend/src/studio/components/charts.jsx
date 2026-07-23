@@ -210,6 +210,42 @@ export function RoundScoreChart({ rounds, targetScore, maxScore = 100, emptyMess
   );
 }
 
+// Enrollment-over-time bar chart — how many real roster members joined per
+// period (day/week/month, whichever the screen bucketed the data into).
+// `buckets`: [{ key, label, count }] in chronological order.
+export function EnrollmentChart({ buckets, emptyMessage }) {
+  if (!buckets || buckets.length === 0) {
+    return <p className="text-sm text-[#888] py-8 text-center">{emptyMessage}</p>;
+  }
+
+  const width = 560;
+  const height = 180;
+  const pad = { top: 16, right: 12, bottom: 28, left: 12 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
+  const slotW = innerW / buckets.length;
+  const barW = Math.min(40, slotW * 0.55);
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+      <line x1={pad.left} y1={pad.top + innerH} x2={width - pad.right} y2={pad.top + innerH} stroke="#101A24" strokeOpacity="0.12" strokeWidth="1.5" />
+      {buckets.map((b, i) => {
+        const barH = Math.max(4, (b.count / maxCount) * (innerH - 20));
+        const cx = pad.left + slotW * i + slotW / 2;
+        const barY = pad.top + innerH - barH;
+        return (
+          <g key={b.key}>
+            <rect x={cx - barW / 2} y={barY} width={barW} height={barH} rx="6" fill="#2178C4" />
+            <text x={cx} y={barY - 6} textAnchor="middle" fontSize="11" fontWeight="800" fill="#101A24">{b.count}</text>
+            <text x={cx} y={height - 12} textAnchor="middle" fontSize="10.5" fontWeight="800" fill="#8A8A8A">{b.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 const JOURNEY_STAGE_COLORS = ['#5B87B8', '#4FA7B8', '#4FB88B', '#8FD673', '#C9EF7A'];
 
 // Cohort Summit Journey — a mountain-range read of where every real learner

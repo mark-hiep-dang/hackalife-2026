@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   getCohorts, createCohort, getCourses, getMockExamAnalytics, getLearnersAtRisk, getMisconceptionClusters, detectClusters,
-  getCohortRoster, addLearnerToCohort, removeLearnerFromCohort, getAllLearnerAccounts
+  getCohortRoster, addLearnerToCohort, removeLearnerFromCohort, getAllLearnerAccounts, getCohortEnrollmentTrend
 } from '../../utils/studioApi';
 import { Card, SectionTitle, Spinner, EmptyState, RiskBadge, PatternBadge, SeverityBadge, Sparkline, Button, CAMP_COLORS, TopicBarList } from '../components/ui';
-import { CircularGauge, RoundScoreChart } from '../components/charts';
+import { CircularGauge, RoundScoreChart, EnrollmentChart } from '../components/charts';
 import RescueExpeditionFlow from '../components/RescueExpeditionFlow';
 import LearnerProfile from './LearnerProfile';
 import { X, Settings, Plus, Trash2, ArrowLeft } from 'lucide-react';
@@ -28,6 +28,37 @@ function severityForCluster(affectedCount) {
 
 function initials(name) {
   return (name || '').trim().split(/\s+/).slice(-2).map((w) => w[0]).join('').toUpperCase() || '?';
+}
+
+const ENROLLMENT_GRANULARITIES = ['day', 'week', 'month'];
+const MAX_ENROLLMENT_BUCKETS = { day: 14, week: 10, month: 6 };
+
+// `joinedAtDates`: raw ISO timestamp strings from studio_cohort_learners.joined_at.
+// Bucketed client-side (rather than in SQL) since the granularity is a UI toggle.
+function bucketEnrollments(joinedAtDates, granularity) {
+  const buckets = new Map();
+  for (const iso of joinedAtDates || []) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) continue;
+    let key, label;
+    if (granularity === 'day') {
+      key = d.toISOString().slice(0, 10);
+      label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    } else if (granularity === 'month') {
+      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      label = `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    } else {
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      key = weekStart.toISOString().slice(0, 10);
+      label = `${String(weekStart.getDate()).padStart(2, '0')}/${String(weekStart.getMonth() + 1).padStart(2, '0')}`;
+    }
+    const existing = buckets.get(key);
+    if (existing) existing.count += 1; else buckets.set(key, { key, label, count: 1 });
+  }
+  const sortedKeys = [...buckets.keys()].sort();
+  const maxBuckets = MAX_ENROLLMENT_BUCKETS[granularity];
+  return sortedKeys.slice(-maxBuckets).map((key) => buckets.get(key));
 }
 
 const TREND_LABEL_KEYS = {
@@ -247,6 +278,8 @@ export default function LearnersAndExams({ initialCohortId } = {}) {
   const [showAllLearners, setShowAllLearners] = useState(false);
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showCreateCohort, setShowCreateCohort] = useState(false);
+  const [enrollmentDates, setEnrollmentDates] = useState(null);
+  const [enrollmentGranularity, setEnrollmentGranularity] = useState('week');
 
   function refreshCohorts(selectId) {
     return getCohorts().then((cs) => { setCohorts(cs); if (selectId) setCohortId(selectId); else if (cs.length && !cohortId) setCohortId(cs[0].id); return cs; });
@@ -259,10 +292,11 @@ export default function LearnersAndExams({ initialCohortId } = {}) {
     getLearnersAtRisk(cohortId).then(setLearners);
     getCohortRoster(cohortId).then(setRoster);
     getMisconceptionClusters(cohortId).then(setClusters);
+    getCohortEnrollmentTrend(cohortId).then(setEnrollmentDates);
   }
   useEffect(() => {
     if (!cohortId) return;
-    setAnalytics(null); setLearners(null); setRoster(null); setClusters(null); setShowAllLearners(false);
+    setAnalytics(null); setLearners(null); setRoster(null); setClusters(null); setShowAllLearners(false); setEnrollmentDates(null);
     loadCohortData();
   }, [cohortId]);
 
@@ -368,13 +402,31 @@ export default function LearnersAndExams({ initialCohortId } = {}) {
             </div>
           </div>
 
-          <Card>
-            <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
-              <h3 className="font-comic font-extrabold text-[#101A24]">📈 {t.studioScoreByRoundTitle}</h3>
-              <span className="text-xs font-bold text-[#888]">{t.studioPassMarkCaption.replace('{score}', targetScore)}</span>
-            </div>
-            <RoundScoreChart rounds={scoredRounds} targetScore={targetScore} emptyMessage={t.studioNoTrendData} />
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
+                <h3 className="font-comic font-extrabold text-[#101A24]">📈 {t.studioScoreByRoundTitle}</h3>
+                <span className="text-xs font-bold text-[#888]">{t.studioPassMarkCaption.replace('{score}', targetScore)}</span>
+              </div>
+              <RoundScoreChart rounds={scoredRounds} targetScore={targetScore} emptyMessage={t.studioNoTrendData} />
+            </Card>
+
+            <Card>
+              <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
+                <h3 className="font-comic font-extrabold text-[#101A24]">🧑‍🎓 {t.studioEnrollmentTrendTitle}</h3>
+                <div className="flex gap-1">
+                  {ENROLLMENT_GRANULARITIES.map((g) => (
+                    <button key={g} onClick={() => setEnrollmentGranularity(g)}
+                      className={`font-comic font-extrabold text-[11px] px-2.5 py-1.5 rounded-lg transition-all ${enrollmentGranularity === g ? 'bg-[#101A24] text-white' : 'bg-[#F9FAFB] text-[#888] hover:text-[#101A24]'}`}
+                    >{t[`studioEnrollmentGranularity_${g}`]}</button>
+                  ))}
+                </div>
+              </div>
+              {enrollmentDates === null ? <Spinner label={t.studioLoading} /> : (
+                <EnrollmentChart buckets={bucketEnrollments(enrollmentDates, enrollmentGranularity)} emptyMessage={t.studioNoEnrollmentData} />
+              )}
+            </Card>
+          </div>
         </>
       )}
 

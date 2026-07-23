@@ -101,6 +101,18 @@ export default function Overview({ onNavigate }) {
   const prev = trend[trend.length - 2];
   const scoreDelta = last && prev ? Math.round(last.averageScore - prev.averageScore) : null;
 
+  // Short, real-data recap under the hero heading (spec: "18 học viên mới,
+  // điểm trung bình tăng 4 điểm") — only mentions whichever of the two
+  // actually happened this round, never a fabricated number.
+  const heroSummarySegments = [];
+  if (data.newLearnersThisWeek > 0) heroSummarySegments.push(t.studioHeroSummaryNewLearners.replace('{n}', data.newLearnersThisWeek));
+  if (scoreDelta) {
+    heroSummarySegments.push((scoreDelta > 0 ? t.studioHeroSummaryScoreUp : t.studioHeroSummaryScoreDown).replace('{n}', Math.abs(scoreDelta)));
+  }
+  const heroSummary = heroSummarySegments.length
+    ? `${t.studioHeroSummaryPrefix} ${heroSummarySegments.join(` ${t.studioHeroSummaryAnd} `)}. ${t.studioHeroSummaryCta}`
+    : '';
+
   const statCards = [
     { icon: '🎓', label: t.studioStatActiveCourses, value: data.activeCourses, bg: 'bg-brand-green', ink: 'text-brand-green-ink', shadow: '#4F9A5A', sub: null, nav: 'courses' },
     { icon: '🙋', label: t.studioStatActiveLearners, value: data.activeLearners, bg: 'bg-brand-cyan', ink: 'text-brand-cyan-ink', shadow: '#3B93A8', sub: null, nav: 'learners-exams' },
@@ -136,6 +148,7 @@ export default function Overview({ onNavigate }) {
             🎉 {t.studioHeroBadge}
           </span>
           <p className="font-comic font-extrabold text-2xl md:text-[28px] text-white leading-snug">{heroMessage}</p>
+          {heroSummary && <p className="text-[13.5px] font-bold text-white/80 leading-snug mt-2.5">{heroSummary}</p>}
         </div>
       </div>
 
