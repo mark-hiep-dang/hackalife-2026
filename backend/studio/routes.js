@@ -308,46 +308,71 @@ export function journeyStageForScore(score, stages) {
   return stages.find((s) => score <= s.maxScore) || stages[stages.length - 1];
 }
 
+// A learner's real position on Llama Learner's own Camp Map (LessonPath.jsx)
+// is simply how many of the core lessons they've completed in sequence —
+// 0 done = still at Base Camp, 1 done = now at Camp 1, etc., capped at the
+// last stage (Summit) once every lesson is done. This is the literal same
+// signal the learner sees checked off in their own app, unlike an indirect
+// mastery-score composite that can lag behind real lesson completion.
+export function journeyStageForCompletedCount(completedCount, stages) {
+  return stages[Math.min(completedCount, stages.length - 1)];
+}
+
 const EMPTY_JOURNEY = { stages: [], total: 0, medianStageKey: null, modeStageKey: null, movedForwardCount: 0, noProgressCount: 0, needsInterventionCount: 0 };
 
 // `learnersWithRisk` is the already-computed getRealLearnersWithRisk(db)
-// result (system-wide) — passed in rather than recomputed, since the
-// overview route already needs that same call for learnersNeedingAttention.
+// result (system-wide) — only consulted here for the needsIntervention
+// signal, since that risk detection is a distinct (quiz-history-based)
+// concern from real lesson-completion progress.
 export async function computeCohortJourney(db, learnersWithRisk) {
   const course = await db.get("SELECT * FROM studio_courses WHERE status = 'PUBLISHED' ORDER BY id LIMIT 1");
   if (!course) return EMPTY_JOURNEY;
 
-  const camps = await db.all('SELECT * FROM studio_camps WHERE course_id = ? ORDER BY order_index', [course.id]);
-  if (camps.length === 0) return EMPTY_JOURNEY;
+  // Stage count/labels mirror Llama Learner's own Camp Map — the fixed,
+  // real core-lesson sequence (`lessons`, ordered) every learner actually
+  // studies through — not the trainer-authored studio_camps (a separate
+  // content-authoring system that doesn't drive what a learner sees today).
+  const legacyLessons = await db.all('SELECT id FROM lessons ORDER BY order_index ASC');
+  if (legacyLessons.length === 0) return EMPTY_JOURNEY;
 
-  const stages = buildJourneyStages(camps);
+  const stages = buildJourneyStages(legacyLessons);
   const rosterRows = await db.all(
     `SELECT DISTINCT learner_id FROM studio_cohort_learners WHERE cohort_id IN (SELECT id FROM studio_cohorts WHERE course_id = ?)`,
     [course.id]
   );
-  const rosterIds = new Set(rosterRows.map((r) => r.learner_id));
+  const rosterIds = rosterRows.map((r) => r.learner_id);
   const stageCounts = Object.fromEntries(stages.map((s) => [s.key, 0]));
-  const activeIdsInRoster = new Set();
   let movedForwardCount = 0, noProgressCount = 0, needsInterventionCount = 0;
   const sevenDaysAgo = Date.now() - 7 * 86400000;
 
-  for (const learner of learnersWithRisk) {
-    if (!rosterIds.has(learner.id)) continue;
-    activeIdsInRoster.add(learner.id);
-    const stage = journeyStageForScore(learner.summitReadinessScore, stages);
+  const legacyLessonIds = new Set(legacyLessons.map((l) => l.id));
+  const riskByLearnerId = new Map((learnersWithRisk || []).map((l) => [l.id, l]));
+
+  const completionRows = rosterIds.length
+    ? await db.all(
+        `SELECT user_id, lesson_id, completed_at FROM user_lessons WHERE user_id IN (${rosterIds.map(() => '?').join(',')})`,
+        rosterIds
+      )
+    : [];
+  const completionsByLearner = new Map();
+  for (const row of completionRows) {
+    if (!legacyLessonIds.has(row.lesson_id)) continue;
+    if (!completionsByLearner.has(row.user_id)) completionsByLearner.set(row.user_id, []);
+    completionsByLearner.get(row.user_id).push(row);
+  }
+
+  for (const learnerId of rosterIds) {
+    const completions = completionsByLearner.get(learnerId) || [];
+    const stage = journeyStageForCompletedCount(completions.length, stages);
     stageCounts[stage.key]++;
-    if (learner.status === RISK_STATUS.NEEDS_HELP_NOW) needsInterventionCount++;
-    if (learner.lastActivityAt) {
-      const lastMs = new Date(learner.lastActivityAt).getTime();
+
+    if (completions.length > 0) {
+      const latestCompletedAt = completions.reduce((max, r) => (!max || r.completed_at > max ? r.completed_at : max), null);
+      const lastMs = new Date(latestCompletedAt).getTime();
       if (lastMs >= sevenDaysAgo) movedForwardCount++;
       else noProgressCount++;
     }
-  }
-  // Roster members with zero quiz activity ever (never appear in
-  // learnersWithRisk, which only covers real+active accounts) still count
-  // toward the journey total, at the first (Base Camp) stage.
-  for (const id of rosterIds) {
-    if (!activeIdsInRoster.has(id)) stageCounts[stages[0].key]++;
+    if (riskByLearnerId.get(learnerId)?.status === RISK_STATUS.NEEDS_HELP_NOW) needsInterventionCount++;
   }
 
   const stagesOut = stages.map((s) => ({ key: s.key, icon: s.icon, label: s.label, count: stageCounts[s.key] }));
